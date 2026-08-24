@@ -3,60 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Perizinan Al-Islam</title>
+    <title>Sistem Perizinan Santri Al-Islam</title>
     
-    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        emerald: {
-                            50: '#ecfdf5',
-                            100: '#d1fae5',
-                            500: '#10b981',
-                            600: '#059669',
-                            700: '#047857',
-                            800: '#065f46',
-                            900: '#064e3b',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-
-    <!-- Load React & ReactDOM -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Load Babel for JSX parsing in browser -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-    <!-- Custom minimal CSS for animations -->
     <style>
-        .animate-fade-in-down {
-            animation: fadeInDown 0.3s ease-out;
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9fafb;
+        }
+        /* Custom scrollbar untuk tabel */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
         }
         @keyframes fadeInDown {
             from { opacity: 0; transform: translateY(-10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+        .animate-fade-in-down {
+            animation: fadeInDown 0.3s ease-out forwards;
+        }
     </style>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, createContext, useContext } = React;
+        const { useState, useEffect, createContext, useContext, useMemo } = React;
 
-        // --- CONFIGURATION & ENVIRONMENT ---
-        const API_BASE_URL = ''; 
-        const USE_MOCK_API = true;
+        const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbyddspvXA3vpGmDpHYjm5-uOlbEdSbDTYygeHsNv192SokqVrEKwBxiZAkYXVscTomM/exec';
+        const USE_MOCK_API = false; // Diubah ke false agar menggunakan GAS asli milik Anda
 
-        // --- CONSTANTS ---
         const ROLES = {
             ADMIN: 'ADMIN',
             WALI_KELAS: 'WALI_KELAS',
@@ -64,20 +58,22 @@
             SECURITY: 'SECURITY'
         };
 
-        // --- ICONS (SVG Inline) ---
         const Icons = {
             Home: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
             Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
             FileText: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>,
             Scan: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>,
             Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+            LogOut: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
+            Menu: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>,
+            CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>,
             XCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>,
             Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
             Edit: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>,
-            Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>,
+            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
         };
 
-        // --- CONTEXTS ---
         const AuthContext = createContext(null);
         const ToastContext = createContext(null);
 
@@ -87,38 +83,40 @@
                     return new Promise((resolve, reject) => {
                         setTimeout(() => {
                             if (action === 'login') {
-                                if (payload.username === 'admin' && payload.password === '123') resolve({ success: true, data: { user_id: 'U001', username: 'admin', nama: 'Administrator', role: ROLES.ADMIN } });
-                                else if (payload.username === 'walikelas' && payload.password === '123') resolve({ success: true, data: { user_id: 'U002', username: 'walikelas', nama: 'Ust. Ahmad', role: ROLES.WALI_KELAS, kelas_id: 'K01' } });
-                                else if (payload.username === 'sekretaris' && payload.password === '123') resolve({ success: true, data: { user_id: 'U003', username: 'sekretaris', nama: 'Ust. Budi', role: ROLES.SEKRETARIS_MUDIR } });
-                                else if (payload.username === 'security' && payload.password === '123') resolve({ success: true, data: { user_id: 'U004', username: 'security', nama: 'Pak Satpam', role: ROLES.SECURITY } });
-                                else reject(new Error("Username atau password salah"));
-                            } else if (action === 'getDashboard') {
-                                resolve({ success: true, data: { totalIzin: 15, disetujui: 10, ditolak: 2, menunggu: 3, keluar: 8, kembali: 2, terlambat: 0 } });
+                                if (payload.username === 'admin') resolve({ success: true, data: { user_id: 'U1', nama: 'Admin', role: ROLES.ADMIN } });
+                                else reject(new Error("Mock Login Failed"));
                             } else if (action === 'getSantri') {
                                 resolve({ success: true, data: [
-                                    { santri_id: 'S001', nama: 'Ahmad Fulan', jk: 'Laki-laki', jenjang: 'SMP', kelas: 'VII-A', kota_asal: 'Cirebon', nama_ayah: 'Budi', no_telp: '08123456789', status: 'Aktif' },
-                                    { santri_id: 'S002', nama: 'Fatimah Az-Zahra', jk: 'Perempuan', jenjang: 'SMA', kelas: 'X-B', kota_asal: 'Bandung', nama_ayah: 'Andi', no_telp: '08198765432', status: 'Aktif' },
-                                    { santri_id: 'S003', nama: 'Umar bin Khattab', jk: 'Laki-laki', jenjang: 'SMA', kelas: 'XI-A', kota_asal: 'Jakarta', nama_ayah: 'Tono', no_telp: '08561234567', status: 'Aktif' }
+                                    { santri_id: 'S001', nama: 'Ahmad Fulan', jk: 'Laki-laki', jenjang: 'SMP', kelas: 'VII-A', kota_asal: 'Cirebon', nama_ayah: 'Budi', no_telp: '0812' }
                                 ]});
-                            } else if (action === 'saveSantri') {
-                                resolve({ success: true, message: 'Data santri berhasil disimpan' });
                             } else {
                                 resolve({ success: true, data: {} });
                             }
                         }, 800);
                     });
                 }
-                
+
                 try {
                     const response = await fetch(API_BASE_URL, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                        body: JSON.stringify({ action, ...payload })
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Wajib text/plain untuk GAS CORS
+                        body: JSON.stringify({ action, ...payload }),
+                        redirect: 'follow'
                     });
-                    const data = await response.json();
+                    
+                    const text = await response.text();
+                    let data;
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        console.error("Bukan JSON:", text);
+                        throw new Error("Gagal terhubung. Pastikan Google Apps Script sudah di 'New Deployment'.");
+                    }
+
                     if (!data.success) throw new Error(data.message || 'Terjadi kesalahan dari server.');
                     return data;
                 } catch (error) {
+                    console.error('API Error:', error);
                     throw error;
                 }
             }
@@ -142,10 +140,11 @@
             );
         };
 
-        const Input = ({ label, type = "text", value, onChange, placeholder, required }) => (
+        const Input = ({ label, type = "text", value, onChange, placeholder, required, name }) => (
             <div className="mb-4">
                 {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
                 <input
+                    name={name}
                     type={type}
                     value={value}
                     onChange={onChange}
@@ -156,12 +155,14 @@
             </div>
         );
 
-        const Select = ({ label, value, onChange, options, required }) => (
+        const Select = ({ label, value, onChange, options, required, name }) => (
             <div className="mb-4">
                 {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
-                <select value={value} onChange={onChange} required={required} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors bg-white">
+                <select name={name} value={value} onChange={onChange} required={required} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white">
                     <option value="">-- Pilih --</option>
-                    {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                    {options.map((opt, idx) => (
+                        <option key={idx} value={opt}>{opt}</option>
+                    ))}
                 </select>
             </div>
         );
@@ -178,7 +179,7 @@
 
         const Toast = ({ message, type, onClose }) => {
             useEffect(() => {
-                const timer = setTimeout(onClose, 3000);
+                const timer = setTimeout(onClose, 4000);
                 return () => clearTimeout(timer);
             }, [onClose]);
 
@@ -209,6 +210,9 @@
 
             if (!user) return null;
 
+            // Proteksi aman dari error jika backend memberikan respon role yang salah
+            const safeRole = user?.role || 'UNKNOWN';
+
             const menuItems = {
                 [ROLES.ADMIN]: [
                     { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
@@ -231,13 +235,15 @@
                 ]
             };
 
-            const currentMenu = menuItems[user.role] || [];
+            const currentMenu = menuItems[safeRole] || [];
 
             return (
                 <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
                     <div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center sticky top-0 z-20">
                         <div className="font-bold text-emerald-700">Al-Islam Permit</div>
-                        <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-600"><Icons.Menu /></button>
+                        <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-600">
+                            <Icons.Menu />
+                        </button>
                     </div>
 
                     <div className={`fixed md:static inset-y-0 left-0 w-64 bg-white border-r transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out z-30 flex flex-col`}>
@@ -245,14 +251,22 @@
                             <h1 className="font-bold text-xl text-emerald-700 leading-tight">Sistem Perizinan<br/><span className="text-sm text-gray-500 font-normal">PPM Al-Islam</span></h1>
                         </div>
                         <div className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-                            <div className="mb-6 px-4 py-3 bg-emerald-50 rounded-lg text-sm">
+                            <div className="mb-6 px-4 py-3 bg-emerald-50 rounded-lg text-sm border border-emerald-100">
                                 <p className="text-gray-500">Masuk sebagai:</p>
-                                <p className="font-semibold text-emerald-800">{user.nama}</p>
-                                <p className="text-xs text-emerald-600 mt-1 uppercase tracking-wider font-bold">{user.role.replace('_', ' ')}</p>
+                                <p className="font-semibold text-emerald-800">{user.nama || 'Pengguna'}</p>
+                                <p className="text-xs text-emerald-600 mt-1 uppercase tracking-wider font-bold">{safeRole.replace('_', ' ')}</p>
                             </div>
-                            {currentMenu.map(item => (
-                                <SidebarItem key={item.id} icon={item.icon} label={item.label} active={currentRoute === item.id} onClick={() => { setCurrentRoute(item.id); setSidebarOpen(false); }} />
-                            ))}
+                            {currentMenu.length > 0 ? currentMenu.map(item => (
+                                <SidebarItem
+                                    key={item.id}
+                                    icon={item.icon}
+                                    label={item.label}
+                                    active={currentRoute === item.id}
+                                    onClick={() => { setCurrentRoute(item.id); setSidebarOpen(false); }}
+                                />
+                            )) : (
+                                <p className="text-red-500 text-sm px-4">Error Role: Menu tidak tersedia.</p>
+                            )}
                         </div>
                         <div className="p-4 border-t">
                             <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-red-600 hover:bg-red-50 transition-colors">
@@ -263,195 +277,129 @@
                     </div>
 
                     {isSidebarOpen && <div className="fixed inset-0 bg-black/20 z-20 md:hidden" onClick={() => setSidebarOpen(false)} />}
-                    <div className="flex-1 overflow-y-auto w-full">
+                    <div className="flex-1 overflow-y-auto h-screen">
                         <main className="p-4 md:p-8 max-w-6xl mx-auto pb-24 md:pb-8">
-                             {React.cloneElement(children, { currentRoute })}
+                            {React.cloneElement(children, { currentRoute })}
                         </main>
                     </div>
                 </div>
             );
         };
 
-        const DashboardAdmin = () => (
-            <div className="space-y-6">
-                <div><h2 className="text-2xl font-bold text-gray-800">Dashboard Admin</h2><p className="text-gray-500">Ringkasan perizinan pondok secara keseluruhan.</p></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <StatCard title="Total Pengajuan" value="42" icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
-                    <StatCard title="Santri Keluar" value="28" icon={<Icons.Scan />} color="bg-yellow-50 text-yellow-600" />
-                    <StatCard title="Santri Kembali" value="12" icon={<Icons.Users />} color="bg-emerald-50 text-emerald-600" />
-                    <StatCard title="Terlambat" value="0" icon={<Icons.Settings />} color="bg-red-50 text-red-600" />
-                </div>
-                <Card><h3 className="font-semibold text-lg mb-4">Aktivitas Terbaru</h3><div className="text-center text-gray-500 py-8 border-2 border-dashed rounded-lg">[Data Histori Aktivitas]</div></Card>
-            </div>
-        );
-
-        const DashboardWaliKelas = () => (
-            <div className="space-y-6">
-                <div><h2 className="text-2xl font-bold text-gray-800">Dashboard Wali Kelas</h2><p className="text-gray-500">Pantau status perizinan santri di kelas Anda.</p></div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <StatCard title="Total Santri" value="32" icon={<Icons.Users />} color="bg-blue-50 text-blue-600" />
-                    <StatCard title="Izin Menunggu" value="3" icon={<Icons.FileText />} color="bg-yellow-50 text-yellow-600" />
-                    <StatCard title="Izin Disetujui" value="5" icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
-                </div>
-                <Button icon={<Icons.FileText />}>Ajukan Izin Baru</Button>
-            </div>
-        );
-
-        const DashboardSecretary = () => {
-            const [stats, setStats] = useState({ menunggu: 0, disetujui: 0, keluar: 0, terlambat: 0 });
-            useEffect(() => {
-                apiService.request('getDashboard').then(res => setStats(res.data));
-            }, []);
-
-            return (
-                <div className="space-y-6">
-                    <div><h2 className="text-2xl font-bold text-gray-800">Dashboard Sekretaris Mudir</h2><p className="text-gray-500">Pemantauan real-time status izin santri.</p></div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <StatCard title="Menunggu Screening" value={stats.menunggu} icon={<Icons.FileText />} color="bg-yellow-50 text-yellow-600" />
-                        <StatCard title="Izin Disetujui" value={stats.disetujui} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
-                        <StatCard title="Santri Keluar" value={stats.keluar} icon={<Icons.Scan />} color="bg-blue-50 text-blue-600" />
-                        <StatCard title="Terlambat" value={stats.terlambat} icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
-                    </div>
-                </div>
-            );
-        };
-
-        const ScannerSecurity = () => (
-            <div className="max-w-md mx-auto space-y-6 mt-4 text-center">
-                <h2 className="text-2xl font-bold text-gray-800">Scanner Keamanan</h2>
-                <Card className="aspect-square bg-gray-900 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden">
-                    <div className="absolute inset-4 border-2 border-dashed border-emerald-500/50 rounded-xl" />
-                    <Icons.Scan />
-                    <p className="text-emerald-500 mt-4 text-sm">Meminta akses kamera...</p>
-                </Card>
-                <div className="flex gap-2">
-                    <Button fullWidth variant="secondary">Riwayat Hari Ini</Button>
-                    <Button fullWidth variant="danger">Lapor Masalah</Button>
-                </div>
-            </div>
-        );
-
-        const Modal = ({ isOpen, onClose, title, children }) => {
-            if (!isOpen) return null;
-            return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fade-in-down">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
-                        <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
-                            <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
-                            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icons.XCircle /></button>
-                        </div>
-                        <div className="p-6 overflow-y-auto flex-1">{children}</div>
-                    </div>
-                </div>
-            );
-        };
-
-        const MasterSantri = () => {
+        const DataSantriPage = () => {
             const { showToast } = useContext(ToastContext);
-            const [santriList, setSantriList] = useState([]);
+            const [santri, setSantri] = useState([]);
             const [loading, setLoading] = useState(true);
-            const [searchTerm, setSearchTerm] = useState('');
+            const [search, setSearch] = useState('');
             const [isModalOpen, setIsModalOpen] = useState(false);
-            const [isSubmitting, setIsSubmitting] = useState(false);
+            const [editingData, setEditingData] = useState(null);
             
             const initialForm = { santri_id: '', nama: '', jk: '', jenjang: '', kelas: '', kota_asal: '', nama_ayah: '', no_telp: '', status: 'Aktif' };
             const [formData, setFormData] = useState(initialForm);
+            const [saving, setSaving] = useState(false);
+
+            useEffect(() => {
+                fetchSantri();
+            }, []);
 
             const fetchSantri = async () => {
                 setLoading(true);
                 try {
                     const res = await apiService.request('getSantri');
-                    setSantriList(res.data);
-                } catch (e) {
-                    showToast('Gagal memuat data santri', 'error');
+                    setSantri(res.data || []);
+                } catch (err) {
+                    showToast(err.message, 'error');
                 } finally {
                     setLoading(false);
                 }
             };
 
-            useEffect(() => { fetchSantri(); }, []);
+            const filteredSantri = useMemo(() => {
+                return santri.filter(s => s.nama.toLowerCase().includes(search.toLowerCase()) || (s.kelas && s.kelas.toLowerCase().includes(search.toLowerCase())));
+            }, [santri, search]);
 
-            const handleEdit = (santri) => {
-                setFormData(santri);
+            const handleOpenModal = (data = null) => {
+                if (data) {
+                    setEditingData(data);
+                    setFormData(data);
+                } else {
+                    setEditingData(null);
+                    setFormData(initialForm);
+                }
                 setIsModalOpen(true);
             };
 
-            const handleAdd = () => {
-                setFormData(initialForm);
-                setIsModalOpen(true);
-            };
+            const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                setIsSubmitting(true);
+                setSaving(true);
                 try {
+                    // Panggil API saveSantri
                     await apiService.request('saveSantri', formData);
-                    showToast('Data santri berhasil disimpan', 'success');
+                    showToast('Data santri berhasil disimpan!', 'success');
                     setIsModalOpen(false);
-                    fetchSantri(); // Refresh
-                } catch (e) {
-                    showToast(e.message || 'Gagal menyimpan data', 'error');
+                    fetchSantri(); // Refresh table
+                } catch (err) {
+                    showToast(err.message, 'error');
                 } finally {
-                    setIsSubmitting(false);
+                    setSaving(false);
                 }
             };
 
-            const filteredSantri = santriList.filter(s => s.nama.toLowerCase().includes(searchTerm.toLowerCase()) || s.kelas.toLowerCase().includes(searchTerm.toLowerCase()));
-
             return (
-                <div className="space-y-6">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="space-y-6 animate-fade-in-down">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
-                            <h2 className="text-2xl font-bold text-gray-800">Data Santri</h2>
-                            <p className="text-gray-500">Kelola master data santri pondok.</p>
+                            <h2 className="text-2xl font-bold text-gray-800">Master Data Santri</h2>
+                            <p className="text-gray-500">Kelola informasi santri aktif pondok pesantren.</p>
                         </div>
-                        <Button onClick={handleAdd} icon={<Icons.Plus />}>Tambah Santri</Button>
+                        <Button onClick={() => handleOpenModal()} icon={<Icons.Plus />}>
+                            <Icons.Plus /> Tambah Santri
+                        </Button>
                     </div>
 
-                    <Card className="p-0 overflow-hidden">
-                        <div className="p-4 border-b bg-gray-50 flex items-center">
-                            <div className="relative w-full max-w-md">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><Icons.Search /></div>
-                                <input type="text" placeholder="Cari nama atau kelas..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" />
-                            </div>
+                    <Card>
+                        <div className="flex mb-4 items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200 w-full md:w-1/3">
+                            <Icons.Search />
+                            <input 
+                                type="text" placeholder="Cari nama atau kelas..." 
+                                className="bg-transparent border-none outline-none w-full text-sm"
+                                value={search} onChange={(e) => setSearch(e.target.value)}
+                            />
                         </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
+
+                        <div className="overflow-x-auto rounded-lg border border-gray-200">
+                            <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
                                 <thead>
-                                    <tr className="bg-white border-b text-sm text-gray-500 uppercase tracking-wider">
-                                        <th className="p-4 font-medium">ID / Nama Santri</th>
-                                        <th className="p-4 font-medium">Jenjang & Kelas</th>
-                                        <th className="p-4 font-medium">Gender</th>
-                                        <th className="p-4 font-medium">Status</th>
-                                        <th className="p-4 font-medium text-right">Aksi</th>
+                                    <tr className="bg-gray-100 text-gray-700">
+                                        <th className="p-4 font-semibold">Nama Santri</th>
+                                        <th className="p-4 font-semibold">L/P</th>
+                                        <th className="p-4 font-semibold">Kelas</th>
+                                        <th className="p-4 font-semibold">Kota Asal</th>
+                                        <th className="p-4 font-semibold">Status</th>
+                                        <th className="p-4 font-semibold text-center">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {loading ? (
-                                        <tr><td colSpan="5" className="text-center p-8 text-gray-500">Memuat data...</td></tr>
+                                        <tr><td colSpan="6" className="p-8 text-center text-gray-500">Memuat data dari Google Sheets...</td></tr>
                                     ) : filteredSantri.length === 0 ? (
-                                        <tr><td colSpan="5" className="text-center p-8 text-gray-500">Tidak ada data ditemukan.</td></tr>
+                                        <tr><td colSpan="6" className="p-8 text-center text-gray-500">Tidak ada data ditemukan.</td></tr>
                                     ) : (
-                                        filteredSantri.map((santri, i) => (
-                                            <tr key={i} className="hover:bg-gray-50 transition-colors">
+                                        filteredSantri.map(s => (
+                                            <tr key={s.santri_id} className="hover:bg-gray-50 transition-colors">
+                                                <td className="p-4 font-medium text-gray-800">{s.nama}</td>
+                                                <td className="p-4 text-gray-600">{s.jk === 'Laki-laki' ? 'L' : 'P'}</td>
+                                                <td className="p-4"><span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">{s.jenjang} - {s.kelas}</span></td>
+                                                <td className="p-4 text-gray-600">{s.kota_asal}</td>
                                                 <td className="p-4">
-                                                    <div className="font-medium text-gray-900">{santri.nama}</div>
-                                                    <div className="text-xs text-gray-500 font-mono">{santri.santri_id || 'Belum ada ID'}</div>
-                                                </td>
-                                                <td className="p-4">
-                                                    <div className="text-gray-900">{santri.kelas}</div>
-                                                    <div className="text-xs text-gray-500">{santri.jenjang}</div>
-                                                </td>
-                                                <td className="p-4 text-gray-700">{santri.jk}</td>
-                                                <td className="p-4">
-                                                    <span className={`px-2 py-1 text-xs rounded-full font-medium ${santri.status === 'Aktif' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                                                        {santri.status}
+                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${s.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                                                        {s.status}
                                                     </span>
                                                 </td>
-                                                <td className="p-4 text-right">
-                                                    <button onClick={() => handleEdit(santri)} className="p-2 text-gray-400 hover:text-emerald-600 transition-colors rounded-lg hover:bg-emerald-50" title="Edit">
-                                                        <Icons.Edit />
-                                                    </button>
+                                                <td className="p-4 flex justify-center gap-2">
+                                                    <button onClick={() => handleOpenModal(s)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Icons.Edit /></button>
                                                 </td>
                                             </tr>
                                         ))
@@ -461,27 +409,61 @@
                         </div>
                     </Card>
 
-                    <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={formData.santri_id ? "Edit Data Santri" : "Tambah Santri Baru"}>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Input label="Nama Lengkap" value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value})} required placeholder="Contoh: Ahmad Fulan" />
-                                <Select label="Jenis Kelamin" value={formData.jk} onChange={e => setFormData({...formData, jk: e.target.value})} required options={[{value: 'Laki-laki', label: 'Laki-laki'}, {value: 'Perempuan', label: 'Perempuan'}]} />
-                                <Select label="Jenjang" value={formData.jenjang} onChange={e => setFormData({...formData, jenjang: e.target.value})} required options={[{value: 'SMP', label: 'SMP'}, {value: 'SMA', label: 'SMA'}]} />
-                                <Input label="Kelas Aktif" value={formData.kelas} onChange={e => setFormData({...formData, kelas: e.target.value})} required placeholder="Contoh: VII-A" />
-                                <Input label="Kota Asal" value={formData.kota_asal} onChange={e => setFormData({...formData, kota_asal: e.target.value})} required placeholder="Contoh: Cirebon" />
-                                <Input label="Nama Ayah / Wali" value={formData.nama_ayah} onChange={e => setFormData({...formData, nama_ayah: e.target.value})} required placeholder="Nama orang tua/wali" />
-                                <Input label="No. Telepon / WhatsApp" value={formData.no_telp} onChange={e => setFormData({...formData, no_telp: e.target.value})} required placeholder="08..." />
-                                <Select label="Status Santri" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} required options={[{value: 'Aktif', label: 'Aktif'}, {value: 'Nonaktif', label: 'Nonaktif'}, {value: 'Lulus', label: 'Lulus'}]} />
+                    {/* MODAL FORM TAMBAH/EDIT */}
+                    {isModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+                            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-fade-in-down">
+                                <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                                    <h3 className="text-xl font-bold text-gray-800">{editingData ? 'Edit Data Santri' : 'Tambah Santri Baru'}</h3>
+                                    <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><Icons.XCircle /></button>
+                                </div>
+                                <div className="p-6 overflow-y-auto max-h-[70vh]">
+                                    <form id="santriForm" onSubmit={handleSubmit} className="space-y-4">
+                                        <Input name="nama" label="Nama Lengkap Santri" required value={formData.nama} onChange={handleChange} />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <Select name="jk" label="Jenis Kelamin" required options={['Laki-laki', 'Perempuan']} value={formData.jk} onChange={handleChange} />
+                                            <Select name="jenjang" label="Jenjang" required options={['SMP', 'SMA']} value={formData.jenjang} onChange={handleChange} />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <Input name="kelas" label="Kelas (Contoh: VII-A)" required value={formData.kelas} onChange={handleChange} />
+                                            <Input name="kota_asal" label="Kota Asal" required value={formData.kota_asal} onChange={handleChange} />
+                                        </div>
+                                        <Input name="nama_ayah" label="Nama Ayah" required value={formData.nama_ayah} onChange={handleChange} />
+                                        <Input name="no_telp" label="Nomor Telepon (WA)" required value={formData.no_telp} onChange={handleChange} />
+                                        <Select name="status" label="Status Santri" required options={['Aktif', 'Nonaktif', 'Lulus']} value={formData.status} onChange={handleChange} />
+                                    </form>
+                                </div>
+                                <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+                                    <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Batal</Button>
+                                    <Button type="submit" onClick={(e) => { e.preventDefault(); document.getElementById('santriForm').requestSubmit(); }} disabled={saving}>
+                                        {saving ? 'Menyimpan...' : 'Simpan Data'}
+                                    </Button>
+                                </div>
                             </div>
-                            <div className="flex justify-end gap-3 pt-4 border-t mt-6">
-                                <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Batal</Button>
-                                <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Menyimpan...' : 'Simpan Data'}</Button>
-                            </div>
-                        </form>
-                    </Modal>
+                        </div>
+                    )}
                 </div>
             );
         };
+
+        const DashboardAdmin = () => (
+            <div className="space-y-6">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800">Dashboard Admin</h2>
+                    <p className="text-gray-500">Ringkasan perizinan pondok secara keseluruhan.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <StatCard title="Total Pengajuan Hari Ini" value="0" icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
+                    <StatCard title="Santri Keluar" value="0" icon={<Icons.Scan />} color="bg-yellow-50 text-yellow-600" />
+                    <StatCard title="Santri Kembali" value="0" icon={<Icons.Users />} color="bg-emerald-50 text-emerald-600" />
+                    <StatCard title="Terlambat" value="0" icon={<Icons.Settings />} color="bg-red-50 text-red-600" />
+                </div>
+                <Card>
+                    <h3 className="font-semibold text-lg mb-4">Integrasi Google Sheets Terhubung</h3>
+                    <p className="text-gray-600 text-sm">Dashboard statistik akan diaktifkan setelah tabel PERIZINAN dan SCAN_LOG selesai dirancang di Phase berikutnya.</p>
+                </Card>
+            </div>
+        );
 
         const LoginPage = () => {
             const { login } = useContext(AuthContext);
@@ -495,6 +477,12 @@
                 setLoading(true);
                 try {
                     const res = await apiService.request('login', { username, password });
+                    
+                    // PROTEKSI: Mencegah layar putih jika Backend (GAS) memberikan data kosong
+                    if (!res.data || !res.data.role) {
+                        throw new Error("Login ditolak oleh server. Harap pastikan Code.gs sudah di-Deploy ulang (New deployment) di Google Apps Script.");
+                    }
+
                     login(res.data);
                     showToast(`Selamat datang, ${res.data.nama}`, 'success');
                 } catch (err) {
@@ -517,14 +505,9 @@
                     <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
                         <Card className="py-8 px-4 sm:px-10">
                             <form className="space-y-6" onSubmit={handleSubmit}>
-                                <Input label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="Masukkan username" />
-                                <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" />
+                                <Input name="username" label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="Masukkan username" />
+                                <Input name="password" label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" />
                                 
-                                <div className="bg-blue-50 text-blue-800 p-3 rounded text-xs">
-                                    <strong>Mode Mock Aktif.</strong> Coba login dengan: <br/>
-                                    admin/123, walikelas/123, sekretaris/123, security/123
-                                </div>
-
                                 <Button type="submit" fullWidth disabled={loading}>
                                     {loading ? 'Memverifikasi...' : 'Masuk ke Sistem'}
                                 </Button>
@@ -541,37 +524,44 @@
             if (currentRoute === 'dashboard') {
                 switch (user.role) {
                     case ROLES.ADMIN: return <DashboardAdmin />;
-                    case ROLES.WALI_KELAS: return <DashboardWaliKelas />;
-                    case ROLES.SEKRETARIS_MUDIR: return <DashboardSecretary />;
-                    case ROLES.SECURITY: return <ScannerSecurity />;
-                    default: return <div>Unknown Role</div>;
+                    case ROLES.SEKRETARIS_MUDIR: return <div className="p-4">Dashboard Sekretaris Belum Aktif</div>;
+                    default: return <div className="p-4">Dashboard Role Ini Belum Aktif</div>;
                 }
             }
 
-            if (currentRoute === 'scanner') return <ScannerSecurity />;
-            if (currentRoute === 'master_santri') return <MasterSantri />;
+            if (currentRoute === 'master_santri' && user.role === ROLES.ADMIN) {
+                return <DataSantriPage />;
+            }
             
             return (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
                     <Icons.FileText />
                     <h3 className="mt-4 text-lg font-medium text-gray-900">Modul {currentRoute}</h3>
-                    <p className="mt-1 text-gray-500">Modul ini akan dibangun pada fase pengembangan berikutnya sesuai PRD.</p>
+                    <p className="mt-1 text-gray-500">Modul ini akan dibangun pada fase pengembangan berikutnya.</p>
                 </div>
             );
         };
 
-        const App = () => {
+        function App() {
             const [user, setUser] = useState(null);
             const [toast, setToast] = useState(null);
 
             const showToast = (message, type = 'success') => setToast({ message, type });
 
+            const authValue = {
+                user,
+                login: (userData) => setUser(userData),
+                logout: () => setUser(null)
+            };
+
             return (
                 <ToastContext.Provider value={{ showToast }}>
-                    <AuthContext.Provider value={{ user, login: setUser, logout: () => setUser(null) }}>
+                    <AuthContext.Provider value={authValue}>
                         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
                         
-                        {!user ? <LoginPage /> : (
+                        {!user ? (
+                            <LoginPage />
+                        ) : (
                             <Layout>
                                 <MainRouter />
                             </Layout>
