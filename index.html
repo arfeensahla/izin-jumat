@@ -17,6 +17,9 @@
     <!-- QR Code Generator -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
+    <!-- NEW: HTML5 QR Code Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
     <script>
         tailwind.config = {
             theme: {
@@ -34,7 +37,6 @@
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
         .hidden { display: none !important; }
         
-        /* Spinner Animation */
         .loader {
             border: 3px solid #f3f3f3;
             border-top: 3px solid #22c55e;
@@ -45,12 +47,14 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Toast Animation */
-        @keyframes slideInRight {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         .toast-enter { animation: slideInRight 0.3s ease-out forwards; }
+        
+        /* CSS Untuk override styling default library scanner */
+        #qr-reader { width: 100%; border: none !important; border-radius: 12px; overflow: hidden; background: #000; }
+        #qr-reader__scan_region { background: #000; min-height: 250px; }
+        #qr-reader__dashboard_section_csr button { background-color: #16a34a; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-family: 'Inter'; font-weight: 500; margin: 4px; }
+        #qr-reader__dashboard_section_swaplink { color: #16a34a; text-decoration: none; font-weight: 500; margin-top:10px; display:inline-block; }
     </style>
 </head>
 <body class="text-slate-800 antialiased h-screen overflow-hidden">
@@ -93,10 +97,9 @@
         </div>
     </div>
 
-    <!-- Main App View (Shell) -->
+    <!-- Main App View -->
     <div id="view-app" class="flex h-screen w-full hidden">
         
-        <!-- Mobile Overlay -->
         <div id="mobile-overlay" class="fixed inset-0 bg-slate-900/50 z-20 hidden lg:hidden" onclick="App.ui.toggleSidebar()"></div>
 
         <!-- Sidebar -->
@@ -106,9 +109,7 @@
                 AL-ISLAM
             </div>
             
-            <div class="flex-1 overflow-y-auto py-4 px-3" id="sidebar-menu">
-                <!-- Menu items injected dynamically via JS based on Role -->
-            </div>
+            <div class="flex-1 overflow-y-auto py-4 px-3" id="sidebar-menu"></div>
 
             <div class="p-4 bg-slate-900 border-t border-slate-800">
                 <div class="flex items-center gap-3 mb-4">
@@ -124,7 +125,7 @@
             </div>
         </aside>
 
-        <!-- Main Content Area -->
+        <!-- Main Content -->
         <main class="flex-1 flex flex-col min-w-0 bg-slate-50">
             <!-- Topbar -->
             <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 z-10 flex-shrink-0">
@@ -139,235 +140,135 @@
                 </div>
             </header>
 
-            <!-- Dynamic Content Container -->
-            <div id="content-area" class="flex-1 overflow-y-auto p-4 lg:p-8">
-                <!-- Content injected here -->
-            </div>
+            <!-- Content Container -->
+            <div id="content-area" class="flex-1 overflow-y-auto p-4 lg:p-8"></div>
         </main>
     </div>
 
     <script>
-        /**
-         * APPLICATION CORE
-         * Phase 1: Foundation & Auth
-         */
-        
-        // PENTING: Ganti dengan URL Google Apps Script Web App Anda setelah di-deploy
-        const API_URL = "https://script.google.com/macros/s/AKfycby8bTXMgdLeVoCaT29KdqbQqIm0ms_LwzPc0G7hsXjUwPLYJe3J2aWc4pfORhfQ5v0Tpw/exec"; 
+        const API_URL = "https://script.google.com/macros/s/AKfycby8bTXMgdLeVoCaT29KdqbQqIm0ms_LwzPc0G7hsXjUwPLYJe3J2aWc4pfORhfQ5v0Tpw/exec";
 
         const App = {
             state: {
-                user: null,
-                token: null,
-                currentView: 'dashboard'
+                user: null, token: null, currentView: 'dashboard',
+                html5QrcodeScanner: null // NEW: Save scanner instance
             },
 
             // --- API CLIENT ---
             api: {
                 async post(action, data = {}) {
-                    // Cek jika API_URL belum di set
-                    if(API_URL.includes("REPLACE_ME_LATER") && action === 'login') {
-                         return {
-                             success: true, 
-                             data: {
-                                 token: "mock-token",
-                                 user: { user_id: "1", nama: "Developer Mode", role: "ADMIN" }
-                             }
-                         };
-                    }
-
                     try {
                         const payload = { action, data };
-                        // Jika ada token, masukkan ke payload data
-                        if (App.state.token) {
-                            payload.data.token = App.state.token;
-                        }
+                        if (App.state.token) payload.data.token = App.state.token;
 
                         const response = await fetch(API_URL, {
                             method: "POST",
-                            headers: { "Content-Type": "text/plain;charset=utf-8" }, // Mencegah preflight CORS issues di GAS
+                            headers: { "Content-Type": "text/plain;charset=utf-8" },
                             body: JSON.stringify(payload)
                         });
 
                         const result = await response.json();
-                        if (!result.success) {
-                            throw new Error(result.message || "Terjadi kesalahan server");
-                        }
+                        if (!result.success) throw new Error(result.message || "Kesalahan server");
                         return result;
                     } catch (error) {
-                        console.error(`API Error [${action}]:`, error);
-                        throw new Error(error.message === "Failed to fetch" ? "Koneksi ke server gagal. Periksa jaringan Anda." : error.message);
+                        throw new Error(error.message === "Failed to fetch" ? "Koneksi jaringan gagal." : error.message);
                     }
                 }
             },
 
             // --- AUTHENTICATION ---
             auth: {
-                async init() {
+                init() {
                     const savedToken = localStorage.getItem('al_islam_token');
                     const savedUser = localStorage.getItem('al_islam_user');
-
                     if (savedToken && savedUser) {
                         App.state.token = savedToken;
                         App.state.user = JSON.parse(savedUser);
-                        
-                        // Secara background, verifikasi token (opsional di MVP, asumsikan valid dulu agar cepat)
                         App.ui.showApp();
-                    } else {
-                        App.ui.showLogin();
-                    }
-
+                    } else { App.ui.showLogin(); }
                     this.bindEvents();
                 },
-
                 bindEvents() {
                     document.getElementById('form-login').addEventListener('submit', async (e) => {
                         e.preventDefault();
-                        const btn = document.getElementById('btn-login');
-                        const loader = document.getElementById('login-loader');
-                        const username = document.getElementById('login-username').value;
-                        const password = document.getElementById('login-password').value;
-
-                        // UI Loading state
-                        btn.disabled = true;
-                        loader.classList.remove('hidden');
+                        const btn = document.getElementById('btn-login'), loader = document.getElementById('login-loader');
+                        const username = document.getElementById('login-username').value, password = document.getElementById('login-password').value;
+                        btn.disabled = true; loader.classList.remove('hidden');
 
                         try {
                             const res = await App.api.post('login', { username, password });
-                            
-                            App.state.token = res.data.token;
-                            App.state.user = res.data.user;
-                            
+                            App.state.token = res.data.token; App.state.user = res.data.user;
                             localStorage.setItem('al_islam_token', res.data.token);
                             localStorage.setItem('al_islam_user', JSON.stringify(res.data.user));
-                            
-                            App.ui.showToast('Login berhasil', 'success');
                             App.ui.showApp();
-                            
-                        } catch (error) {
-                            App.ui.showToast(error.message, 'error');
-                        } finally {
-                            btn.disabled = false;
-                            loader.classList.add('hidden');
-                        }
+                            // Redirect otomatis jika security
+                            if(App.state.user.role === 'SECURITY') App.router.navigate('scanner');
+                        } catch (error) { App.ui.showToast(error.message, 'error'); } 
+                        finally { btn.disabled = false; loader.classList.add('hidden'); }
                     });
                 },
-
                 logout() {
-                    App.state.token = null;
-                    App.state.user = null;
-                    localStorage.removeItem('al_islam_token');
-                    localStorage.removeItem('al_islam_user');
+                    App.state.token = null; App.state.user = null;
+                    localStorage.removeItem('al_islam_token'); localStorage.removeItem('al_islam_user');
                     document.getElementById('form-login').reset();
+                    // Matikan kamera jika logout saat scanner terbuka
+                    if(App.state.html5QrcodeScanner) {
+                        try { App.state.html5QrcodeScanner.clear(); } catch(e) {}
+                    }
                     App.ui.showLogin();
                 }
             },
 
-            // --- UI & ROUTING ---
+            // --- UI HELPERS ---
             ui: {
                 showModal(htmlContent) {
-                    const container = document.getElementById('modal-container');
-                    const content = document.getElementById('modal-content');
+                    const container = document.getElementById('modal-container'), content = document.getElementById('modal-content');
                     content.innerHTML = htmlContent;
-                    
                     container.classList.remove('hidden');
-                    // Small delay to trigger animation
-                    setTimeout(() => {
-                        container.classList.remove('opacity-0');
-                        content.classList.remove('scale-95');
-                    }, 10);
+                    setTimeout(() => { container.classList.remove('opacity-0'); content.classList.remove('scale-95'); }, 10);
                 },
-
                 closeModal() {
-                    const container = document.getElementById('modal-container');
-                    const content = document.getElementById('modal-content');
-                    
-                    container.classList.add('opacity-0');
-                    content.classList.add('scale-95');
+                    const container = document.getElementById('modal-container'), content = document.getElementById('modal-content');
+                    container.classList.add('opacity-0'); content.classList.add('scale-95');
                     setTimeout(() => container.classList.add('hidden'), 300);
                 },
-
-                showLogin() {
-                    document.getElementById('view-app').classList.add('hidden');
-                    document.getElementById('view-login').classList.remove('hidden');
-                },
-
+                showLogin() { document.getElementById('view-app').classList.add('hidden'); document.getElementById('view-login').classList.remove('hidden'); },
                 showApp() {
-                    document.getElementById('view-login').classList.add('hidden');
-                    document.getElementById('view-app').classList.remove('hidden');
+                    document.getElementById('view-login').classList.add('hidden'); document.getElementById('view-app').classList.remove('hidden');
+                    this.setupSidebar(); this.updateUserInfo();
                     
-                    this.setupSidebar();
-                    this.updateUserInfo();
-                    App.router.navigate('dashboard');
+                    // Route khusus untuk SECURITY, langsung masuk ke scanner
+                    if(App.state.user.role === 'SECURITY') App.router.navigate('scanner');
+                    else App.router.navigate('dashboard');
 
-                    // Set Date
                     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
                     document.getElementById('current-date').textContent = new Date().toLocaleDateString('id-ID', options);
                 },
-
                 updateUserInfo() {
-                    const user = App.state.user;
-                    if(!user) return;
+                    const user = App.state.user; if(!user) return;
                     document.getElementById('user-name').textContent = user.nama;
                     document.getElementById('user-role').textContent = user.role.replace('_', ' ');
                     document.getElementById('user-avatar').textContent = user.nama.charAt(0).toUpperCase();
                 },
-
                 toggleSidebar() {
-                    const sidebar = document.getElementById('sidebar');
-                    const overlay = document.getElementById('mobile-overlay');
-                    sidebar.classList.toggle('-translate-x-full');
-                    overlay.classList.toggle('hidden');
+                    document.getElementById('sidebar').classList.toggle('-translate-x-full');
+                    document.getElementById('mobile-overlay').classList.toggle('hidden');
                 },
-
                 showToast(message, type = 'info') {
                     const container = document.getElementById('toast-container');
                     const toast = document.createElement('div');
-                    
-                    let bg = 'bg-blue-600';
-                    let icon = 'ph-info';
+                    let bg = 'bg-blue-600', icon = 'ph-info';
                     if(type === 'success') { bg = 'bg-primary-600'; icon = 'ph-check-circle'; }
                     if(type === 'error') { bg = 'bg-red-600'; icon = 'ph-warning-circle'; }
-                    if(type === 'warning') { bg = 'bg-yellow-500'; icon = 'ph-warning'; }
-
+                    
                     toast.className = `toast-enter flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white ${bg}`;
                     toast.innerHTML = `<i class="ph ${icon} text-xl"></i><span class="text-sm font-medium">${message}</span>`;
-                    
                     container.appendChild(toast);
-                    
-                    setTimeout(() => {
-                        toast.style.opacity = '0';
-                        toast.style.transform = 'translateX(100%)';
-                        toast.style.transition = 'all 0.3s ease';
-                        setTimeout(() => toast.remove(), 300);
-                    }, 3000);
+                    setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(100%)'; setTimeout(() => toast.remove(), 300); }, 3000);
                 },
-
-                renderSidebarMenu(items) {
-                    const menuContainer = document.getElementById('sidebar-menu');
-                    menuContainer.innerHTML = '';
-                    
-                    items.forEach(item => {
-                        if(item.isHeader) {
-                            menuContainer.innerHTML += `<div class="px-4 py-2 mt-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">${item.title}</div>`;
-                        } else {
-                            menuContainer.innerHTML += `
-                                <a href="#" onclick="App.router.navigate('${item.route}'); return false;" 
-                                   class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors group mb-1"
-                                   id="menu-${item.route}">
-                                    <i class="ph ${item.icon} text-lg group-hover:text-primary-500 transition-colors"></i>
-                                    ${item.title}
-                                </a>
-                            `;
-                        }
-                    });
-                },
-
                 setupSidebar() {
                     const role = App.state.user.role;
                     let menu = [];
-
-                    // Role Based Access Control UI
                     if (role === 'ADMIN') {
                         menu = [
                             { route: 'dashboard', icon: 'ph-squares-four', title: 'Dashboard' },
@@ -377,748 +278,287 @@
                             { route: 'master-tahun', icon: 'ph-calendar-blank', title: 'Tahun Pelajaran' },
                             { isHeader: true, title: 'Sistem' },
                             { route: 'jadwal', icon: 'ph-calendar-check', title: 'Jadwal Perizinan' },
-                            { route: 'reports', icon: 'ph-file-text', title: 'Laporan' },
-                            { route: 'settings', icon: 'ph-gear', title: 'Pengaturan' }
+                            { route: 'scanner', icon: 'ph-qr-code', title: 'Test Scanner' } // Untuk testing Admin
                         ];
                     } else if (role === 'SEKRETARIS_MUDIR') {
                         menu = [
                             { route: 'dashboard', icon: 'ph-squares-four', title: 'Dashboard' },
-                            { route: 'approval', icon: 'ph-check-square-offset', title: 'Approval Izin' },
-                            { route: 'monitoring', icon: 'ph-eye', title: 'Monitoring Santri' }
+                            { route: 'approval', icon: 'ph-check-square-offset', title: 'Approval Izin' }
                         ];
                     } else if (role === 'WALI_KELAS') {
                         menu = [
                             { route: 'dashboard', icon: 'ph-squares-four', title: 'Dashboard' },
                             { route: 'pengajuan', icon: 'ph-paper-plane-tilt', title: 'Ajukan Izin' },
-                            { route: 'kelas-saya', icon: 'ph-users-three', title: 'Santri Kelas' },
                             { route: 'histori', icon: 'ph-clock-counter-clockwise', title: 'Histori Izin' }
                         ];
                     } else if (role === 'SECURITY') {
                         menu = [
                             { route: 'scanner', icon: 'ph-qr-code', title: 'Scan QR' },
-                            { route: 'status-luar', icon: 'ph-sign-out', title: 'Santri Di Luar' }
+                            { route: 'dashboard', icon: 'ph-squares-four', title: 'Dashboard Info' }
                         ];
                     }
 
-                    this.renderSidebarMenu(menu);
+                    const menuContainer = document.getElementById('sidebar-menu');
+                    menuContainer.innerHTML = '';
+                    menu.forEach(item => {
+                        if(item.isHeader) {
+                            menuContainer.innerHTML += `<div class="px-4 py-2 mt-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">${item.title}</div>`;
+                        } else {
+                            menuContainer.innerHTML += `
+                                <a href="#" onclick="App.router.navigate('${item.route}'); return false;" 
+                                   class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors group mb-1"
+                                   id="menu-${item.route}">
+                                    <i class="ph ${item.icon} text-lg group-hover:text-primary-500 transition-colors"></i>${item.title}
+                                </a>
+                            `;
+                        }
+                    });
                 }
             },
 
             // --- ROUTER & VIEWS ---
             router: {
                 navigate(route) {
+                    // Bersihkan instance kamera setiap berpindah halaman agar resource terbebas
+                    if(App.state.html5QrcodeScanner) {
+                        try { App.state.html5QrcodeScanner.clear(); } catch(e) {}
+                        App.state.html5QrcodeScanner = null;
+                    }
+
                     App.state.currentView = route;
-                    
-                    // Highlight active menu
-                    document.querySelectorAll('[id^="menu-"]').forEach(el => {
-                        el.classList.remove('bg-primary-500/10', 'text-primary-400');
-                        el.classList.add('text-slate-300');
-                    });
+                    document.querySelectorAll('[id^="menu-"]').forEach(el => { el.classList.remove('bg-primary-500/10', 'text-primary-400'); el.classList.add('text-slate-300'); });
                     const activeMenu = document.getElementById(`menu-${route}`);
-                    if(activeMenu) {
-                        activeMenu.classList.remove('text-slate-300');
-                        activeMenu.classList.add('bg-primary-500/10', 'text-primary-400');
-                    }
+                    if(activeMenu) { activeMenu.classList.remove('text-slate-300'); activeMenu.classList.add('bg-primary-500/10', 'text-primary-400'); }
 
-                    // Render content based on route
-                    const contentArea = document.getElementById('content-area');
+                    if(window.innerWidth < 1024) { document.getElementById('sidebar').classList.add('-translate-x-full'); document.getElementById('mobile-overlay').classList.add('hidden'); }
                     
-                    // Close sidebar on mobile after navigation
-                    if(window.innerWidth < 1024) {
-                        document.getElementById('sidebar').classList.add('-translate-x-full');
-                        document.getElementById('mobile-overlay').classList.add('hidden');
-                    }
-
-                    this.renderView(route, contentArea);
-                },
-
-                renderView(route, container) {
-                    // Titles mapping
-                    const titles = {
-                        'dashboard': 'Dashboard',
-                        'scanner': 'QR Scanner',
-                        'master-tahun': 'Data Tahun Pelajaran',
-                        'master-kelas': 'Data Kelas',
-                        'master-santri': 'Data Santri',
-                        'jadwal': 'Jadwal Perizinan (Jumat)',
-                        'pengajuan': 'Form Pengajuan Izin Santri',
-                        'histori': 'Histori & Status Izin'
-                    };
-                    document.getElementById('page-title').textContent = titles[route] || 'Halaman';
-
-                    // Show loading state while rendering/fetching
-                    container.innerHTML = `
-                        <div class="flex items-center justify-center h-full min-h-[400px]">
-                            <div class="loader w-8 h-8 border-[3px]"></div>
-                        </div>
-                    `;
-
-                    // Use setTimeout to ensure loading UI is painted before heavy ops
+                    const titles = { 'dashboard': 'Dashboard', 'scanner': 'Pos Security', 'approval': 'Approval Sekretaris', 'pengajuan': 'Ajukan Izin', 'histori': 'Histori Izin' };
+                    document.getElementById('page-title').textContent = titles[route] || 'Modul';
+                    
+                    const container = document.getElementById('content-area');
+                    container.innerHTML = `<div class="flex items-center justify-center h-full min-h-[400px]"><div class="loader w-8 h-8 border-[3px]"></div></div>`;
+                    
                     setTimeout(() => {
-                        if (route === 'dashboard') {
-                            App.views.renderDashboard(container);
-                        } else if (route === 'scanner') {
-                            App.views.renderScanner(container);
-                        } else if (App.views[route]) {
-                            App.views[route](container);
-                        } else {
-                            container.innerHTML = `
-                                <div class="bg-white p-8 rounded-xl shadow-sm border border-slate-100 text-center max-w-lg mx-auto mt-10">
-                                    <i class="ph ph-hammer text-4xl text-slate-300 mb-3"></i>
-                                    <h3 class="text-lg font-medium text-slate-800">Modul dalam Pembangunan</h3>
-                                    <p class="text-slate-500 text-sm mt-1">Halaman <b>${route}</b> akan tersedia pada fase pengembangan selanjutnya.</p>
-                                </div>
-                            `;
-                        }
+                        if (App.views[route]) App.views[route](container);
+                        else container.innerHTML = `<div class="text-center p-8"><h3 class="font-bold text-slate-600">Modul sedang disiapkan.</h3></div>`;
                     }, 50);
                 }
             },
 
-            // --- VIEW MODULES ---
             views: {
-                renderDashboard(container) {
-                    const isAdmin = App.state.user.role === 'ADMIN';
-                    
-                    container.innerHTML = `
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
-                                <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xl"><i class="ph-fill ph-file-text"></i></div>
-                                <div><p class="text-slate-500 text-sm font-medium">Total Izin Pekan Ini</p><p class="text-2xl font-bold text-slate-800">0</p></div>
-                            </div>
-                            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
-                                <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xl"><i class="ph-fill ph-sign-out"></i></div>
-                                <div><p class="text-slate-500 text-sm font-medium">Sedang Di Luar</p><p class="text-2xl font-bold text-slate-800">0</p></div>
-                            </div>
-                            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
-                                <div class="w-12 h-12 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-xl"><i class="ph-fill ph-check-circle"></i></div>
-                                <div><p class="text-slate-500 text-sm font-medium">Selesai (Kembali)</p><p class="text-2xl font-bold text-slate-800">0</p></div>
-                            </div>
-                        </div>
-                        <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 text-center relative overflow-hidden">
-                            <div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <i class="ph ph-rocket text-3xl text-slate-400"></i>
-                            </div>
-                            <h3 class="text-lg font-semibold text-slate-800 mb-2">Selamat Datang di Sistem Perizinan</h3>
-                            <p class="text-slate-500 max-w-md mx-auto">Anda masuk sebagai ${App.state.user.role}.</p>
-                            
-                            ${isAdmin ? `
-                            <div class="mt-8 p-4 bg-orange-50 border border-orange-100 rounded-lg inline-block text-left">
-                                <h4 class="font-bold text-orange-800 text-sm mb-1"><i class="ph ph-magic-wand"></i> Developer Tools</h4>
-                                <p class="text-xs text-orange-600 mb-3">Tekan tombol ini untuk mengisi database Google Sheets dengan data dummy (Tahun Pelajaran, Kelas, dan Santri).</p>
-                                <button onclick="App.actions.generateDummy()" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm">
-                                    Generate Data Dummy
-                                </button>
-                            </div>
-                            ` : ''}
-                        </div>
-                    `;
-                },
-
-                renderScanner(container) {
-                    container.innerHTML = `
-                        <div class="flex flex-col items-center justify-center h-full max-w-lg mx-auto mt-4">
-                            <div class="bg-slate-900 w-full aspect-[3/4] sm:aspect-square rounded-2xl flex items-center justify-center relative overflow-hidden shadow-2xl">
-                                <div class="absolute inset-0 flex items-center justify-center border-2 border-dashed border-slate-600 m-8 rounded-xl">
-                                    <div class="text-center">
-                                        <i class="ph ph-camera text-4xl text-slate-400 mb-2"></i>
-                                        <p class="text-slate-400 text-sm font-medium">Kamera Scanner (Fase 8)</p>
-                                    </div>
-                                </div>
-                                <div class="absolute w-full h-1 bg-primary-500 top-1/2 shadow-[0_0_15px_#22c55e]"></div>
-                            </div>
-                            <p class="mt-6 text-slate-500 text-center px-4">Arahkan kamera ke QR Code izin santri.</p>
-                        </div>
-                    `;
-                },
-
-                // Helper Table Builder
-                buildTableUI(title, btnText, theadHTML, tbodyHTML) {
-                    return `
-                        <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-                            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                                <h3 class="font-semibold text-slate-800">${title}</h3>
-                                <button class="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2">
-                                    <i class="ph ph-plus"></i> ${btnText}
-                                </button>
-                            </div>
-                            <div class="overflow-x-auto w-full">
-                                <table class="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
-                                            ${theadHTML}
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-100 text-sm">
-                                        ${tbodyHTML}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    `;
-                },
-
-                // --- RESTORED MODULES ---
+                renderDashboard(container) { /* Mockup Dashboard */ container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 text-center relative"><div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"><i class="ph ph-rocket text-3xl text-slate-400"></i></div><h3 class="text-lg font-semibold text-slate-800">Dashboard ${App.state.user.role}</h3></div>`; },
                 
-                async 'master-santri'(container) {
-                    try {
-                        const res = await App.api.post('getSantri');
-                        let tbody = '';
-                        if (res.data.length === 0) {
-                            tbody = `<tr><td colspan="6" class="p-8 text-center text-slate-400">Belum ada data santri</td></tr>`;
-                        } else {
-                            res.data.forEach(item => {
-                                tbody += `
-                                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-                                        <td class="p-4 font-medium text-slate-800">${item.nama_santri}</td>
-                                        <td class="p-4 text-slate-500">${item.jenis_kelamin === 'Laki-laki' ? 'L' : 'P'}</td>
-                                        <td class="p-4 text-slate-500">${item.jenjang}</td>
-                                        <td class="p-4 text-slate-500">${item.nama_kelas}</td>
-                                        <td class="p-4 text-slate-500">${item.kota_asal}</td>
-                                        <td class="p-4"><span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">${item.status_santri}</span></td>
-                                    </tr>
-                                `;
-                            });
-                        }
-                        const thead = `<th class="p-4">Nama Santri</th><th class="p-4">L/P</th><th class="p-4">Jenjang</th><th class="p-4">Kelas Aktif</th><th class="p-4">Kota Asal</th><th class="p-4">Status</th>`;
-                        container.innerHTML = this.buildTableUI('Direktori Santri', 'Tambah Santri', thead, tbody);
-                    } catch(e) {
-                        container.innerHTML = `<div class="p-4 text-red-600 bg-red-50 rounded-lg border border-red-100">Gagal memuat data: ${e.message}</div>`;
-                    }
+                // --- PENGELOLAAN IZIN MODULES ---
+                'pengajuan'(container) { 
+                     // [View Form Pengajuan dari Phase Sebelumnya]
+                     App.api.post('getSantriByClass').then(res => {
+                         let options = '<option value="">-- Pilih Santri --</option>';
+                         res.data.forEach(s => { options += `<option value="${s.santri_id}">${s.nama_santri}</option>`; });
+                         container.innerHTML = `<div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm p-6 sm:p-8 border border-slate-200">
+                             <h3 class="text-lg font-bold text-slate-800 mb-6 border-b border-slate-100 pb-4"><i class="ph-fill ph-paper-plane-tilt text-primary-500"></i> Form Pengajuan</h3>
+                             <form id="form-izin" class="space-y-4">
+                                <div><label class="block text-sm font-medium mb-1">Pilih Santri *</label><select id="izin-santri" required class="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none">${options}</select></div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div><label class="block text-sm font-medium mb-1">Tujuan *</label><input type="text" id="izin-tujuan" required class="w-full px-4 py-2 border rounded-lg"></div>
+                                    <div><label class="block text-sm font-medium mb-1">Keperluan *</label><input type="text" id="izin-keperluan" required class="w-full px-4 py-2 border rounded-lg"></div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div><label class="block text-sm font-medium mb-1">Penjemput *</label><input type="text" id="izin-walisafar" required class="w-full px-4 py-2 border rounded-lg"></div>
+                                    <div><label class="block text-sm font-medium mb-1">Hubungan *</label><select id="izin-hubungan" required class="w-full px-4 py-2 border rounded-lg"><option value="Ayah">Ayah</option><option value="Ibu">Ibu</option><option value="Keluarga">Keluarga</option></select></div>
+                                </div>
+                                <div class="pt-4 flex justify-end"><button type="submit" id="btn-submit-izin" class="bg-primary-600 text-white font-medium py-2 px-6 rounded-lg">Kirim Pengajuan</button></div>
+                             </form></div>`;
+                         
+                         document.getElementById('form-izin').addEventListener('submit', async (e) => {
+                             e.preventDefault(); const btn = document.getElementById('btn-submit-izin'); btn.innerHTML = 'Memproses...'; btn.disabled = true;
+                             try {
+                                 await App.api.post('createPermit', { santri_id: document.getElementById('izin-santri').value, keperluan: document.getElementById('izin-keperluan').value, tujuan: document.getElementById('izin-tujuan').value, wali_safar: document.getElementById('izin-walisafar').value, hubungan_wali: document.getElementById('izin-hubungan').value });
+                                 App.ui.showToast('Pengajuan Terkirim!', 'success'); setTimeout(() => App.router.navigate('histori'), 800);
+                             } catch(err) { App.ui.showToast(err.message, 'error'); btn.innerHTML = 'Kirim Pengajuan'; btn.disabled = false; }
+                         });
+                     });
                 },
-
-                async 'master-kelas'(container) {
-                    try {
-                        const res = await App.api.post('getClasses');
-                        let tbody = '';
-                        if (res.data.length === 0) {
-                            tbody = `<tr><td colspan="4" class="p-8 text-center text-slate-400">Belum ada data kelas</td></tr>`;
-                        } else {
-                            res.data.forEach(item => {
-                                tbody += `
-                                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-                                        <td class="p-4 font-medium text-slate-800">${item.jenjang}</td>
-                                        <td class="p-4 text-slate-800 font-bold">${item.nama_kelas}</td>
-                                        <td class="p-4 text-slate-500">${item.tahun_pelajaran_id}</td>
-                                        <td class="p-4 text-slate-500 text-sm">Wali ID: ${item.wali_kelas_id || '-'}</td>
-                                    </tr>
-                                `;
-                            });
-                        }
-                        const thead = `<th class="p-4">Jenjang</th><th class="p-4">Nama Kelas</th><th class="p-4">Tahun Pelajaran</th><th class="p-4">Wali Kelas</th>`;
-                        container.innerHTML = this.buildTableUI('Daftar Kelas', 'Tambah Kelas', thead, tbody);
-                    } catch(e) {
-                        container.innerHTML = `<div class="p-4 text-red-600 bg-red-50 rounded-lg border border-red-100">Gagal memuat data: ${e.message}</div>`;
-                    }
-                },
-
-                async 'jadwal'(container) {
-                    try {
-                        const res = await App.api.post('getSchedules');
-                        let tbody = '';
-                        res.data.forEach(item => {
-                            tbody += `
-                                <tr class="border-b border-slate-100 hover:bg-slate-50">
-                                    <td class="p-4 font-bold text-slate-700">${item.pekan}</td>
-                                    <td class="p-4 text-slate-500">${item.jenjang}</td>
-                                    <td class="p-4 text-slate-500">${item.gender}</td>
-                                    <td class="p-4 text-slate-500">${item.hari}</td>
-                                    <td class="p-4"><span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">${item.status}</span></td>
-                                </tr>
-                            `;
-                        });
-                        const thead = `<th class="p-4">Pekan</th><th class="p-4">Jenjang</th><th class="p-4">Gender</th><th class="p-4">Hari</th><th class="p-4">Status</th>`;
-                        container.innerHTML = this.buildTableUI('Konfigurasi Jadwal', 'Ubah Jadwal', thead, tbody);
-                    } catch(e) {
-                        container.innerHTML = `<div class="p-4 text-red-600 bg-red-50 rounded-lg">Gagal memuat: ${e.message}</div>`;
-                    }
-                },
-
-                async 'kelas-saya'(container) {
-                    try {
-                        const res = await App.api.post('getSantriByClass');
-                        let tbody = '';
-                        if(res.data.length === 0) {
-                            tbody = '<tr><td colspan="4" class="p-8 text-center text-slate-400">Belum ada santri di kelas ini</td></tr>';
-                        } else {
-                            res.data.forEach(s => {
-                                tbody += `
-                                    <tr class="hover:bg-slate-50 border-b border-slate-100">
-                                        <td class="p-4 font-medium text-slate-800">${s.nama_santri}</td>
-                                        <td class="p-4 text-slate-500">${s.jenis_kelamin}</td>
-                                        <td class="p-4 text-slate-500">${s.kota_asal}</td>
-                                        <td class="p-4"><span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">Aktif</span></td>
-                                    </tr>
-                                `;
-                            });
-                        }
-                        const thead = `<th class="p-4">Nama Santri</th><th class="p-4">L/P</th><th class="p-4">Kota Asal</th><th class="p-4">Status</th>`;
-                        const ui = this.buildTableUI('Daftar Santri Kelas', 'Refresh', thead, tbody);
-                        // Ubah tombol tambah menjadi tombol refresh
-                        container.innerHTML = ui.replace('<i class="ph ph-plus"></i> Tambah', '<i class="ph ph-arrows-clockwise"></i> Refresh');
-                    } catch(e) {
-                        container.innerHTML = `<div class="p-4 text-red-600 bg-red-50 rounded-lg">Gagal memuat: ${e.message}</div>`;
-                    }
-                },
-
-                async 'pengajuan'(container) {
-                    try {
-                        // Ambil daftar santri untuk kelas wali yang sedang login
-                        const res = await App.api.post('getSantriByClass');
-                        const santriList = res.data;
-                        
-                        let options = '<option value="">-- Pilih Santri --</option>';
-                        santriList.forEach(s => {
-                            options += `<option value="${s.santri_id}">${s.nama_santri}</option>`;
-                        });
-
-                        container.innerHTML = `
-                            <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-6 sm:p-8">
-                                <h3 class="text-lg font-bold text-slate-800 mb-6 border-b border-slate-100 pb-4 flex items-center gap-2">
-                                    <i class="ph-fill ph-paper-plane-tilt text-primary-500 text-xl"></i> Form Pengajuan Izin
-                                </h3>
-                                
-                                <form id="form-izin" class="space-y-5">
-                                    <div>
-                                        <label class="block text-sm font-medium text-slate-700 mb-1">Pilih Santri <span class="text-red-500">*</span></label>
-                                        <select id="izin-santri" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition bg-slate-50 focus:bg-white">
-                                            ${options}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-slate-700 mb-1">Keperluan Izin <span class="text-red-500">*</span></label>
-                                        <input type="text" id="izin-keperluan" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition" placeholder="Contoh: Pulang ke rumah, acara keluarga, berobat">
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-slate-700 mb-1">Tujuan / Kota <span class="text-red-500">*</span></label>
-                                        <input type="text" id="izin-tujuan" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition" placeholder="Contoh: Cirebon, RS Muhammadiyah">
-                                    </div>
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div>
-                                            <label class="block text-sm font-medium text-slate-700 mb-1">Wali Safar (Penjemput) <span class="text-red-500">*</span></label>
-                                            <input type="text" id="izin-walisafar" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition" placeholder="Nama lengkap penjemput">
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-slate-700 mb-1">Hubungan Wali <span class="text-red-500">*</span></label>
-                                            <select id="izin-hubungan" required onchange="document.getElementById('div-hubungan-lainnya').classList.toggle('hidden', this.value !== 'Lainnya')" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition">
-                                                <option value="Ayah">Ayah</option>
-                                                <option value="Ibu">Ibu</option>
-                                                <option value="Kakak Kandung">Kakak Kandung</option>
-                                                <option value="Adik Kandung">Adik Kandung</option>
-                                                <option value="Kakek">Kakek</option>
-                                                <option value="Nenek">Nenek</option>
-                                                <option value="Paman">Paman</option>
-                                                <option value="Bibi">Bibi</option>
-                                                <option value="Lainnya">Lainnya...</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div id="div-hubungan-lainnya" class="hidden">
-                                        <label class="block text-sm font-medium text-slate-700 mb-1">Sebutkan Hubungan Lainnya <span class="text-red-500">*</span></label>
-                                        <input type="text" id="izin-hubungan-lainnya" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition" placeholder="Contoh: Sepupu, Tetangga">
-                                    </div>
-                                    
-                                    <div class="pt-4 mt-2 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                        <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none bg-slate-50 py-2 px-3 rounded border border-slate-200">
-                                            <input type="checkbox" id="izin-saudara" class="w-4 h-4 text-primary-600 rounded focus:ring-primary-500">
-                                            Mengikuti Jadwal Kakak/Adik
-                                        </label>
-                                        
-                                        <button type="submit" id="btn-submit-izin" class="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white font-medium py-2.5 px-6 rounded-lg transition shadow-sm flex items-center justify-center gap-2">
-                                            Kirim Pengajuan <i class="ph ph-paper-plane-right"></i>
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        `;
-
-                        // Bind Event Listener
-                        document.getElementById('form-izin').addEventListener('submit', async (e) => {
-                            e.preventDefault();
-                            const btn = document.getElementById('btn-submit-izin');
-                            btn.disabled = true;
-                            btn.innerHTML = '<div class="loader w-4 h-4 border-[2px]"></div> Memproses...';
-                            
-                            try {
-                                const payload = {
-                                    santri_id: document.getElementById('izin-santri').value,
-                                    keperluan: document.getElementById('izin-keperluan').value,
-                                    tujuan: document.getElementById('izin-tujuan').value,
-                                    wali_safar: document.getElementById('izin-walisafar').value,
-                                    hubungan_wali: document.getElementById('izin-hubungan').value,
-                                    hubungan_lainnya: document.getElementById('izin-hubungan-lainnya').value,
-                                    ikut_saudara: document.getElementById('izin-saudara').checked
-                                };
-                                await App.api.post('createPermit', payload);
-                                App.ui.showToast('Pengajuan berhasil dikirim!', 'success');
-                                // Arahkan ke histori setelah sukses
-                                setTimeout(() => App.router.navigate('histori'), 800);
-                            } catch(err) {
-                                App.ui.showToast(err.message, 'error');
-                                btn.disabled = false;
-                                btn.innerHTML = 'Kirim Pengajuan <i class="ph ph-paper-plane-right"></i>';
-                            }
-                        });
-
-                    } catch(e) {
-                        container.innerHTML = `<div class="p-4 text-red-600 bg-red-50 rounded-lg">Gagal memuat form: ${e.message}</div>`;
-                    }
-                },
-
-                async 'approval'(container) {
-                    try {
-                        const res = await App.api.post('getPendingPermits');
-                        if (res.data.length === 0) {
-                            container.innerHTML = `
-                                <div class="flex flex-col items-center justify-center h-full min-h-[300px] text-slate-400">
-                                    <i class="ph ph-check-circle text-6xl mb-4 text-slate-300"></i>
-                                    <p class="text-lg">Tidak ada pengajuan yang menunggu.</p>
-                                </div>`;
-                            return;
-                        }
-                        
-                        let html = `<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">`;
+                
+                'approval'(container) {
+                    App.api.post('getPendingPermits').then(res => {
+                        if (res.data.length === 0) return container.innerHTML = `<div class="text-center p-10"><i class="ph ph-check-circle text-5xl text-slate-300"></i><p class="mt-2 text-slate-500">Tidak ada pengajuan masuk.</p></div>`;
+                        let html = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
                         res.data.forEach(p => {
-                            html += `
-                            <div id="permit-card-${p.permit_id}" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative transition-opacity">
-                                <div class="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h4 class="font-bold text-slate-800 text-lg">${p.nama_santri}</h4>
-                                        <p class="text-sm text-slate-500">${p.jenjang}</p>
-                                    </div>
-                                    <span class="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold whitespace-nowrap border border-yellow-200">
-                                        Menunggu
-                                    </span>
-                                </div>
-                                
-                                <div class="space-y-2.5 text-sm mb-6 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                                    <div class="flex gap-3"><i class="ph-fill ph-calendar-blank text-slate-400 text-lg"></i> <span class="text-slate-700 font-medium">${p.tanggal_izin_format}</span></div>
-                                    <div class="flex gap-3"><i class="ph-fill ph-info text-slate-400 text-lg"></i> <span class="text-slate-700">${p.keperluan} (${p.tujuan})</span></div>
-                                    <div class="flex gap-3"><i class="ph-fill ph-users text-slate-400 text-lg"></i> <span class="text-slate-700">Wali: <span class="font-medium">${p.wali_safar}</span> (${p.hubungan_wali})</span></div>
-                                    ${p.ikut_jadwal_saudara === 'TRUE' ? `<div class="flex gap-3 text-orange-600"><i class="ph-fill ph-link text-lg"></i> <span>Mengikuti Jadwal Saudara</span></div>` : ''}
-                                </div>
-                                
-                                <div class="flex gap-3 border-t border-slate-100 pt-5">
-                                    <button onclick="App.actions.approve('${p.permit_id}')" class="flex-1 bg-green-500 hover:bg-green-600 text-white py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2">
-                                        <i class="ph ph-check-circle text-lg"></i> Setujui
-                                    </button>
-                                    <button onclick="App.actions.reject('${p.permit_id}')" class="flex-1 bg-red-100 hover:bg-red-200 text-red-600 py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 border border-red-200">
-                                        <i class="ph ph-x-circle text-lg"></i> Tolak
-                                    </button>
-                                </div>
-                            </div>`;
+                            html += `<div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                                <h4 class="font-bold text-lg">${p.nama_santri} <span class="text-xs font-normal text-slate-500">(${p.jenjang})</span></h4>
+                                <p class="text-sm text-slate-600 mt-2"><i class="ph-fill ph-info"></i> ${p.keperluan} - ${p.tujuan}</p>
+                                <p class="text-sm text-slate-600"><i class="ph-fill ph-users"></i> Wali: ${p.wali_safar} (${p.hubungan_wali})</p>
+                                <div class="flex gap-2 mt-4 pt-4 border-t border-slate-100">
+                                    <button onclick="App.actions.approve('${p.permit_id}')" class="flex-1 bg-green-500 text-white py-2 rounded-lg text-sm font-semibold">Setujui</button>
+                                    <button onclick="App.actions.reject('${p.permit_id}')" class="flex-1 bg-red-100 text-red-600 py-2 rounded-lg text-sm font-semibold">Tolak</button>
+                                </div></div>`;
                         });
-                        html += `</div>`;
-                        container.innerHTML = html;
-                    } catch(e) {
-                        container.innerHTML = `<div class="p-4 text-red-600 bg-red-50 rounded-lg">Gagal memuat persetujuan: ${e.message}</div>`;
-                    }
+                        container.innerHTML = html + `</div>`;
+                    });
                 },
 
-                async 'master-tahun'(container) {
-                    try {
-                        const res = await App.api.post('getAcademicYears');
-                        const data = res.data;
-                        
-                        let tbody = '';
-                        if (data.length === 0) {
-                            tbody = `<tr><td colspan="4" class="p-8 text-center text-slate-400">Belum ada data tahun pelajaran</td></tr>`;
-                        } else {
-                            data.forEach(item => {
-                                const statusBadge = item.status === 'Aktif' 
-                                    ? '<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">Aktif</span>' 
-                                    : '<span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-medium">Arsip</span>';
-                                tbody += `
-                                    <tr class="hover:bg-slate-50 transition">
-                                        <td class="p-4 font-medium text-slate-800">${item.nama_periode}</td>
-                                        <td class="p-4 text-slate-500">${item.start_date ? new Date(item.start_date).toLocaleDateString('id-ID') : '-'}</td>
-                                        <td class="p-4 text-slate-500">${item.end_date ? new Date(item.end_date).toLocaleDateString('id-ID') : '-'}</td>
-                                        <td class="p-4">${statusBadge}</td>
-                                    </tr>
-                                `;
-                            });
-                        }
+                // --- PHASE 8: SCANNER UI ---
+                'scanner'(container) {
+                    container.innerHTML = `
+                        <div class="max-w-md mx-auto flex flex-col items-center">
+                            <!-- Header Info -->
+                            <div class="bg-slate-900 w-full rounded-t-2xl text-white p-5 text-center">
+                                <h2 class="font-bold text-lg"><i class="ph ph-camera"></i> Pos Security Scanner</h2>
+                                <p class="text-xs text-slate-400 mt-1">Arahkan kamera ke QR Code Pas Digital</p>
+                            </div>
 
-                        const thead = `<th class="p-4">Periode</th><th class="p-4">Tgl Mulai</th><th class="p-4">Tgl Selesai</th><th class="p-4">Status</th>`;
-                        container.innerHTML = this.buildTableUI('Daftar Tahun Pelajaran', 'Tambah Tahun', thead, tbody);
-                    } catch(e) {
-                        container.innerHTML = `<div class="p-4 text-red-600 bg-red-50 rounded-lg border border-red-100">Gagal memuat data: ${e.message}</div>`;
-                    }
-                },
-
-                async 'histori'(container) {
-                    try {
-                        const res = await App.api.post('getMyPermits');
-                        let tbody = '';
-                        
-                        if (res.data.length === 0) {
-                            tbody = `<tr><td colspan="6" class="p-8 text-center text-slate-400">Belum ada histori pengajuan izin.</td></tr>`;
-                        } else {
-                            res.data.forEach(permit => {
-                                // Status Styling
-                                let statusUI = `<span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-bold whitespace-nowrap">Menunggu</span>`;
-                                let actionBtn = `-`;
+                            <!-- Area Kamera -->
+                            <div id="scanner-box" class="w-full bg-black shadow-xl overflow-hidden relative">
+                                <div id="qr-reader" class="w-full min-h-[300px]"></div>
                                 
-                                if(permit.status_pengajuan === 'DISETUJUI') {
-                                    statusUI = `<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold whitespace-nowrap">Disetujui</span>`;
-                                    // Simpan object permit ke dataset (escape quote issue: kita gunakan index atau stringify base64, tapi untuk simpel kita simpan data ke global temp aja)
-                                    window[`permitData_${permit.permit_id}`] = permit;
-                                    actionBtn = `
-                                        <button onclick="App.actions.viewQR('${permit.permit_id}')" class="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1.5 transition">
-                                            <i class="ph ph-qr-code"></i> Lihat QR
-                                        </button>`;
-                                } else if(permit.status_pengajuan === 'DITOLAK') {
-                                    statusUI = `<span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold whitespace-nowrap tooltip" title="${permit.alasan_penolakan || ''}">Ditolak</span>`;
-                                    actionBtn = `<span class="text-xs text-red-500 cursor-help" title="Alasan: ${permit.alasan_penolakan}"><i class="ph ph-info"></i> Alasan</span>`;
-                                }
+                                <!-- Loading overlay -->
+                                <div id="scanner-loading" class="absolute inset-0 bg-slate-900/80 hidden flex-col items-center justify-center z-10">
+                                    <div class="loader w-10 h-10 border-[3px] border-t-primary-500 mb-3"></div>
+                                    <p class="text-white text-sm font-medium tracking-wider">Memverifikasi Data...</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Container Hasil Scan -->
+                            <div id="scanner-result" class="w-full bg-white rounded-b-2xl shadow-xl p-6 hidden flex flex-col items-center border border-t-0 border-slate-200">
+                                <!-- Dynamic Result Here -->
+                            </div>
+                            
+                            <div id="scanner-controls" class="w-full p-4 text-center">
+                                <p class="text-xs text-slate-500 mb-3">Pastikan izin dalam keadaan terang.</p>
+                            </div>
+                        </div>
+                    `;
 
-                                tbody += `
-                                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-                                        <td class="p-4 font-medium text-slate-800">${permit.nama_santri}</td>
-                                        <td class="p-4 text-slate-500 text-sm">${permit.tanggal_izin_format}</td>
-                                        <td class="p-4 text-slate-500 text-sm max-w-[150px] truncate" title="${permit.tujuan}">${permit.keperluan}</td>
-                                        <td class="p-4 text-slate-500 text-sm">${permit.wali_safar}</td>
-                                        <td class="p-4">${statusUI}</td>
-                                        <td class="p-4 text-right">${actionBtn}</td>
-                                    </tr>
-                                `;
-                            });
-                        }
-                        
-                        const thead = `<th class="p-4">Santri</th><th class="p-4">Tanggal Izin</th><th class="p-4">Keperluan</th><th class="p-4">Wali Safar</th><th class="p-4">Status</th><th class="p-4 text-right">Aksi QR</th>`;
-                        container.innerHTML = this.buildTableUI('Daftar Pengajuan Saya', 'Refresh', thead, tbody).replace('Tambah', 'Muat Ulang').replace('<i class="ph ph-plus"></i>', '<i class="ph ph-arrows-clockwise"></i>').replace('button class', 'button onclick="App.router.navigate(\'histori\')" class');
-                        
-                    } catch(e) {
-                        container.innerHTML = `<div class="p-4 text-red-600 bg-red-50 rounded-lg border border-red-100">Gagal memuat histori: ${e.message}</div>`;
-                    }
+                    // Panggil fungsi inisiasi kamera dari App.actions
+                    setTimeout(() => App.actions.initScanner(), 100);
                 }
             },
 
             // --- ACTION HANDLERS ---
             actions: {
-                viewQR(permitId) {
-                    const permit = window[`permitData_${permitId}`];
-                    if(!permit || !permit.qr_token) return App.ui.showToast('Data QR tidak ditemukan', 'error');
+                approve: async (id) => { if(!confirm('Setujui?')) return; await App.api.post('approvePermit', {permit_id: id}); App.router.navigate('approval'); },
+                reject: async (id) => { const alasan = prompt('Alasan:'); if(!alasan) return; await App.api.post('rejectPermit', {permit_id: id, alasan}); App.router.navigate('approval'); },
 
-                    const relasi = permit.hubungan_wali === 'Lainnya' ? permit.hubungan_lainnya : permit.hubungan_wali;
+                // --- PHASE 8: SCAN LOGIC ---
+                initScanner() {
+                    const qrReaderElement = document.getElementById('qr-reader');
+                    if(!qrReaderElement) return;
 
-                    const modalHTML = `
-                        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                            <h3 class="font-bold text-slate-800 flex items-center gap-2"><i class="ph-fill ph-ticket text-primary-500 text-xl"></i> Pas Digital (QR)</h3>
-                            <button onclick="App.ui.closeModal()" class="text-slate-400 hover:text-slate-700 bg-white rounded-full p-1"><i class="ph ph-x text-lg"></i></button>
-                        </div>
-                        <div class="p-6">
-                            <!-- Visual Kartu (Preview) -->
-                            <div id="qr-card-preview" class="border-2 border-slate-200 rounded-xl overflow-hidden mb-6 relative bg-white">
-                                <div class="bg-primary-600 text-white text-center py-3 px-4">
-                                    <p class="font-bold text-[13px] sm:text-sm tracking-wide">PONDOK PESANTREN MODERN AL-ISLAM</p>
-                                    <p class="text-[10px] opacity-80 uppercase tracking-widest mt-0.5">Surat Izin Keluar Santri</p>
-                                </div>
-                                <div class="p-5 text-sm space-y-3">
-                                    <div><p class="text-xs text-slate-400">Nama Santri</p><p class="font-bold text-slate-800 text-base">${permit.nama_santri}</p></div>
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <div><p class="text-xs text-slate-400">Jenjang/Kelas</p><p class="font-medium text-slate-800">${permit.jenjang} - ${permit.nama_kelas}</p></div>
-                                        <div><p class="text-xs text-slate-400">Jam Resmi</p><p class="font-bold text-green-600">08.00 - 16.00</p></div>
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <div><p class="text-xs text-slate-400">Tanggal Izin</p><p class="font-medium text-slate-800">${permit.tanggal_izin_format}</p></div>
-                                        <div><p class="text-xs text-slate-400">Keperluan</p><p class="font-medium text-slate-800 truncate" title="${permit.keperluan}">${permit.keperluan}</p></div>
-                                    </div>
-                                    <div class="pt-3 border-t border-dashed border-slate-200 flex items-center gap-4">
-                                        <div id="qrcode-box" class="w-24 h-24 bg-white p-1 border border-slate-200 rounded-lg flex-shrink-0"></div>
-                                        <div class="flex-1">
-                                            <p class="text-xs text-slate-400">Wali Safar (Penjemput)</p>
-                                            <p class="font-bold text-slate-800">${permit.wali_safar}</p>
-                                            <p class="text-xs text-slate-500 uppercase mt-0.5">(${relasi})</p>
-                                            <p class="text-[10px] text-slate-400 mt-2 italic leading-tight">* Tunjukkan QR ini ke Petugas Security saat keluar dan kembali.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Aksi -->
-                            <button onclick="App.actions.downloadQRPNG('${permitId}')" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-sm">
-                                <i class="ph ph-download-simple text-lg"></i> Unduh Gambar (PNG)
-                            </button>
-                        </div>
-                    `;
-                    App.ui.showModal(modalHTML);
-
-                    // Generate QR Code inside the box using library
-                    setTimeout(() => {
-                        new QRCode(document.getElementById("qrcode-box"), {
-                            text: permit.qr_token,
-                            width: 88,
-                            height: 88,
-                            colorDark : "#1e293b", // slate-800
-                            colorLight : "#ffffff",
-                            correctLevel : QRCode.CorrectLevel.M
-                        });
-                    }, 50);
-                },
-
-                // Generate Canvas then trigger download
-                downloadQRPNG(permitId) {
-                    const permit = window[`permitData_${permitId}`];
-                    if(!permit) return;
-
-                    const relasi = permit.hubungan_wali === 'Lainnya' ? permit.hubungan_lainnya : permit.hubungan_wali;
-                    
-                    // Buat Canvas yang ukurannya proporsional dengan pop-up
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 480;
-                    canvas.height = 560;
-                    const ctx = canvas.getContext('2d');
-
-                    // 1. Background Kartu (Putih) & Border
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.strokeStyle = '#e2e8f0';
-                    ctx.lineWidth = 4;
-                    ctx.strokeRect(0, 0, canvas.width, canvas.height);
-
-                    // 2. Header Hijau
-                    ctx.fillStyle = '#16a34a'; 
-                    ctx.fillRect(0, 0, canvas.width, 90);
-
-                    // 3. Teks Header
-                    ctx.fillStyle = '#ffffff';
-                    ctx.textAlign = 'center';
-                    ctx.font = 'bold 19px "Inter", Arial, sans-serif';
-                    ctx.fillText('PONDOK PESANTREN MODERN AL-ISLAM', canvas.width / 2, 42);
-                    
-                    ctx.font = 'normal 13px "Inter", Arial, sans-serif';
-                    if(ctx.letterSpacing !== undefined) ctx.letterSpacing = "2px";
-                    ctx.fillText('SURAT IZIN KELUAR SANTRI', canvas.width / 2, 68);
-                    if(ctx.letterSpacing !== undefined) ctx.letterSpacing = "0px"; // reset
-
-                    // Helper function untuk menggambar label & value persis seperti di CSS
-                    ctx.textAlign = 'left';
-                    const drawField = (label, value, x, y, valColor = '#1e293b', valFont = 'bold 18px "Inter", Arial, sans-serif') => {
-                        ctx.fillStyle = '#94a3b8'; // text-slate-400
-                        ctx.font = 'normal 13px "Inter", Arial, sans-serif';
-                        ctx.fillText(label, x, y);
-                        
-                        ctx.fillStyle = valColor; 
-                        ctx.font = valFont;
-                        ctx.fillText(value, x, y + 25);
+                    // Menggunakan Html5QrcodeScanner bawaan lib untuk handle kamera otomatis
+                    const config = {
+                        fps: 10, 
+                        qrbox: { width: 250, height: 250 },
+                        aspectRatio: 1.0,
+                        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
                     };
 
-                    // 4. Data Utama (Sama persis urutannya dengan HTML)
-                    drawField('Nama Santri', permit.nama_santri, 40, 140);
+                    App.state.html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", config, false);
                     
-                    // Grid 2 Kolom (Jenjang & Jam)
-                    drawField('Jenjang / Kelas', `${permit.jenjang} - ${permit.nama_kelas}`, 40, 210, '#1e293b', 'normal 17px "Inter", Arial, sans-serif');
-                    drawField('Jam Resmi', '08.00 - 16.00', 280, 210, '#16a34a', 'bold 17px "Inter", Arial, sans-serif');
-                    
-                    // Grid 2 Kolom (Tanggal & Keperluan)
-                    drawField('Tanggal Izin', permit.tanggal_izin_format, 40, 280, '#1e293b', 'normal 17px "Inter", Arial, sans-serif');
-                    
-                    // Truncate text keperluan agar tidak melewati batas kanan canvas
-                    let safeKeperluan = permit.keperluan.length > 18 ? permit.keperluan.substring(0, 16) + '...' : permit.keperluan;
-                    drawField('Keperluan', safeKeperluan, 280, 280, '#1e293b', 'normal 17px "Inter", Arial, sans-serif');
-
-                    // 5. Garis Pembatas (Dashed Line)
-                    ctx.beginPath();
-                    ctx.setLineDash([6, 6]);
-                    ctx.moveTo(40, 335);
-                    ctx.lineTo(440, 335);
-                    ctx.strokeStyle = '#cbd5e1';
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-                    ctx.setLineDash([]); // reset garis
-
-                    // 6. Section Bawah (QR di Kiri, Wali Safar di Kanan)
-                    const qrCanvas = document.querySelector('#qrcode-box canvas');
-                    if (qrCanvas) {
-                        // Gambar QR Code persis di sisi kiri bawah
-                        // Memberi background putih & border abu pada QR
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(40, 365, 130, 130);
-                        ctx.strokeStyle = '#e2e8f0';
-                        ctx.strokeRect(40, 365, 130, 130);
-                        
-                        ctx.drawImage(qrCanvas, 45, 370, 120, 120);
-                        
-                        // Gambar Info Wali Safar di samping kanan QR Code
-                        drawField('Wali Safar (Penjemput)', permit.wali_safar, 200, 385);
-                        
-                        ctx.fillStyle = '#64748b'; // text-slate-500
-                        ctx.font = 'normal 12px "Inter", Arial, sans-serif';
-                        ctx.fillText(`(${relasi})`.toUpperCase(), 200, 430);
-
-                        // Note kecil di bawah Wali Safar
-                        ctx.fillStyle = '#94a3b8'; // text-slate-400
-                        ctx.font = 'italic 11px "Inter", Arial, sans-serif';
-                        ctx.fillText('* Tunjukkan QR ini ke Petugas Security', 200, 470);
-                        ctx.fillText('  saat akan keluar dan kembali ke pondok.', 200, 485);
-                        
-                        // Eksekusi Download
-                        const imgURL = canvas.toDataURL("image/png");
-                        const link = document.createElement('a');
-                        link.download = `Pas_Izin_${permit.nama_santri.replace(/\s+/g, '_')}.png`;
-                        link.href = imgURL;
-                        link.click();
-                        App.ui.showToast('Berhasil mengunduh Kartu Izin PNG', 'success');
-                    } else {
-                        App.ui.showToast('Gagal memproses gambar QR', 'error');
-                    }
+                    App.state.html5QrcodeScanner.render(
+                        (decodedText) => this.handleScanSuccess(decodedText),
+                        (error) => { /* Abaikan error loop jika belum menemukan QR */ }
+                    );
                 },
 
-                async approve(permitId) {
-                    if(!confirm('Anda yakin ingin menyetujui pengajuan ini? QR Code otomatis akan diterbitkan.')) return;
+                async handleScanSuccess(decodedText) {
+                    // Hindari multiple scan sekaligus
+                    if(document.getElementById('scanner-loading').classList.contains('hidden') === false) return;
                     
-                    const card = document.getElementById(`permit-card-${permitId}`);
-                    card.style.opacity = '0.5';
-                    card.style.pointerEvents = 'none';
+                    // Bunyi / Getar jika support
+                    if (navigator.vibrate) navigator.vibrate(200);
 
-                    try {
-                        await App.api.post('approvePermit', { permit_id: permitId });
-                        App.ui.showToast('Izin disetujui, QR Code diterbitkan!', 'success');
-                        setTimeout(() => App.router.navigate('approval'), 500); // Reload data
-                    } catch (e) {
-                        App.ui.showToast(e.message, 'error');
-                        card.style.opacity = '1';
-                        card.style.pointerEvents = 'auto';
+                    // Tampilkan UI Loading & Jeda kamera (Pause backend call)
+                    document.getElementById('scanner-loading').classList.remove('hidden');
+                    document.getElementById('scanner-loading').classList.add('flex');
+                    
+                    if(App.state.html5QrcodeScanner) {
+                        App.state.html5QrcodeScanner.pause(true); // Pause scanning
                     }
-                },
-                
-                async reject(permitId) {
-                    const alasan = prompt('Masukkan alasan penolakan (Wajib):');
-                    if (alasan === null) return; // Cancelled
-                    if (alasan.trim() === '') return App.ui.showToast('Alasan penolakan tidak boleh kosong', 'error');
 
-                    const card = document.getElementById(`permit-card-${permitId}`);
-                    card.style.opacity = '0.5';
-                    card.style.pointerEvents = 'none';
-
-                    try {
-                        await App.api.post('rejectPermit', { permit_id: permitId, alasan: alasan });
-                        App.ui.showToast('Izin berhasil ditolak', 'info');
-                        setTimeout(() => App.router.navigate('approval'), 500); // Reload data
-                    } catch (e) {
-                        App.ui.showToast(e.message, 'error');
-                        card.style.opacity = '1';
-                        card.style.pointerEvents = 'auto';
-                    }
-                },
-
-                async generateDummy() {
-                    if(!confirm('Buat data dummy (Tahun, Kelas, dan 4 Santri)?')) return;
+                    const resultContainer = document.getElementById('scanner-result');
+                    const controlContainer = document.getElementById('scanner-controls');
                     
                     try {
-                        App.ui.showToast('Memproses data dummy, mohon tunggu...', 'info');
-                        const res = await App.api.post('generateDummy');
-                        App.ui.showToast(res.data.message, 'success');
-                    } catch(e) {
-                        App.ui.showToast(e.message, 'error');
+                        // Tembak API
+                        const res = await App.api.post('scanQR', { qr_token: decodedText });
+                        const data = res.data;
+
+                        // UI Untuk Success (EXIT atau RETURN)
+                        let icon = data.scan_type === 'EXIT' ? 'ph-sign-out' : 'ph-sign-in';
+                        let colorStr = 'text-green-600 bg-green-100 border-green-200'; // Default Hijau
+                        
+                        // Khusus jika Return Terlambat warnanya beda
+                        if(data.status_waktu.includes('TERLAMBAT')) {
+                            colorStr = data.status_waktu.includes('TOLERANSI') ? 'text-red-600 bg-red-100 border-red-200' : 'text-orange-600 bg-orange-100 border-orange-200';
+                        }
+
+                        resultContainer.innerHTML = `
+                            <div class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 ${colorStr}">
+                                <i class="ph-fill ${icon}"></i>
+                            </div>
+                            <h3 class="font-bold text-xl text-slate-800 text-center uppercase tracking-wide">${data.nama_santri}</h3>
+                            
+                            <div class="w-full mt-5 space-y-3">
+                                <div class="flex justify-between items-center py-2 border-b border-dashed border-slate-200">
+                                    <span class="text-sm text-slate-500">Tindakan</span>
+                                    <span class="font-bold text-slate-800">SCAN ${data.scan_type}</span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b border-dashed border-slate-200">
+                                    <span class="text-sm text-slate-500">Waktu Tercatat</span>
+                                    <span class="font-bold text-slate-800">${data.waktu}</span>
+                                </div>
+                                <div class="flex justify-between items-center py-2">
+                                    <span class="text-sm text-slate-500">Status</span>
+                                    <span class="font-bold text-[13px] uppercase px-2 py-1 rounded ${colorStr}">${data.status_waktu}</span>
+                                </div>
+                            </div>
+                        `;
+
+                    } catch (error) {
+                        // Vibrate panjang tanda error
+                        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+                        // UI Untuk Error (Kedaluwarsa, 3rd Scan, Palsu)
+                        resultContainer.innerHTML = `
+                            <div class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 text-red-600 bg-red-100 border-red-200">
+                                <i class="ph-fill ph-x-circle"></i>
+                            </div>
+                            <h3 class="font-bold text-lg text-slate-800 text-center">Scan Ditolak</h3>
+                            <p class="text-sm text-slate-500 text-center mt-2 p-3 bg-slate-50 rounded-lg w-full border border-slate-100">${error.message}</p>
+                        `;
+                    }
+
+                    // Tampilkan hasil & sembunyikan loading
+                    document.getElementById('scanner-loading').classList.add('hidden');
+                    document.getElementById('scanner-loading').classList.remove('flex');
+                    document.getElementById('scanner-box').classList.add('hidden');
+                    
+                    resultContainer.classList.remove('hidden');
+                    
+                    // Ganti tombol di bawah menjadi "Scan Berikutnya"
+                    controlContainer.innerHTML = `
+                        <button onclick="App.actions.resetScanner()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl transition shadow-lg flex items-center justify-center gap-2">
+                            <i class="ph ph-qr-code text-xl"></i> Scan Berikutnya
+                        </button>
+                    `;
+                },
+
+                resetScanner() {
+                    // Kembalikan UI ke mode kamera
+                    document.getElementById('scanner-result').classList.add('hidden');
+                    document.getElementById('scanner-box').classList.remove('hidden');
+                    
+                    document.getElementById('scanner-controls').innerHTML = `<p class="text-xs text-slate-500 mb-3">Pastikan izin dalam keadaan terang.</p>`;
+
+                    // Resume Kamera
+                    if(App.state.html5QrcodeScanner) {
+                        App.state.html5QrcodeScanner.resume();
                     }
                 }
             }
         };
 
-        // Initialize App on Load
         document.addEventListener('DOMContentLoaded', () => App.auth.init());
-
     </script>
 </body>
 </html>
