@@ -531,35 +531,41 @@
                     
                     if(!data || data.length === 0) {
                         tbody.innerHTML = `<tr><td class="py-4 text-center text-gray-500">Belum ada data tersedia.</td></tr>`;
+                        thead.innerHTML = '';
                         return;
                     }
 
-                    // Generate Headers dynamically from object keys (excluding sensitive/internal fields)
-                    const keys = Object.keys(data[0]).filter(k => k !== 'password_hash' && k !== 'session_token' && !k.endsWith('_id'));
+                    // Ambil kunci unik dari objek data pertama, saring kolom internal sistem yang sensitif
+                    const keys = Object.keys(data[0]).filter(k => k !== 'password_hash' && k !== 'session_token');
                     
                     let trHead = '<tr>';
                     keys.forEach(k => {
-                        trHead += `<th class="py-3 px-4 font-semibold uppercase tracking-wider">${k.replace(/_/g, ' ')}</th>`;
+                        trHead += `<th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">${k.replace(/_/g, ' ')}</th>`;
                     });
                     trHead += '</tr>';
                     thead.innerHTML = trHead;
 
-                    // Generate Rows
+                    // Generate Rows dengan penanganan aman untuk berbagai tipe nilai
                     let trBody = '';
                     data.forEach(row => {
                         trBody += '<tr class="hover:bg-gray-50 transition">';
                         keys.forEach(k => {
                             let val = row[k];
-                            // Format dates if any
-                            if(val && typeof val === 'string' && val.includes('T') && val.includes('Z')) {
-                                val = new Date(val).toLocaleDateString('id-ID');
+                            
+                            // Format tanggal ISO jika ada
+                            if(val && typeof val === 'string' && (val.includes('T') && val.includes('Z') || !isNaN(Date.parse(val)) && val.length > 10)) {
+                                try {
+                                    val = new Date(val).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+                                } catch(e) { /* fallback */ }
                             }
-                            // Status formatting
+                            
+                            // Format badge status jika kolom status
                             if(k === 'status' || k === 'status_santri') {
                                 const color = val === 'AKTIF' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
                                 val = `<span class="px-2 py-1 text-xs font-semibold rounded-full ${color}">${val}</span>`;
                             }
-                            trBody += `<td class="py-3 px-4 text-gray-700">${val || '-'}</td>`;
+                            
+                            trBody += `<td class="py-3 px-4 text-gray-700">${val !== undefined && val !== null && val !== '' ? val : '-'}</td>`;
                         });
                         trBody += '</tr>';
                     });
