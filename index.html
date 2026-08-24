@@ -1,728 +1,453 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sistem Perizinan Santri | Al-Islam</title>
-    <!-- Tailwind CSS (Foundation Styling) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#166534', // Hijau pesantren
-                        secondary: '#bbf7d0',
-                        accent: '#facc15'
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        /* Base styles */
-        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f3f4f6; }
-        .hidden { display: none !important; }
-        .spinner { border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s ease-in-out infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-    </style>
-</head>
-<body class="text-gray-800 antialiased h-screen overflow-hidden">
+import React, { useState, useEffect, createContext, useContext } from 'react';
 
-    <!-- 1. NOTIFICATION TOAST -->
-    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
+// --- CONFIGURATION & ENVIRONMENT ---
+// Di production Vite, ini diambil dari import.meta.env.VITE_API_BASE_URL
+const API_BASE_URL = ''; 
+const USE_MOCK_API = true; // Set false jika GAS sudah di-deploy
 
-    <!-- MODAL FORM TAMBAH DATA -->
-    <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center px-4">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden transform transition-all">
-            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                <h3 id="modal-title" class="text-lg font-bold text-gray-800">Tambah Data</h3>
-                <button onclick="App.UI.closeModal()" class="text-gray-400 hover:text-red-500 transition">
-                    <i class="fa-solid fa-times text-xl"></i>
-                </button>
-            </div>
-            <div class="px-6 py-4 max-h-[70vh] overflow-y-auto">
-                <form id="modal-form" onsubmit="App.MasterData.submitForm(event)">
-                    <div id="modal-body" class="flex flex-col gap-4">
-                        <!-- Form inputs di-generate dinamis di sini -->
-                    </div>
-                    <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100">
-                        <button type="button" onclick="App.UI.closeModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Batal</button>
-                        <button type="submit" id="modal-btn-save" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-green-700 flex items-center">
-                            <span id="modal-btn-text">Simpan Data</span>
-                            <div id="modal-spinner" class="spinner ml-2 hidden !w-4 !h-4 !border-2"></div>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+// --- CONSTANTS ---
+const ROLES = {
+  ADMIN: 'ADMIN',
+  WALI_KELAS: 'WALI_KELAS',
+  SEKRETARIS_MUDIR: 'SEKRETARIS_MUDIR',
+  SECURITY: 'SECURITY'
+};
+
+// --- ICONS (SVG Inline to avoid external dependencies) ---
+const Icons = {
+  Home: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  FileText: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>,
+  Scan: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>,
+  Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  LogOut: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
+  Menu: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>,
+  CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>,
+  XCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+};
+
+// --- CONTEXTS ---
+const AuthContext = createContext(null);
+const ToastContext = createContext(null);
+
+// --- API SERVICE ---
+const apiService = {
+  request: async (action, payload) => {
+    if (USE_MOCK_API) {
+      return new Promise((resolve, reject) => {
+        setTimeout(() => {
+          console.log(`[MOCK API] Action: ${action}`, payload);
+          if (action === 'login') {
+            if (payload.username === 'admin' && payload.password === '123') resolve({ success: true, data: { user_id: 'U001', username: 'admin', nama: 'Administrator', role: ROLES.ADMIN } });
+            else if (payload.username === 'walikelas' && payload.password === '123') resolve({ success: true, data: { user_id: 'U002', username: 'walikelas', nama: 'Ust. Ahmad', role: ROLES.WALI_KELAS, kelas_id: 'K01' } });
+            else if (payload.username === 'sekretaris' && payload.password === '123') resolve({ success: true, data: { user_id: 'U003', username: 'sekretaris', nama: 'Ust. Budi (Sekmud)', role: ROLES.SEKRETARIS_MUDIR } });
+            else if (payload.username === 'security' && payload.password === '123') resolve({ success: true, data: { user_id: 'U004', username: 'security', nama: 'Pak Satpam', role: ROLES.SECURITY } });
+            else reject(new Error("Username atau password salah"));
+          } else if (action === 'getDashboard') {
+             resolve({ success: true, data: { totalIzin: 15, disetujui: 10, ditolak: 2, menunggu: 3, keluar: 8, kembali: 2, terlambat: 0 } });
+          } else {
+             resolve({ success: true, data: {} });
+          }
+        }, 800);
+      });
+    }
+
+    // Real API Call via GAS
+    try {
+      const response = await fetch(API_BASE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Avoid CORS preflight on GAS
+        body: JSON.stringify({ action, ...payload })
+      });
+      const data = await response.json();
+      if (!data.success) throw new Error(data.message || 'Terjadi kesalahan dari server.');
+      return data;
+    } catch (error) {
+      console.error('API Error:', error);
+      throw error;
+    }
+  }
+};
+
+// --- UI COMPONENTS ---
+const Card = ({ children, className = "" }) => (
+  <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 ${className}`}>{children}</div>
+);
+
+const Button = ({ children, onClick, variant = 'primary', className = "", disabled, type="button", fullWidth }) => {
+  const baseStyle = "px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2";
+  const variants = {
+    primary: "bg-emerald-600 hover:bg-emerald-700 text-white focus:ring-emerald-500",
+    secondary: "bg-gray-100 hover:bg-gray-200 text-gray-800 focus:ring-gray-400",
+    danger: "bg-red-500 hover:bg-red-600 text-white focus:ring-red-500",
+  };
+  return (
+    <button type={type} onClick={onClick} disabled={disabled} className={`${baseStyle} ${variants[variant]} ${fullWidth ? 'w-full' : ''} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
+      {children}
+    </button>
+  );
+};
+
+const Input = ({ label, type = "text", value, onChange, placeholder, required }) => (
+  <div className="mb-4">
+    {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      required={required}
+      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+    />
+  </div>
+);
+
+const StatCard = ({ title, value, icon, color = "bg-emerald-50 text-emerald-600" }) => (
+  <Card className="flex items-center gap-4">
+    <div className={`p-4 rounded-full ${color}`}>
+      {icon}
     </div>
-
-    <!-- 2. LOGIN VIEW -->
-    <div id="view-login" class="h-screen flex items-center justify-center bg-gray-100 hidden">
-        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md mx-4">
-            <div class="text-center mb-8">
-                <div class="bg-primary text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i class="fa-solid fa-mosque text-2xl"></i>
-                </div>
-                <h1 class="text-2xl font-bold text-gray-900">Perizinan Al-Islam</h1>
-                <p class="text-sm text-gray-500 mt-1">Sistem Management Perizinan Keluar Santri</p>
-            </div>
-
-            <form id="form-login" onsubmit="App.Auth.handleLogin(event)">
-                <div class="mb-5">
-                    <label class="block text-sm font-medium text-gray-700 mb-2" for="username">Username</label>
-                    <input type="text" id="username" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="Masukkan username" required>
-                </div>
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2" for="password">Password</label>
-                    <input type="password" id="password" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="Masukkan password" required>
-                </div>
-                <button type="submit" id="btn-login" class="w-full bg-primary hover:bg-green-800 text-white font-semibold py-3 px-4 rounded-lg flex justify-center items-center transition">
-                    <span id="text-login">Masuk Sistem</span>
-                    <div id="spinner-login" class="spinner ml-2 hidden"></div>
-                </button>
-            </form>
-        </div>
+    <div>
+      <p className="text-sm text-gray-500 font-medium">{title}</p>
+      <h3 className="text-2xl font-bold text-gray-800">{value}</h3>
     </div>
+  </Card>
+);
 
-    <!-- 3. DASHBOARD SHELL (APP VIEW) -->
-    <div id="view-app" class="h-screen flex flex-col md:flex-row hidden">
-        
-        <!-- Sidebar -->
-        <aside id="sidebar" class="bg-primary text-white w-full md:w-64 flex-shrink-0 flex flex-col transition-all duration-300 transform -translate-x-full md:translate-x-0 fixed md:static h-full z-40">
-            <div class="p-4 flex items-center justify-between border-b border-green-700">
-                <div class="flex items-center gap-3">
-                    <i class="fa-solid fa-mosque text-xl"></i>
-                    <span class="font-bold tracking-wider">AL-ISLAM</span>
-                </div>
-                <button class="md:hidden text-white" onclick="App.UI.toggleSidebar()">
-                    <i class="fa-solid fa-times text-xl"></i>
-                </button>
-            </div>
+const Toast = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className="fixed top-4 right-4 z-50 animate-fade-in-down">
+      <div className={`flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg text-white ${type === 'error' ? 'bg-red-500' : 'bg-gray-800'}`}>
+        {type === 'error' ? <Icons.XCircle /> : <Icons.CheckCircle />}
+        <span className="font-medium">{message}</span>
+      </div>
+    </div>
+  );
+};
+
+// --- LAYOUTS ---
+const SidebarItem = ({ icon: Icon, label, active, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${active ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
+  >
+    <Icon />
+    <span>{label}</span>
+  </button>
+);
+
+const Layout = ({ children }) => {
+  const { user, logout } = useContext(AuthContext);
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [currentRoute, setCurrentRoute] = useState('dashboard');
+
+  if (!user) return null; // Should not reach here if not logged in
+
+  const menuItems = {
+    [ROLES.ADMIN]: [
+      { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
+      { id: 'master_santri', label: 'Data Santri', icon: Icons.Users },
+      { id: 'perizinan', label: 'Semua Perizinan', icon: Icons.FileText },
+      { id: 'settings', label: 'Pengaturan', icon: Icons.Settings },
+    ],
+    [ROLES.WALI_KELAS]: [
+      { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
+      { id: 'pengajuan', label: 'Ajukan Izin', icon: Icons.FileText },
+      { id: 'histori', label: 'Histori Kelas', icon: Icons.Users },
+    ],
+    [ROLES.SEKRETARIS_MUDIR]: [
+      { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
+      { id: 'screening', label: 'Screening Izin', icon: Icons.FileText },
+    ],
+    [ROLES.SECURITY]: [
+      { id: 'scanner', label: 'Scan QR Code', icon: Icons.Scan },
+      { id: 'log', label: 'Riwayat Scan', icon: Icons.FileText },
+    ]
+  };
+
+  const currentMenu = menuItems[user.role] || [];
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+      {/* Mobile Header */}
+      <div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center sticky top-0 z-20">
+        <div className="font-bold text-emerald-700">Al-Islam Permit</div>
+        <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-600">
+          <Icons.Menu />
+        </button>
+      </div>
+
+      {/* Sidebar */}
+      <div className={`fixed md:static inset-y-0 left-0 w-64 bg-white border-r transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out z-30 flex flex-col`}>
+        <div className="p-6 border-b hidden md:block">
+          <h1 className="font-bold text-xl text-emerald-700 leading-tight">Sistem Perizinan<br/><span className="text-sm text-gray-500 font-normal">PPM Al-Islam</span></h1>
+        </div>
+        <div className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+          <div className="mb-6 px-4 py-3 bg-emerald-50 rounded-lg text-sm">
+            <p className="text-gray-500">Masuk sebagai:</p>
+            <p className="font-semibold text-emerald-800">{user.nama}</p>
+            <p className="text-xs text-emerald-600 mt-1 uppercase tracking-wider font-bold">{user.role.replace('_', ' ')}</p>
+          </div>
+          {currentMenu.map(item => (
+            <SidebarItem
+              key={item.id}
+              icon={item.icon}
+              label={item.label}
+              active={currentRoute === item.id}
+              onClick={() => { setCurrentRoute(item.id); setSidebarOpen(false); }}
+            />
+          ))}
+        </div>
+        <div className="p-4 border-t">
+          <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-red-600 hover:bg-red-50 transition-colors">
+            <Icons.LogOut />
+            <span className="font-medium">Keluar</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      {isSidebarOpen && <div className="fixed inset-0 bg-black/20 z-20 md:hidden" onClick={() => setSidebarOpen(false)} />}
+      <div className="flex-1 overflow-y-auto">
+        <main className="p-4 md:p-8 max-w-6xl mx-auto pb-24 md:pb-8">
+           {React.cloneElement(children, { currentRoute })}
+        </main>
+      </div>
+    </div>
+  );
+};
+
+// --- PAGES ---
+const DashboardAdmin = () => (
+  <div className="space-y-6">
+    <div>
+      <h2 className="text-2xl font-bold text-gray-800">Dashboard Admin</h2>
+      <p className="text-gray-500">Ringkasan perizinan pondok secara keseluruhan.</p>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <StatCard title="Total Pengajuan Hari Ini" value="42" icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
+      <StatCard title="Santri Keluar" value="28" icon={<Icons.Scan />} color="bg-yellow-50 text-yellow-600" />
+      <StatCard title="Santri Kembali" value="12" icon={<Icons.Users />} color="bg-emerald-50 text-emerald-600" />
+      <StatCard title="Terlambat" value="0" icon={<Icons.Settings />} color="bg-red-50 text-red-600" />
+    </div>
+    <Card>
+      <h3 className="font-semibold text-lg mb-4">Aktivitas Terbaru</h3>
+      <div className="text-center text-gray-500 py-8 border-2 border-dashed rounded-lg">
+        [Data Histori Aktivitas akan ditampilkan di sini]
+      </div>
+    </Card>
+  </div>
+);
+
+const DashboardWaliKelas = () => (
+  <div className="space-y-6">
+    <div>
+      <h2 className="text-2xl font-bold text-gray-800">Dashboard Wali Kelas</h2>
+      <p className="text-gray-500">Pantau status perizinan santri di kelas Anda.</p>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <StatCard title="Total Santri" value="32" icon={<Icons.Users />} color="bg-blue-50 text-blue-600" />
+      <StatCard title="Izin Menunggu" value="3" icon={<Icons.FileText />} color="bg-yellow-50 text-yellow-600" />
+      <StatCard title="Izin Disetujui" value="5" icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
+    </div>
+    <div className="flex gap-4">
+      <Button icon={<Icons.FileText />}>Ajukan Izin Baru</Button>
+    </div>
+  </div>
+);
+
+const DashboardSecretary = () => {
+  const [stats, setStats] = useState({ totalIzin: 0, disetujui: 0, ditolak: 0, menunggu: 0, keluar: 0, kembali: 0, terlambat: 0 });
+  const [loading, setLoading] = useState(true);
+
+  const fetchDashboardData = async () => {
+    try {
+      const res = await apiService.request('getDashboard');
+      setStats(res.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+    // Near real-time polling (30s)
+    const interval = setInterval(fetchDashboardData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">Dashboard Sekretaris Mudir</h2>
+          <p className="text-gray-500">Pemantauan real-time status izin santri pekan ini.</p>
+        </div>
+        <Button variant="secondary" onClick={fetchDashboardData} disabled={loading}>
+          {loading ? 'Memuat...' : 'Refresh Data'}
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="Menunggu Screening" value={stats.menunggu} icon={<Icons.FileText />} color="bg-yellow-50 text-yellow-600" />
+        <StatCard title="Izin Disetujui" value={stats.disetujui} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
+        <StatCard title="Santri Keluar" value={stats.keluar} icon={<Icons.Scan />} color="bg-blue-50 text-blue-600" />
+        <StatCard title="Santri Terlambat" value={stats.terlambat} icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
+      </div>
+
+      <Card>
+        <h3 className="font-semibold text-lg mb-4">Daftar Menunggu Screening (Preview)</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-gray-600 border-b">
+                <th className="p-3">Nama Santri</th>
+                <th className="p-3">Kelas</th>
+                <th className="p-3">Keperluan</th>
+                <th className="p-3">Status</th>
+                <th className="p-3">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colSpan="5" className="text-center p-8 text-gray-500">Data segera dihubungkan ke backend (Phase 6)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+const ScannerSecurity = () => (
+  <div className="max-w-md mx-auto space-y-6 mt-4">
+    <div className="text-center">
+      <h2 className="text-2xl font-bold text-gray-800">Scanner Keamanan</h2>
+      <p className="text-gray-500">Arahkan kamera ke QR Code Santri</p>
+    </div>
+    <Card className="aspect-square bg-gray-900 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden">
+      {/* Visual placeholder for Camera */}
+      <div className="absolute inset-4 border-2 border-dashed border-emerald-500/50 rounded-xl" />
+      <Icons.Scan />
+      <p className="text-emerald-500 mt-4 text-sm font-medium">Meminta akses kamera...</p>
+      <p className="text-xs text-gray-500 mt-2">(Scanner diimplementasi penuh di Phase 8)</p>
+    </Card>
+    <div className="flex gap-2">
+      <Button fullWidth variant="secondary">Riwayat Hari Ini</Button>
+      <Button fullWidth variant="danger">Lapor Masalah</Button>
+    </div>
+  </div>
+);
+
+const LoginPage = () => {
+  const { login } = useContext(AuthContext);
+  const { showToast } = useContext(ToastContext);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await apiService.request('login', { username, password });
+      login(res.data);
+      showToast(`Selamat datang, ${res.data.nama}`, 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+        <div className="mx-auto w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center text-white mb-4 shadow-lg shadow-emerald-200">
+          <Icons.FileText />
+        </div>
+        <h2 className="text-3xl font-extrabold text-gray-900">PPM Al-Islam</h2>
+        <p className="mt-2 text-sm text-gray-600">Sistem Management Perizinan Keluar Santri</p>
+      </div>
+
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <Card className="py-8 px-4 sm:px-10">
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            <Input label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="Masukkan username" />
+            <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" />
             
-            <div class="p-4 flex items-center gap-3 border-b border-green-700 bg-green-900 bg-opacity-30">
-                <div class="w-10 h-10 rounded-full bg-green-700 flex items-center justify-center font-bold" id="user-initial">A</div>
-                <div class="flex flex-col">
-                    <span class="font-semibold text-sm truncate" id="user-name">Loading...</span>
-                    <span class="text-xs text-green-300" id="user-role">Role</span>
-                </div>
-            </div>
+            {USE_MOCK_API && (
+              <div className="bg-blue-50 text-blue-800 p-3 rounded text-xs">
+                <strong>Mode Mock Aktif.</strong> Coba login dengan: <br/>
+                admin/123, walikelas/123, sekretaris/123, security/123
+              </div>
+            )}
 
-            <nav class="flex-1 overflow-y-auto py-4 px-2" id="sidebar-nav">
-                <!-- Navigation items injected dynamically by Role -->
-            </nav>
-
-            <div class="p-4 border-t border-green-700">
-                <button onclick="App.Auth.handleLogout()" class="w-full flex items-center gap-3 px-4 py-2 text-sm text-green-100 hover:bg-green-700 rounded-lg transition">
-                    <i class="fa-solid fa-right-from-bracket"></i>
-                    <span>Logout</span>
-                </button>
-            </div>
-        </aside>
-
-        <!-- Main Content Wrapper -->
-        <div class="flex-1 flex flex-col min-w-0 bg-gray-50 h-full overflow-hidden">
-            <!-- Topbar Mobile -->
-            <header class="bg-white shadow-sm h-16 flex items-center justify-between px-4 md:hidden z-30">
-                <div class="flex items-center gap-3">
-                    <i class="fa-solid fa-mosque text-primary"></i>
-                    <span class="font-bold text-gray-800">Al-Islam</span>
-                </div>
-                <button class="text-gray-600 hover:text-primary" onclick="App.UI.toggleSidebar()">
-                    <i class="fa-solid fa-bars text-xl"></i>
-                </button>
-            </header>
-
-            <!-- Main Scrollable Area -->
-            <main class="flex-1 overflow-y-auto p-4 md:p-8" id="main-content">
-                
-                <!-- PAGE: DASHBOARD -->
-                <div id="page-dash" class="app-page">
-                    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                        <h2 class="text-2xl font-bold text-gray-800 mb-2">Dashboard Utama</h2>
-                        <p class="text-gray-600">Sistem Management Perizinan Keluar Santri.</p>
-                        <p class="text-gray-600 mt-4 font-semibold text-sm bg-blue-50 p-3 rounded text-blue-800">
-                            <i class="fa-solid fa-circle-check mr-2"></i> Phase 1, 2 & 4 Aktif. Master Data & Jadwal Perizinan siap digunakan.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- PAGE: MASTER DATA (DYNAMIC SHELL) -->
-                <div id="page-master" class="app-page hidden flex flex-col gap-4">
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 id="md-title" class="text-lg font-semibold text-gray-800">Master Data</h3>
-                            <button id="md-btn-add" class="hidden bg-primary text-white px-3 py-1.5 rounded text-sm hover:bg-green-700 transition">
-                                <i class="fa-solid fa-plus mr-1"></i> Tambah Data
-                            </button>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead id="md-thead" class="bg-gray-50 border-y border-gray-200 text-sm text-gray-600">
-                                    <!-- Table headers injected here -->
-                                </thead>
-                                <tbody id="md-tbody" class="text-sm divide-y divide-gray-100">
-                                    <tr><td class="py-4 text-center text-gray-500">Pilih menu master data di sidebar untuk memuat data.</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- PAGE: JADWAL PERIZINAN -->
-                <div id="page-jadwal" class="app-page hidden flex flex-col gap-4">
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <div>
-                                <h3 class="text-lg font-semibold text-gray-800">Pengaturan Jadwal Perizinan Jumat</h3>
-                                <p class="text-xs text-gray-500 mt-1">Jadwal mingguan otomatis yang menentukan tanggal dan giliran penjemputan santri.</p>
-                            </div>
-                            <button onclick="App.Jadwal.load()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded text-sm transition">
-                                <i class="fa-solid fa-rotate mr-1"></i> Refresh
-                            </button>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead class="bg-gray-50 border-y border-gray-200 text-sm text-gray-600">
-                                    <tr>
-                                        <th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">Pekan</th>
-                                        <th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">Jenjang</th>
-                                        <th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">Gender</th>
-                                        <th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">Hari</th>
-                                        <th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">Jam Resmi</th>
-                                        <th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">Status</th>
-                                        <th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="jadwal-tbody" class="text-sm divide-y divide-gray-100">
-                                    <tr><td colspan="7" class="py-4 text-center text-gray-500">Memuat data jadwal...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-            </main>
-        </div>
-        
-        <!-- Mobile Sidebar Overlay -->
-        <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden md:hidden" onclick="App.UI.toggleSidebar()"></div>
+            <Button type="submit" fullWidth disabled={loading}>
+              {loading ? 'Memverifikasi...' : 'Masuk ke Sistem'}
+            </Button>
+          </form>
+        </Card>
+      </div>
     </div>
+  );
+};
 
-    <!-- ============================================================================== -->
-    <!-- APPLICATION LOGIC (MODULES) -->
-    <!-- ============================================================================== -->
-    <script>
-        const App = {
-            Config: {
-                API_URL: 'https://script.google.com/macros/s/AKfycbyddspvXA3vpGmDpHYjm5-uOlbEdSbDTYygeHsNv192SokqVrEKwBxiZAkYXVscTomM/exec'
-            },
+const MainRouter = ({ currentRoute }) => {
+  const { user } = useContext(AuthContext);
 
-            State: {
-                user: null,
-                token: localStorage.getItem('auth_token') || null
-            },
+  if (currentRoute === 'dashboard') {
+    switch (user.role) {
+      case ROLES.ADMIN: return <DashboardAdmin />;
+      case ROLES.WALI_KELAS: return <DashboardWaliKelas />;
+      case ROLES.SEKRETARIS_MUDIR: return <DashboardSecretary />;
+      case ROLES.SECURITY: return <ScannerSecurity />; // Security defaults to scanner
+      default: return <div>Unknown Role</div>;
+    }
+  }
 
-            API: {
-                async post(action, data = {}) {
-                    const payload = {
-                        action: action,
-                        token: App.State.token,
-                        data: data
-                    };
+  if (currentRoute === 'scanner') return <ScannerSecurity />;
+  
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-center">
+      <Icons.FileText />
+      <h3 className="mt-4 text-lg font-medium text-gray-900">Modul {currentRoute}</h3>
+      <p className="mt-1 text-gray-500">Modul ini akan dibangun pada fase pengembangan berikutnya sesuai PRD.</p>
+    </div>
+  );
+};
 
-                    try {
-                        const response = await fetch(App.Config.API_URL, {
-                            method: 'POST',
-                            body: JSON.stringify(payload)
-                        });
-                        
-                        if (!response.ok) throw new Error("Koneksi ke server gagal");
-                        const result = await response.json();
-                        
-                        if (!result.success && result.code === 'UNAUTHORIZED') {
-                            App.Auth.forceLogout();
-                        }
-                        
-                        return result;
-                    } catch (error) {
-                        console.error('API Error:', error);
-                        return { success: false, message: 'Terjadi kesalahan jaringan. Periksa koneksi Anda.' };
-                    }
-                }
-            },
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [toast, setToast] = useState(null);
 
-            Auth: {
-                async handleLogin(e) {
-                    e.preventDefault();
-                    
-                    const userVal = document.getElementById('username').value;
-                    const passVal = document.getElementById('password').value;
-                    const btnText = document.getElementById('text-login');
-                    const spinner = document.getElementById('spinner-login');
-                    const btn = document.getElementById('btn-login');
-                    
-                    btn.disabled = true;
-                    btn.classList.add('opacity-80');
-                    btnText.innerText = 'Memproses...';
-                    spinner.classList.remove('hidden');
+  const showToast = (message, type = 'success') => setToast({ message, type });
 
-                    const response = await App.API.post('login', { username: userVal, password: passVal });
-                    
-                    btn.disabled = false;
-                    btn.classList.remove('opacity-80');
-                    btnText.innerText = 'Masuk Sistem';
-                    spinner.classList.add('hidden');
+  const authValue = {
+    user,
+    login: (userData) => setUser(userData),
+    logout: () => setUser(null)
+  };
 
-                    if (response.success) {
-                        App.State.token = response.data.token;
-                        App.State.user = response.data;
-                        localStorage.setItem('auth_token', response.data.token);
-                        localStorage.setItem('user_data', JSON.stringify(response.data));
-                        
-                        App.UI.showToast('Login berhasil!', 'success');
-                        App.UI.renderApp();
-                    } else {
-                        App.UI.showToast(response.message, 'error');
-                    }
-                },
-
-                async handleLogout() {
-                    if(!confirm('Apakah Anda yakin ingin keluar?')) return;
-                    App.UI.showToast('Sedang keluar sistem...', 'info');
-                    await App.API.post('logout');
-                    this.forceLogout();
-                },
-
-                forceLogout() {
-                    App.State.token = null;
-                    App.State.user = null;
-                    localStorage.removeItem('auth_token');
-                    localStorage.removeItem('user_data');
-                    App.UI.showLogin();
-                },
-
-                async checkSession() {
-                    if (!App.State.token) {
-                        App.UI.showLogin();
-                        return;
-                    }
-
-                    const savedUser = localStorage.getItem('user_data');
-                    if (savedUser) {
-                        App.State.user = JSON.parse(savedUser);
-                        App.UI.renderApp();
-                    }
-
-                    const response = await App.API.post('getCurrentUser');
-                    if (response.success) {
-                        App.State.user = response.data;
-                        localStorage.setItem('user_data', JSON.stringify(response.data));
-                        App.UI.updateUserInfo();
-                    } else {
-                        this.forceLogout();
-                    }
-                }
-            },
-
-            UI: {
-                showLogin() {
-                    document.getElementById('view-app').classList.add('hidden');
-                    document.getElementById('view-login').classList.remove('hidden');
-                    document.getElementById('form-login').reset();
-                },
-
-                renderApp() {
-                    document.getElementById('view-login').classList.add('hidden');
-                    document.getElementById('view-app').classList.remove('hidden');
-                    this.updateUserInfo();
-                    this.renderSidebar();
-                },
-
-                updateUserInfo() {
-                    if (!App.State.user) return;
-                    const name = App.State.user.nama || 'User';
-                    document.getElementById('user-name').innerText = name;
-                    document.getElementById('user-role').innerText = App.State.user.role.replace('_', ' ');
-                    document.getElementById('user-initial').innerText = name.charAt(0).toUpperCase();
-                },
-
-                renderSidebar() {
-                    const role = App.State.user.role;
-                    const navContainer = document.getElementById('sidebar-nav');
-                    let menus = [];
-
-                    if (role === 'ADMIN') {
-                        menus = [
-                            { id: 'dash', label: 'Dashboard', icon: 'fa-chart-pie', type: 'menu' },
-                            { label: 'MASTER DATA', type: 'header' },
-                            { id: 'master_TAHUN_PELAJARAN', label: 'Tahun Pelajaran', icon: 'fa-calendar', type: 'menu' },
-                            { id: 'master_KELAS', label: 'Data Kelas', icon: 'fa-chalkboard-teacher', type: 'menu' },
-                            { id: 'master_SANTRI', label: 'Data Santri', icon: 'fa-users', type: 'menu' },
-                            { id: 'master_USERS', label: 'Data Users', icon: 'fa-user-shield', type: 'menu' },
-                            { label: 'OPERASIONAL', type: 'header' },
-                            { id: 'jadwal', label: 'Jadwal Perizinan', icon: 'fa-calendar-alt', type: 'menu' },
-                            { id: 'laporan', label: 'Laporan', icon: 'fa-print', type: 'menu' },
-                            { id: 'settings', label: 'Pengaturan', icon: 'fa-cog', type: 'menu' }
-                        ];
-                    } else if (role === 'WALI_KELAS') {
-                        menus = [
-                            { id: 'dash', label: 'Dashboard Kelas', icon: 'fa-home', type: 'menu' },
-                            { label: 'PERIZINAN', type: 'header' },
-                            { id: 'pengajuan', label: 'Ajukan Izin', icon: 'fa-plus-circle', type: 'menu' },
-                            { id: 'histori', label: 'Histori Santri', icon: 'fa-history', type: 'menu' }
-                        ];
-                    } else if (role === 'SEKRETARIS_MUDIR') {
-                        menus = [
-                            { id: 'dash', label: 'Dashboard Real-Time', icon: 'fa-chart-line', type: 'menu' },
-                            { label: 'VERIFIKASI', type: 'header' },
-                            { id: 'approval', label: 'Screening & Approval', icon: 'fa-check-double', type: 'menu' }
-                        ];
-                    } else if (role === 'SECURITY') {
-                        menus = [
-                            { id: 'scan', label: 'SCAN QR', icon: 'fa-qrcode', type: 'menu' },
-                            { label: 'MONITORING', type: 'header' },
-                            { id: 'monitor', label: 'Santri di Luar', icon: 'fa-binoculars', type: 'menu' }
-                        ];
-                    }
-
-                    navContainer.innerHTML = '';
-                    menus.forEach((menu) => {
-                        if (menu.type === 'header') {
-                            const header = document.createElement('div');
-                            header.className = 'px-4 py-2 mt-4 mb-1 text-xs font-bold text-green-300 opacity-70 tracking-wider';
-                            header.innerText = menu.label;
-                            navContainer.appendChild(header);
-                            return;
-                        }
-
-                        const activeClass = menu.id === 'dash' ? 'bg-green-700 text-white menu-active' : 'text-green-100 hover:bg-green-800';
-                        const a = document.createElement('a');
-                        a.href = '#';
-                        a.className = `flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition menu-item ${activeClass}`;
-                        a.innerHTML = `<i class="fa-solid ${menu.icon} w-5 text-center"></i><span class="font-medium text-sm">${menu.label}</span>`;
-                        
-                        a.onclick = (e) => {
-                            e.preventDefault();
-                            document.querySelectorAll('.menu-item').forEach(child => {
-                                child.classList.remove('bg-green-700', 'text-white', 'menu-active');
-                                child.classList.add('text-green-100');
-                            });
-                            a.classList.remove('text-green-100');
-                            a.classList.add('bg-green-700', 'text-white', 'menu-active');
-                            App.UI.toggleSidebar(true);
-                            
-                            App.Pages.switch(menu.id);
-                        };
-
-                        navContainer.appendChild(a);
-                    });
-                },
-
-                toggleSidebar(forceClose = false) {
-                    const sidebar = document.getElementById('sidebar');
-                    const overlay = document.getElementById('sidebar-overlay');
-                    
-                    if (forceClose || !sidebar.classList.contains('-translate-x-full')) {
-                        sidebar.classList.add('-translate-x-full');
-                        overlay.classList.add('hidden');
-                    } else {
-                        sidebar.classList.remove('-translate-x-full');
-                        overlay.classList.remove('hidden');
-                    }
-                },
-
-                showToast(message, type = 'info') {
-                    const container = document.getElementById('toast-container');
-                    const toast = document.createElement('div');
-                    const bg = type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-gray-800';
-                    toast.className = `${bg} text-white px-4 py-3 rounded-lg shadow-lg text-sm flex items-center justify-between gap-4 transition-all duration-300 transform translate-y-2 opacity-0`;
-                    toast.innerHTML = `<span>${message}</span><button onclick="this.parentElement.remove()" class="text-white opacity-80 hover:opacity-100"><i class="fa-solid fa-times"></i></button>`;
-                    container.appendChild(toast);
-                    
-                    setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
-                    setTimeout(() => {
-                        toast.classList.add('opacity-0');
-                        setTimeout(() => toast.remove(), 300);
-                    }, 4000);
-                },
-
-                closeModal() {
-                    document.getElementById('modal-container').classList.add('hidden');
-                    document.getElementById('modal-form').reset();
-                }
-            },
-
-            Pages: {
-                switch(pageId) {
-                    document.querySelectorAll('.app-page').forEach(el => el.classList.add('hidden'));
-                    
-                    let targetId = `page-${pageId}`;
-                    let isMasterData = false;
-                    let masterEntity = null;
-
-                    if (pageId.startsWith('master_')) {
-                        targetId = 'page-master';
-                        isMasterData = true;
-                        masterEntity = pageId.replace('master_', '');
-                    }
-
-                    const target = document.getElementById(targetId);
-                    
-                    if(target) {
-                        target.classList.remove('hidden');
-                    } else {
-                        document.getElementById('page-dash').classList.remove('hidden');
-                        App.UI.showToast('Modul dalam tahap pengembangan (MVP).', 'info');
-                    }
-
-                    if(isMasterData && masterEntity) {
-                        App.MasterData.load(masterEntity);
-                    } else if(pageId === 'jadwal') {
-                        App.Jadwal.load();
-                    }
-                }
-            },
-
-            MasterData: {
-                currentEntity: null,
-                
-                schemas: {
-                    'TAHUN_PELAJARAN': [
-                        { name: 'nama_tahun', label: 'Nama Tahun Pelajaran (Misal: 2026/2027)', type: 'text', required: true }
-                    ],
-                    'KELAS': [
-                        { name: 'nama_kelas', label: 'Nama Kelas (Misal: VII-A)', type: 'text', required: true },
-                        { name: 'jenjang', label: 'Jenjang', type: 'select', options: ['SMP', 'SMA'], required: true },
-                        { name: 'tahun_pelajaran_id', label: 'ID Tahun Pelajaran', type: 'text', required: true, note: 'Ambil dari data Tahun Pelajaran' },
-                        { name: 'wali_kelas_id', label: 'ID Wali Kelas (User ID)', type: 'text', required: true, note: 'Ambil dari data Users' }
-                    ],
-                    'SANTRI': [
-                        { name: 'nama_santri', label: 'Nama Lengkap Santri', type: 'text', required: true },
-                        { name: 'jenis_kelamin', label: 'Jenis Kelamin', type: 'select', options: ['Laki-laki', 'Perempuan'], required: true },
-                        { name: 'jenjang', label: 'Jenjang', type: 'select', options: ['SMP', 'SMA'], required: true },
-                        { name: 'kelas_id', label: 'ID Kelas', type: 'text', required: true, note: 'Ambil dari data Kelas' },
-                        { name: 'kota_asal', label: 'Kota Asal', type: 'text', required: true },
-                        { name: 'nama_ayah', label: 'Nama Ayah', type: 'text', required: true },
-                        { name: 'nomor_telepon', label: 'Nomor Telepon WA (08...)', type: 'text', required: true }
-                    ],
-                    'USERS': [
-                        { name: 'username', label: 'Username Login', type: 'text', required: true },
-                        { name: 'password', label: 'Password (Minimal 6 karakter)', type: 'password', required: true },
-                        { name: 'nama', label: 'Nama Lengkap', type: 'text', required: true },
-                        { name: 'role', label: 'Hak Akses (Role)', type: 'select', options: ['ADMIN', 'WALI_KELAS', 'SEKRETARIS_MUDIR', 'SECURITY'], required: true },
-                        { name: 'jenjang', label: 'Jenjang (Opsional, khusus Wali Kelas)', type: 'select', options: ['', 'SMP', 'SMA'], required: false },
-                        { name: 'kelas_id', label: 'ID Kelas (Opsional, khusus Wali Kelas)', type: 'text', required: false }
-                    ]
-                },
-
-                async load(entity) {
-                    this.currentEntity = entity;
-                    document.getElementById('md-title').innerText = `Data ${entity.replace('_', ' ')}`;
-                    document.getElementById('md-tbody').innerHTML = `<tr><td class="py-4 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat data...</td></tr>`;
-                    document.getElementById('md-thead').innerHTML = '';
-                    
-                    const btnAdd = document.getElementById('md-btn-add');
-                    btnAdd.classList.remove('hidden');
-                    btnAdd.onclick = () => this.showModal();
-
-                    const response = await App.API.post('getMasterData', { entity: entity });
-                    
-                    if(response.success) {
-                        this.renderTable(response.data);
-                    } else {
-                        document.getElementById('md-tbody').innerHTML = `<tr><td class="py-4 text-center text-red-500">Gagal memuat data: ${response.message}</td></tr>`;
-                    }
-                },
-
-                renderTable(data) {
-                    const thead = document.getElementById('md-thead');
-                    const tbody = document.getElementById('md-tbody');
-                    
-                    if(!data || data.length === 0) {
-                        tbody.innerHTML = `<tr><td class="py-4 text-center text-gray-500">Belum ada data tersedia.</td></tr>`;
-                        thead.innerHTML = '';
-                        return;
-                    }
-
-                    const keys = Object.keys(data[0]).filter(k => k !== 'password_hash' && k !== 'session_token');
-                    
-                    let trHead = '<tr>';
-                    keys.forEach(k => {
-                        trHead += `<th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">${k.replace(/_/g, ' ')}</th>`;
-                    });
-                    trHead += '</tr>';
-                    thead.innerHTML = trHead;
-
-                    let trBody = '';
-                    data.forEach(row => {
-                        trBody += '<tr class="hover:bg-gray-50 transition">';
-                        keys.forEach(k => {
-                            let val = row[k];
-                            
-                            if(val && typeof val === 'string' && (val.includes('T') && val.includes('Z') || !isNaN(Date.parse(val)) && val.length > 10)) {
-                                try {
-                                    val = new Date(val).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-                                } catch(e) {}
-                            }
-                            
-                            if(k === 'status' || k === 'status_santri') {
-                                const color = val === 'AKTIF' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
-                                val = `<span class="px-2 py-1 text-xs font-semibold rounded-full ${color}">${val}</span>`;
-                            }
-                            
-                            trBody += `<td class="py-3 px-4 text-gray-700">${val !== undefined && val !== null && val !== '' ? val : '-'}</td>`;
-                        });
-                        trBody += '</tr>';
-                    });
-                    tbody.innerHTML = trBody;
-                },
-
-                showModal() {
-                    const entity = this.currentEntity;
-                    const schema = this.schemas[entity];
-                    if(!schema) {
-                        App.UI.showToast('Skema form belum dikonfigurasi untuk entitas ini.', 'error');
-                        return;
-                    }
-
-                    document.getElementById('modal-title').innerText = `Tambah ${entity.replace('_', ' ')}`;
-                    const container = document.getElementById('modal-body');
-                    container.innerHTML = '';
-
-                    schema.forEach(field => {
-                        let inputHtml = '';
-                        const requiredAttr = field.required ? 'required' : '';
-                        
-                        if (field.type === 'select') {
-                            let options = field.options.map(opt => `<option value="${opt}">${opt === '' ? '-- Kosongkan jika tidak perlu --' : opt}</option>`).join('');
-                            inputHtml = `<select id="field_${field.name}" name="${field.name}" class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-primary focus:border-primary" ${requiredAttr}>${options}</select>`;
-                        } else {
-                            inputHtml = `<input type="${field.type}" id="field_${field.name}" name="${field.name}" class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-primary focus:border-primary" ${requiredAttr}>`;
-                        }
-
-                        const noteHtml = field.note ? `<p class="text-xs text-gray-500 mt-1"><i class="fa-solid fa-circle-info mr-1"></i>${field.note}</p>` : '';
-
-                        container.innerHTML += `
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1" for="field_${field.name}">${field.label}</label>
-                                ${inputHtml}
-                                ${noteHtml}
-                            </div>
-                        `;
-                    });
-
-                    document.getElementById('modal-container').classList.remove('hidden');
-                },
-
-                async submitForm(e) {
-                    e.preventDefault();
-                    
-                    const btnSave = document.getElementById('modal-btn-save');
-                    const btnText = document.getElementById('modal-btn-text');
-                    const spinner = document.getElementById('modal-spinner');
-                    
-                    btnSave.disabled = true;
-                    btnText.innerText = 'Menyimpan...';
-                    spinner.classList.remove('hidden');
-
-                    const formData = {};
-                    const schema = this.schemas[this.currentEntity];
-                    schema.forEach(field => {
-                        formData[field.name] = document.getElementById(`field_${field.name}`).value;
-                    });
-
-                    const response = await App.API.post('createMasterData', {
-                        entity: this.currentEntity,
-                        formData: formData
-                    });
-
-                    btnSave.disabled = false;
-                    btnText.innerText = 'Simpan Data';
-                    spinner.classList.add('hidden');
-
-                    if(response.success) {
-                        App.UI.showToast(response.message, 'success');
-                        App.UI.closeModal();
-                        this.load(this.currentEntity);
-                    } else {
-                        App.UI.showToast(response.message, 'error');
-                    }
-                }
-            },
-
-            Jadwal: {
-                async load() {
-                    const tbody = document.getElementById('jadwal-tbody');
-                    tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat jadwal perizinan...</td></tr>`;
-
-                    const response = await App.API.post('getSchedules');
-                    if(response.success) {
-                        this.renderTable(response.data);
-                    } else {
-                        tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-red-500">Gagal memuat jadwal: ${response.message}</td></tr>`;
-                    }
-                },
-
-                renderTable(data) {
-                    const tbody = document.getElementById('jadwal-tbody');
-                    if(!data || data.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-gray-500">Belum ada konfigurasi jadwal.</td></tr>`;
-                        return;
-                    }
-
-                    let tr = '';
-                    data.forEach(item => {
-                        const statusBadge = item.status === 'AKTIF' 
-                            ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">AKTIF</span>' 
-                            : '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">NONAKTIF</span>';
-
-                        tr += `
-                            <tr class="hover:bg-gray-50 transition">
-                                <td class="py-3 px-4 font-bold text-gray-800">${item.pekan}</td>
-                                <td class="py-3 px-4 text-gray-700">${item.jenjang}</td>
-                                <td class="py-3 px-4 text-gray-700">${item.gender}</td>
-                                <td class="py-3 px-4 text-gray-700">${item.hari}</td>
-                                <td class="py-3 px-4 text-gray-700">${item.jam_mulai} - ${item.jam_selesai}</td>
-                                <td class="py-3 px-4">${statusBadge}</td>
-                                <td class="py-3 px-4">
-                                    <button onclick="App.Jadwal.toggleStatus('${item.jadwal_id}', '${item.status}')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1 rounded transition">
-                                        Ubah Status
-                                    </button>
-                                </td>
-                            </tr>
-                        `;
-                    });
-                    tbody.innerHTML = tr;
-                },
-
-                async toggleStatus(jadwalId, currentStatus) {
-                    const newStatus = currentStatus === 'AKTIF' ? 'NONAKTIF' : 'AKTIF';
-                    const response = await App.API.post('updateSchedule', {
-                        jadwal_id: jadwalId,
-                        status: newStatus
-                    });
-
-                    if(response.success) {
-                        App.UI.showToast(response.message, 'success');
-                        this.load();
-                    } else {
-                        App.UI.showToast(response.message, 'error');
-                    }
-                }
-            },
-
-            init() {
-                console.log("App Initializing - Phase 4 Active");
-                this.Auth.checkSession();
-            }
-        };
-
-        document.addEventListener('DOMContentLoaded', () => App.init());
-    </script>
-</body>
-</html>
+  return (
+    <ToastContext.Provider value={{ showToast }}>
+      <AuthContext.Provider value={authValue}>
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+        
+        {!user ? (
+          <LoginPage />
+        ) : (
+          <Layout>
+            <MainRouter />
+          </Layout>
+        )}
+      </AuthContext.Provider>
+    </ToastContext.Provider>
+  );
+}
