@@ -46,7 +46,7 @@
     <div id="root" class="h-full"></div>
 
     <script type="text/babel">
-        const STORAGE_KEY = 'al_islam_perizinan_db_v1.1';
+        const STORAGE_KEY = 'al_islam_perizinan_db_v2.0';
         
         const initialDB = {
             academicYears: [
@@ -148,8 +148,7 @@
         };
 
         const callBackendAPI = async (action, payload = {}) => {
-            // Simulate network latency for authentic feel
-            await new Promise(resolve => setTimeout(resolve, 350));
+            await new Promise(resolve => setTimeout(resolve, 300));
             const db = getDB();
 
             switch(action) {
@@ -160,7 +159,6 @@
                 }
                 case 'getDashboardData': {
                     const { role, userId } = payload;
-                    const now = new Date();
                     const activeYear = db.academicYears.find(y => y.active) || db.academicYears[0];
                     
                     let permits = db.permits;
@@ -199,7 +197,7 @@
                 }
                 case 'createPermit': {
                     const newId = 'prm_' + Date.now();
-                    const schedule = db.schedules[0]; // Default active schedule
+                    const schedule = db.schedules[0];
                     const newPermit = {
                         permit_id: newId,
                         santri_id: payload.santri_id,
@@ -295,7 +293,6 @@
                     const nowISO = now.toISOString();
 
                     if (!exitLog) {
-                        // Scan 1: EXIT
                         const newScan = {
                             scan_id: 'scn_' + Date.now(),
                             permit_id: permit.permit_id,
@@ -324,23 +321,17 @@
                             data: { permit, santri: santriInfo, scan_time: nowISO }
                         };
                     } else if (!returnLog) {
-                        // Scan 2: RETURN
-                        // Calculate time status based on 16.00 and 16.30
                         const hours = now.getHours();
                         const minutes = now.getMinutes();
                         const totalMinutes = hours * 60 + minutes;
-                        const limitStandard = 16 * 60; // 16.00
-                        const limitTolerance = 16 * 60 + 30; // 16.30
+                        const limitStandard = 16 * 60;
+                        const limitTolerance = 16 * 60 + 30;
 
                         let statusKembali = 'TEPAT WAKTU';
-                        let desc = 'Kembali tepat waktu (≤ 16.00)';
-
                         if (totalMinutes > limitStandard && totalMinutes <= limitTolerance) {
                             statusKembali = 'TERLAMBAT KEMBALI - DALAM TOLERANSI';
-                            desc = 'Terlambat kembali dalam rentang toleransi (16.00 - 16.30)';
                         } else if (totalMinutes > limitTolerance) {
                             statusKembali = 'TERLAMBAT KEMBALI - MELEWATI TOLERANSI';
-                            desc = 'Terlambat kembali melewati batas toleransi (> 16.30)';
                         }
 
                         const newScan = {
@@ -371,7 +362,6 @@
                             data: { permit, santri: santriInfo, scan_time: nowISO, statusKembali }
                         };
                     } else {
-                        // Scan 3: ALREADY COMPLETED
                         return { 
                             success: false, 
                             code: 'QR_ALREADY_COMPLETED', 
@@ -380,7 +370,6 @@
                     }
                 }
                 case 'promoteStudents': {
-                    // Simulates promotion of classes
                     const { from_year, to_year } = payload;
                     db.classes.forEach(cls => {
                         if (cls.name.startsWith('VII')) cls.name = cls.name.replace('VII', 'VIII');
@@ -459,7 +448,6 @@
 
             return (
                 <div className="h-full flex flex-col bg-slate-50">
-                    {/* Header Navigation */}
                     <header className="bg-emerald-800 text-white shadow-md sticky top-0 z-50">
                         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
                             <div className="flex items-center space-x-3">
@@ -486,7 +474,6 @@
                         </div>
                     </header>
 
-                    {/* Toast Notification */}
                     {toast && (
                         <div className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-lg text-white font-medium text-sm flex items-center space-x-2 animate-bounce ${toast.type === 'error' ? 'bg-rose-600' : 'bg-emerald-600'}`}>
                             <i className={`fa-solid ${toast.type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'}`}></i>
@@ -494,7 +481,6 @@
                         </div>
                     )}
 
-                    {/* Main Content Area based on Role */}
                     <main className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
                         <div className="max-w-7xl mx-auto">
                             {currentUser.role === 'ADMIN' && <AdminModule currentUser={currentUser} showToast={showToast} />}
@@ -602,7 +588,7 @@
             }, []);
 
             const handlePromote = async () => {
-                if (confirm('Jalankan proses kenaikan kelas massal tahun pelajaran?')) {
+                if (window.confirm('Jalankan proses kenaikan kelas massal tahun pelajaran?')) {
                     const res = await callBackendAPI('promoteStudents', { from_year: 'ay_2025', to_year: 'ay_2026' });
                     if (res.success) {
                         showToast(res.message);
@@ -621,7 +607,6 @@
 
             return (
                 <div className="space-y-6">
-                    {/* Admin Navigation Tabs */}
                     <div className="flex space-x-2 border-b overflow-x-auto pb-2">
                         <button onClick={() => setActiveTab('dashboard')} className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition ${activeTab === 'dashboard' ? 'bg-emerald-600 text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100'}`}>Dashboard Overview</button>
                         <button onClick={() => setActiveTab('promosi')} className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition ${activeTab === 'promosi' ? 'bg-emerald-600 text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100'}`}>Kenaikan Kelas</button>
@@ -726,8 +711,31 @@
                         <div className="bg-white p-6 rounded-2xl shadow space-y-4">
                             <h3 className="font-bold text-slate-800 text-lg">Master Data Santri & Rombel Kelas</h3>
                             <p className="text-sm text-slate-600">Kelola database santri, kelas, dan akun pengguna secara terpusat melalui backend.</p>
-                            <div className="bg-slate-50 p-4 rounded-xl border text-center text-sm text-slate-500">
-                                Data tersinkronisasi otomatis dengan Google Sheets & Google Apps Script API.
+                            <div className="overflow-x-auto mt-2">
+                                <table className="w-full text-left text-sm">
+                                    <thead>
+                                        <tr className="border-b bg-slate-50 text-slate-600 font-semibold text-xs uppercase">
+                                            <th className="p-3">Nama Santri</th>
+                                            <th className="p-3">Jenjang</th>
+                                            <th className="p-3">Kota Asal</th>
+                                            <th className="p-3">Nama Ayah</th>
+                                            <th className="p-3">Telepon</th>
+                                            <th className="p-3">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {getDB().santri.map(s => (
+                                            <tr key={s.santri_id} className="border-b hover:bg-slate-50">
+                                                <td className="p-3 font-medium text-slate-800">{s.nama_santri}</td>
+                                                <td className="p-3 text-slate-600">{s.jenjang}</td>
+                                                <td className="p-3">{s.kota_asal}</td>
+                                                <td className="p-3">{s.nama_ayah}</td>
+                                                <td className="p-3">{s.nomor_telepon}</td>
+                                                <td className="p-3"><span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-xs">{s.status_santri}</span></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     )}
@@ -758,7 +766,6 @@
             const [dashboardData, setDashboardData] = React.useState(null);
             const [loading, setLoading] = React.useState(true);
 
-            // Form states
             const [selectedSantriId, setSelectedSantriId] = React.useState('');
             const [keperluan, setKeperluan] = React.useState('');
             const [tujuan, setTujuan] = React.useState('');
@@ -983,7 +990,7 @@
                                                     </td>
                                                     <td className="p-3">
                                                         {p.status_pengajuan === 'DISETUJUI' ? (
-                                                            <button onClick={() => alert(`QR Token untuk ${sInfo?.nama_santri}:\n${p.qr_token}\n\nJam Perizinan Resmi: 08.00–16.00`)} className="bg-emerald-600 text-white px-3 py-1 rounded-lg text-xs font-medium hover:bg-emerald-700">
+                                                            <button onClick={() => window.alert(`QR Token untuk ${sInfo?.nama_santri}:\n${p.qr_token}\n\nJam Perizinan Resmi: 08.00–16.00`)} className="bg-emerald-600 text-white px-3 py-1 rounded-lg text-xs font-medium hover:bg-emerald-700">
                                                                 <i className="fa-solid fa-qrcode mr-1"></i> Lihat QR
                                                             </button>
                                                         ) : (
@@ -1017,7 +1024,7 @@
 
             React.useEffect(() => {
                 loadData();
-                const interval = setInterval(loadData, 20000); // Near real-time polling 20s
+                const interval = setInterval(loadData, 20000);
                 return () => clearInterval(interval);
             }, []);
 
@@ -1130,7 +1137,6 @@
                         </div>
                     </div>
 
-                    {/* Reject Modal */}
                     {rejectModalPermitId && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
                             <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4">
@@ -1158,7 +1164,7 @@
         function SecurityModule({ currentUser, showToast }) {
             const [qrInput, setQrInput] = React.useState('');
             const [scanResult, setScanResult] = React.useState(null);
-            const [simulatingCamera, setSimulatingCamera] = React.useState(false);
+            const [cameraActive, setCameraActive] = React.useState(false);
 
             const handleScan = async (tokenToScan) => {
                 const token = tokenToScan || qrInput;
@@ -1184,6 +1190,24 @@
                         </div>
                         <h3 className="font-bold text-slate-800 text-xl">Scanner Pos Keamanan (Security)</h3>
                         <p className="text-xs text-slate-500">Scan QR Code santri untuk pencatatan Exit (Keluar) dan Return (Kembali).</p>
+
+                        <div className="p-4 bg-slate-900 rounded-2xl text-white relative overflow-hidden flex flex-col items-center justify-center min-h-[180px]">
+                            {cameraActive ? (
+                                <div className="space-y-2 text-center">
+                                    <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                    <p className="text-xs text-slate-300">Kamera aktif menyorot QR Code...</p>
+                                    <button onClick={() => setCameraActive(false)} className="px-3 py-1 bg-rose-600 text-white rounded-lg text-xs font-medium">Matikan Kamera</button>
+                                </div>
+                            ) : (
+                                <div className="space-y-2 text-center">
+                                    <i className="fa-solid fa-camera text-3xl text-slate-400"></i>
+                                    <p className="text-xs text-slate-400">Kamera siap digunakan untuk pemindaian</p>
+                                    <button onClick={() => setCameraActive(true)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition shadow">
+                                        Aktifkan Kamera Scanner
+                                    </button>
+                                </div>
+                            )}
+                        </div>
 
                         <div className="space-y-3 pt-2">
                             <input 
@@ -1228,7 +1252,6 @@
             );
         }
 
-        // Mount React Root
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
