@@ -332,7 +332,7 @@
 
                     if(window.innerWidth < 1024) { document.getElementById('sidebar').classList.add('-translate-x-full'); document.getElementById('mobile-overlay').classList.add('hidden'); }
                     
-                    const titles = { 'dashboard': 'Dashboard', 'scanner': 'Pos Security', 'approval': 'Approval Sekretaris', 'pengajuan': 'Ajukan Izin', 'histori': 'Histori Izin' };
+                    const titles = { 'dashboard': 'Dashboard', 'master-santri': 'Data Santri', 'master-kelas': 'Data Kelas', 'master-tahun': 'Tahun Pelajaran', 'jadwal': 'Jadwal Perizinan', 'scanner': 'Pos Security', 'approval': 'Approval Sekretaris', 'pengajuan': 'Ajukan Izin', 'histori': 'Histori Izin' };
                     document.getElementById('page-title').textContent = titles[route] || 'Modul';
                     
                     const container = document.getElementById('content-area');
@@ -346,58 +346,150 @@
             },
 
             views: {
-                renderDashboard(container) { /* Mockup Dashboard */ container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 text-center relative"><div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"><i class="ph ph-rocket text-3xl text-slate-400"></i></div><h3 class="text-lg font-semibold text-slate-800">Dashboard ${App.state.user.role}</h3></div>`; },
+                renderDashboard(container) {
+                    let adminTools = App.state.user.role === 'ADMIN' ? `<div class="mt-8 p-4 bg-orange-50 border border-orange-200 rounded-lg text-left"><h4 class="font-bold text-orange-800 mb-2">Developer Tools</h4><p class="text-sm text-orange-700 mb-3">Gunakan fitur ini untuk membuat data dummy (Tahun Pelajaran, Kelas, dan Santri) agar aplikasi bisa langsung ditest.</p><button onclick="App.actions.generateDummy()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded text-sm font-semibold transition">Generate Data Dummy</button></div>` : '';
+                    container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 text-center relative"><div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"><i class="ph ph-rocket text-3xl text-slate-400"></i></div><h3 class="text-lg font-semibold text-slate-800">Dashboard ${App.state.user.role}</h3><p class="text-slate-500 mt-2">Selamat datang di Sistem Perizinan Santri Al-Islam.</p>${adminTools}</div>`; 
+                },
                 
-                // --- PENGELOLAAN IZIN MODULES ---
+                'master-santri'(container) {
+                    App.api.post('getSantri').then(res => {
+                        let rows = '';
+                        if(res.data.length === 0) rows = `<tr><td colspan="6" class="p-8 text-center text-slate-500">Belum ada data santri</td></tr>`;
+                        else res.data.forEach(s => rows += `<tr class="border-b border-slate-100 hover:bg-slate-50"><td class="p-3">${s.nama_santri}</td><td class="p-3">${s.jenis_kelamin}</td><td class="p-3">${s.jenjang}</td><td class="p-3 font-medium text-slate-700">${s.nama_kelas}</td><td class="p-3">${s.kota_asal}</td><td class="p-3"><span class="px-2 py-1 rounded text-xs ${s.status_santri==='Aktif'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}">${s.status_santri}</span></td></tr>`);
+                        container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div class="p-4 border-b border-slate-200 flex justify-between items-center"><h3 class="font-bold text-slate-800">Direktori Santri</h3><button class="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-primary-700 transition">+ Tambah Santri</button></div><div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200"><tr><th class="p-3">NAMA SANTRI</th><th class="p-3">L/P</th><th class="p-3">JENJANG</th><th class="p-3">KELAS AKTIF</th><th class="p-3">KOTA ASAL</th><th class="p-3">STATUS</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+                    }).catch(err => App.ui.showToast(err.message, 'error'));
+                },
+                'master-kelas'(container) {
+                    App.api.post('getClasses').then(res => {
+                        let rows = '';
+                        if(res.data.length === 0) rows = `<tr><td colspan="4" class="p-8 text-center text-slate-500">Belum ada data kelas</td></tr>`;
+                        else res.data.forEach(c => rows += `<tr class="border-b border-slate-100 hover:bg-slate-50"><td class="p-3 font-semibold text-primary-600">${c.kelas_id}</td><td class="p-3">${c.nama_kelas}</td><td class="p-3">${c.jenjang}</td><td class="p-3">${c.tahun_pelajaran_id}</td></tr>`);
+                        container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div class="p-4 border-b border-slate-200"><h3 class="font-bold text-slate-800">Data Kelas</h3></div><div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200"><tr><th class="p-3">ID KELAS</th><th class="p-3">NAMA KELAS</th><th class="p-3">JENJANG</th><th class="p-3">TAHUN PELAJARAN</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+                    }).catch(err => App.ui.showToast(err.message, 'error'));
+                },
+                'master-tahun'(container) {
+                    App.api.post('getAcademicYears').then(res => {
+                        let rows = '';
+                        res.data.forEach(t => rows += `<tr class="border-b border-slate-100 hover:bg-slate-50"><td class="p-3">${t.nama_periode}</td><td class="p-3">${new Date(t.start_date).toLocaleDateString('id-ID')}</td><td class="p-3">${new Date(t.end_date).toLocaleDateString('id-ID')}</td><td class="p-3"><span class="px-2 py-1 rounded text-xs bg-green-100 text-green-700">${t.status}</span></td></tr>`);
+                        container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div class="p-4 border-b border-slate-200"><h3 class="font-bold text-slate-800">Tahun Pelajaran</h3></div><div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200"><tr><th class="p-3">PERIODE</th><th class="p-3">MULAI</th><th class="p-3">SELESAI</th><th class="p-3">STATUS</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+                    }).catch(err => App.ui.showToast(err.message, 'error'));
+                },
+                'jadwal'(container) {
+                    App.api.post('getSchedules').then(res => {
+                        let rows = '';
+                        res.data.forEach(j => rows += `<tr class="border-b border-slate-100 hover:bg-slate-50"><td class="p-3 font-semibold text-slate-700">${j.pekan}</td><td class="p-3">${j.jenjang}</td><td class="p-3">${j.gender}</td><td class="p-3 text-primary-600 font-medium">${j.hari}</td><td class="p-3"><span class="px-2 py-1 rounded text-xs bg-green-100 text-green-700">${j.status}</span></td></tr>`);
+                        container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div class="p-4 border-b border-slate-200 flex justify-between items-center"><h3 class="font-bold text-slate-800">Jadwal Perizinan Rutin (Otomatis)</h3></div><div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200"><tr><th class="p-3">PEKAN</th><th class="p-3">JENJANG</th><th class="p-3">GENDER</th><th class="p-3">HARI PERIZINAN</th><th class="p-3">STATUS</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+                    }).catch(err => App.ui.showToast(err.message, 'error'));
+                },
+                
                 'pengajuan'(container) { 
-                     // [View Form Pengajuan dari Phase Sebelumnya]
                      App.api.post('getSantriByClass').then(res => {
                          let options = '<option value="">-- Pilih Santri --</option>';
+                         if(res.data.length === 0) options = '<option value="">(Belum ada santri di kelas Anda)</option>';
                          res.data.forEach(s => { options += `<option value="${s.santri_id}">${s.nama_santri}</option>`; });
+                         
                          container.innerHTML = `<div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm p-6 sm:p-8 border border-slate-200">
-                             <h3 class="text-lg font-bold text-slate-800 mb-6 border-b border-slate-100 pb-4"><i class="ph-fill ph-paper-plane-tilt text-primary-500"></i> Form Pengajuan</h3>
+                             <h3 class="text-lg font-bold text-slate-800 mb-6 border-b border-slate-100 pb-4"><i class="ph-fill ph-paper-plane-tilt text-primary-500"></i> Form Pengajuan Izin</h3>
                              <form id="form-izin" class="space-y-4">
                                 <div><label class="block text-sm font-medium mb-1">Pilih Santri *</label><select id="izin-santri" required class="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none">${options}</select></div>
                                 <div class="grid grid-cols-2 gap-4">
-                                    <div><label class="block text-sm font-medium mb-1">Tujuan *</label><input type="text" id="izin-tujuan" required class="w-full px-4 py-2 border rounded-lg"></div>
-                                    <div><label class="block text-sm font-medium mb-1">Keperluan *</label><input type="text" id="izin-keperluan" required class="w-full px-4 py-2 border rounded-lg"></div>
+                                    <div><label class="block text-sm font-medium mb-1">Tujuan *</label><input type="text" id="izin-tujuan" required class="w-full px-4 py-2 border rounded-lg" placeholder="Cth: Bandung"></div>
+                                    <div><label class="block text-sm font-medium mb-1">Keperluan *</label><input type="text" id="izin-keperluan" required class="w-full px-4 py-2 border rounded-lg" placeholder="Cth: Acara Keluarga"></div>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
-                                    <div><label class="block text-sm font-medium mb-1">Penjemput *</label><input type="text" id="izin-walisafar" required class="w-full px-4 py-2 border rounded-lg"></div>
-                                    <div><label class="block text-sm font-medium mb-1">Hubungan *</label><select id="izin-hubungan" required class="w-full px-4 py-2 border rounded-lg"><option value="Ayah">Ayah</option><option value="Ibu">Ibu</option><option value="Keluarga">Keluarga</option></select></div>
+                                    <div><label class="block text-sm font-medium mb-1">Penjemput *</label><input type="text" id="izin-walisafar" required class="w-full px-4 py-2 border rounded-lg" placeholder="Nama Penjemput"></div>
+                                    <div><label class="block text-sm font-medium mb-1">Hubungan *</label>
+                                        <select id="izin-hubungan" required class="w-full px-4 py-2 border rounded-lg">
+                                            <option value="Ayah">Ayah</option><option value="Ibu">Ibu</option><option value="Kakak Kandung">Kakak Kandung</option><option value="Paman">Paman</option><option value="Lainnya">Lainnya...</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                <div class="pt-4 flex justify-end"><button type="submit" id="btn-submit-izin" class="bg-primary-600 text-white font-medium py-2 px-6 rounded-lg">Kirim Pengajuan</button></div>
+                                <div id="hubungan-lainnya-container" class="hidden">
+                                    <label class="block text-sm font-medium mb-1">Sebutkan Hubungan Lainnya *</label><input type="text" id="izin-hubungan-lainnya" class="w-full px-4 py-2 border rounded-lg">
+                                </div>
+                                
+                                <div class="border-t border-slate-100 pt-4 mt-2">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" id="izin-ikut-saudara" class="w-5 h-5 rounded text-primary-600 focus:ring-primary-500">
+                                        <span class="text-sm font-medium text-slate-700">Ikut Jadwal Saudara (Kakak/Adik)</span>
+                                    </label>
+                                    <div id="saudara-container" class="hidden mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                        <label class="block text-sm font-medium mb-1 text-slate-700">ID / Nama Saudara</label>
+                                        <input type="text" id="izin-saudara" class="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Masukkan nama saudara jika ada...">
+                                    </div>
+                                </div>
+
+                                <div class="pt-4 flex justify-end"><button type="submit" id="btn-submit-izin" class="bg-primary-600 hover:bg-primary-700 transition text-white font-medium py-2.5 px-6 rounded-lg shadow-sm">Kirim Pengajuan</button></div>
                              </form></div>`;
                          
+                         // Toggle Hubungan Lainnya
+                         document.getElementById('izin-hubungan').addEventListener('change', (e) => {
+                             const container = document.getElementById('hubungan-lainnya-container');
+                             if(e.target.value === 'Lainnya') { container.classList.remove('hidden'); document.getElementById('izin-hubungan-lainnya').required = true; }
+                             else { container.classList.add('hidden'); document.getElementById('izin-hubungan-lainnya').required = false; }
+                         });
+
+                         // Toggle Ikut Saudara
+                         document.getElementById('izin-ikut-saudara').addEventListener('change', (e) => {
+                             const container = document.getElementById('saudara-container');
+                             if(e.target.checked) container.classList.remove('hidden');
+                             else container.classList.add('hidden');
+                         });
+
                          document.getElementById('form-izin').addEventListener('submit', async (e) => {
-                             e.preventDefault(); const btn = document.getElementById('btn-submit-izin'); btn.innerHTML = 'Memproses...'; btn.disabled = true;
+                             e.preventDefault(); const btn = document.getElementById('btn-submit-izin'); btn.innerHTML = '<div class="loader w-4 h-4 border-[2px] mx-auto"></div>'; btn.disabled = true;
                              try {
-                                 await App.api.post('createPermit', { santri_id: document.getElementById('izin-santri').value, keperluan: document.getElementById('izin-keperluan').value, tujuan: document.getElementById('izin-tujuan').value, wali_safar: document.getElementById('izin-walisafar').value, hubungan_wali: document.getElementById('izin-hubungan').value });
+                                 await App.api.post('createPermit', { 
+                                     santri_id: document.getElementById('izin-santri').value, 
+                                     keperluan: document.getElementById('izin-keperluan').value, 
+                                     tujuan: document.getElementById('izin-tujuan').value, 
+                                     wali_safar: document.getElementById('izin-walisafar').value, 
+                                     hubungan_wali: document.getElementById('izin-hubungan').value,
+                                     hubungan_lainnya: document.getElementById('izin-hubungan-lainnya').value,
+                                     ikut_saudara: document.getElementById('izin-ikut-saudara').checked,
+                                     saudara_id: document.getElementById('izin-saudara').value
+                                 });
                                  App.ui.showToast('Pengajuan Terkirim!', 'success'); setTimeout(() => App.router.navigate('histori'), 800);
                              } catch(err) { App.ui.showToast(err.message, 'error'); btn.innerHTML = 'Kirim Pengajuan'; btn.disabled = false; }
                          });
-                     });
+                     }).catch(err => App.ui.showToast(err.message, 'error'));
+                },
+
+                'histori'(container) {
+                    App.api.post('getMyPermits').then(res => {
+                        let rows = '';
+                        if(res.data.length === 0) rows = `<tr><td colspan="7" class="p-8 text-center text-slate-500">Belum ada histori izin kelas Anda</td></tr>`;
+                        else res.data.forEach(p => {
+                            let statusBadge = p.status_pengajuan === 'DISETUJUI' ? 'bg-green-100 text-green-700' : (p.status_pengajuan === 'DITOLAK' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700');
+                            let btnQR = p.status_pengajuan === 'DISETUJUI' ? `<button onclick='App.actions.showQR(${JSON.stringify(p).replace(/'/g, "&#39;")})' class="text-primary-600 hover:text-primary-800 bg-primary-50 px-2 py-1 rounded" title="Lihat QR"><i class="ph ph-qr-code text-xl"></i></button>` : '-';
+                            rows += `<tr class="border-b border-slate-100 hover:bg-slate-50"><td class="p-3 font-medium text-slate-800">${p.nama_santri}</td><td class="p-3">${p.tanggal_izin_format}</td><td class="p-3">${p.keperluan}</td><td class="p-3">${p.tujuan}</td><td class="p-3">${p.wali_safar}</td><td class="p-3"><span class="px-2 py-1 rounded text-xs font-semibold ${statusBadge}">${p.status_pengajuan}</span></td><td class="p-3 text-center">${btnQR}</td></tr>`;
+                        });
+                        container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div class="p-4 border-b border-slate-200"><h3 class="font-bold text-slate-800">Histori Pengajuan Kelas Saya</h3></div><div class="overflow-x-auto"><table class="w-full text-sm text-left whitespace-nowrap"><thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200"><tr><th class="p-3">NAMA SANTRI</th><th class="p-3">TANGGAL IZIN</th><th class="p-3">KEPERLUAN</th><th class="p-3">TUJUAN</th><th class="p-3">PENJEMPUT</th><th class="p-3">STATUS</th><th class="p-3 text-center">QR CODE</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+                    }).catch(err => App.ui.showToast(err.message, 'error'));
                 },
                 
                 'approval'(container) {
                     App.api.post('getPendingPermits').then(res => {
-                        if (res.data.length === 0) return container.innerHTML = `<div class="text-center p-10"><i class="ph ph-check-circle text-5xl text-slate-300"></i><p class="mt-2 text-slate-500">Tidak ada pengajuan masuk.</p></div>`;
+                        if (res.data.length === 0) return container.innerHTML = `<div class="text-center p-10"><i class="ph ph-check-circle text-5xl text-slate-300"></i><p class="mt-2 text-slate-500">Tidak ada pengajuan masuk yang perlu diproses.</p></div>`;
                         let html = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
                         res.data.forEach(p => {
-                            html += `<div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                            html += `<div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
+                                <div class="absolute top-0 left-0 w-1 h-full bg-orange-400"></div>
                                 <h4 class="font-bold text-lg">${p.nama_santri} <span class="text-xs font-normal text-slate-500">(${p.jenjang})</span></h4>
-                                <p class="text-sm text-slate-600 mt-2"><i class="ph-fill ph-info"></i> ${p.keperluan} - ${p.tujuan}</p>
-                                <p class="text-sm text-slate-600"><i class="ph-fill ph-users"></i> Wali: ${p.wali_safar} (${p.hubungan_wali})</p>
-                                <div class="flex gap-2 mt-4 pt-4 border-t border-slate-100">
-                                    <button onclick="App.actions.approve('${p.permit_id}')" class="flex-1 bg-green-500 text-white py-2 rounded-lg text-sm font-semibold">Setujui</button>
-                                    <button onclick="App.actions.reject('${p.permit_id}')" class="flex-1 bg-red-100 text-red-600 py-2 rounded-lg text-sm font-semibold">Tolak</button>
+                                <div class="mt-3 space-y-1">
+                                    <p class="text-sm text-slate-600"><i class="ph-fill ph-info text-primary-500 mr-1"></i> Keperluan: <strong>${p.keperluan}</strong></p>
+                                    <p class="text-sm text-slate-600"><i class="ph-fill ph-map-pin text-red-500 mr-1"></i> Tujuan: ${p.tujuan}</p>
+                                    <p class="text-sm text-slate-600"><i class="ph-fill ph-users text-blue-500 mr-1"></i> Penjemput: ${p.wali_safar} (${p.hubungan_wali})</p>
+                                </div>
+                                <div class="flex gap-2 mt-5 pt-4 border-t border-slate-100">
+                                    <button onclick="App.actions.approve('${p.permit_id}')" class="flex-1 bg-green-500 hover:bg-green-600 transition text-white py-2 rounded-lg text-sm font-semibold shadow-sm">Setujui</button>
+                                    <button onclick="App.actions.reject('${p.permit_id}')" class="flex-1 bg-red-100 hover:bg-red-200 transition text-red-700 py-2 rounded-lg text-sm font-semibold">Tolak</button>
                                 </div></div>`;
                         });
                         container.innerHTML = html + `</div>`;
-                    });
+                    }).catch(err => App.ui.showToast(err.message, 'error'));
                 },
 
-                // --- PHASE 8: SCANNER UI ---
                 'scanner'(container) {
                     container.innerHTML = `
                         <div class="max-w-md mx-auto flex flex-col items-center">
@@ -428,132 +520,173 @@
                             </div>
                         </div>
                     `;
-
-                    // Panggil fungsi inisiasi kamera dari App.actions
                     setTimeout(() => App.actions.initScanner(), 100);
                 }
             },
 
             // --- ACTION HANDLERS ---
             actions: {
-                approve: async (id) => { if(!confirm('Setujui?')) return; await App.api.post('approvePermit', {permit_id: id}); App.router.navigate('approval'); },
-                reject: async (id) => { const alasan = prompt('Alasan:'); if(!alasan) return; await App.api.post('rejectPermit', {permit_id: id, alasan}); App.router.navigate('approval'); },
+                generateDummy: async () => {
+                    if(!confirm('Buat data dummy (Tahun Pelajaran, Kelas, Santri)?')) return;
+                    try { App.ui.showToast('Memproses...', 'info'); await App.api.post('generateDummy'); App.ui.showToast('Data dummy berhasil dibuat!', 'success'); setTimeout(()=>window.location.reload(), 1500); } 
+                    catch(err) { App.ui.showToast(err.message, 'error'); }
+                },
 
-                // --- PHASE 8: SCAN LOGIC ---
+                approve: async (id) => { if(!confirm('Setujui izin ini?')) return; try { await App.api.post('approvePermit', {permit_id: id}); App.ui.showToast('Berhasil disetujui', 'success'); App.router.navigate('approval'); } catch(err){ App.ui.showToast(err.message, 'error'); } },
+                reject: async (id) => { const alasan = prompt('Alasan penolakan:'); if(!alasan) return; try { await App.api.post('rejectPermit', {permit_id: id, alasan}); App.ui.showToast('Izin ditolak', 'info'); App.router.navigate('approval'); } catch(err){ App.ui.showToast(err.message, 'error'); } },
+
+                showQR(permit) {
+                    App.state.currentPermitForQR = permit;
+                    const html = `
+                        <div class="p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-bold text-lg text-slate-800">Pas Digital Santri</h3>
+                                <button onclick="App.ui.closeModal()" class="text-slate-400 hover:text-red-500 transition"><i class="ph ph-x text-xl"></i></button>
+                            </div>
+                            <div id="qr-card" class="bg-white border-2 border-slate-200 rounded-xl overflow-hidden shadow-sm mb-4 relative">
+                                <div class="bg-primary-600 text-white p-3 text-center">
+                                    <h4 class="font-bold text-[13px] tracking-wide">PONDOK PESANTREN MODERN AL-ISLAM</h4>
+                                    <p class="text-xs opacity-90">KARTU IZIN SANTRI</p>
+                                </div>
+                                <div class="p-4 flex flex-col gap-3">
+                                    <div class="text-center mb-2">
+                                        <h2 class="font-bold text-xl text-slate-800 uppercase">${permit.nama_santri}</h2>
+                                        <p class="text-sm text-slate-500 font-medium">${permit.jenjang} - ${permit.nama_kelas}</p>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-3 text-sm border-t border-b border-slate-100 py-3">
+                                        <div><p class="text-slate-400 text-xs">Tanggal</p><p class="font-semibold text-slate-700">${permit.tanggal_izin_format}</p></div>
+                                        <div><p class="text-slate-400 text-xs">Keperluan</p><p class="font-semibold text-slate-700 truncate" title="${permit.keperluan}">${permit.keperluan}</p></div>
+                                        <div><p class="text-slate-400 text-xs">Jam Perizinan</p><p class="font-semibold text-slate-700">08.00 - 16.00 WIB</p></div>
+                                        <div><p class="text-slate-400 text-xs">Penjemput</p><p class="font-semibold text-slate-700">${permit.wali_safar} (${permit.hubungan_wali})</p></div>
+                                    </div>
+                                    <div class="flex justify-center items-center p-2">
+                                        <div id="qr-code-canvas" class="p-2 border border-slate-200 rounded-lg bg-white"></div>
+                                    </div>
+                                    <p class="text-[10px] text-center text-slate-400 leading-tight">Kartu ini wajib ditunjukkan kepada Security saat keluar dan kembali ke pondok pesantren.</p>
+                                </div>
+                            </div>
+                            <button onclick="App.actions.downloadQRPNG()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 rounded-lg transition flex items-center justify-center gap-2">
+                                <i class="ph ph-download-simple text-lg"></i> Unduh Gambar (PNG)
+                            </button>
+                        </div>
+                    `;
+                    App.ui.showModal(html);
+                    setTimeout(() => {
+                        new QRCode(document.getElementById("qr-code-canvas"), {
+                            text: permit.qr_token, width: 140, height: 140, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H
+                        });
+                    }, 100);
+                },
+
+                downloadQRPNG() {
+                    const permit = App.state.currentPermitForQR;
+                    if(!permit) return;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 400; canvas.height = 580;
+                    const ctx = canvas.getContext('2d');
+                    
+                    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 400, 580);
+                    ctx.fillStyle = '#16a34a'; ctx.fillRect(0, 0, 400, 70);
+                    ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
+                    ctx.font = 'bold 15px Inter, sans-serif'; ctx.fillText('PONDOK PESANTREN MODERN AL-ISLAM', 200, 35);
+                    ctx.font = '12px Inter, sans-serif'; ctx.fillText('KARTU IZIN SANTRI', 200, 55);
+                    
+                    ctx.fillStyle = '#1e293b'; ctx.font = 'bold 22px Inter, sans-serif'; ctx.fillText(permit.nama_santri.toUpperCase(), 200, 110);
+                    ctx.fillStyle = '#64748b'; ctx.font = '16px Inter, sans-serif'; ctx.fillText(`${permit.jenjang} - ${permit.nama_kelas}`, 200, 135);
+                    
+                    ctx.beginPath(); ctx.moveTo(40, 155); ctx.lineTo(360, 155); ctx.strokeStyle = '#e2e8f0'; ctx.stroke();
+                    
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = '#94a3b8'; ctx.font = '12px Inter, sans-serif';
+                    ctx.fillText('Tanggal', 40, 185); ctx.fillText('Keperluan', 220, 185);
+                    ctx.fillText('Jam Perizinan', 40, 235); ctx.fillText('Penjemput', 220, 235);
+                    
+                    ctx.fillStyle = '#334155'; ctx.font = 'bold 14px Inter, sans-serif';
+                    ctx.fillText(permit.tanggal_izin_format, 40, 205); 
+                    let kep = permit.keperluan.length > 20 ? permit.keperluan.substring(0,20)+'...' : permit.keperluan;
+                    ctx.fillText(kep, 220, 205);
+                    
+                    ctx.fillText('08.00 - 16.00 WIB', 40, 255); 
+                    let penjemput = `${permit.wali_safar} (${permit.hubungan_wali})`;
+                    if(penjemput.length > 20) penjemput = penjemput.substring(0, 20) + '...';
+                    ctx.fillText(penjemput, 220, 255);
+                    
+                    ctx.beginPath(); ctx.moveTo(40, 280); ctx.lineTo(360, 280); ctx.stroke();
+
+                    const qrImg = document.querySelector('#qr-code-canvas img');
+                    const drawQR = (imgEl) => {
+                        ctx.drawImage(imgEl, 130, 300, 140, 140);
+                        ctx.textAlign = 'center'; ctx.fillStyle = '#94a3b8'; ctx.font = '10px Inter, sans-serif';
+                        ctx.fillText('Kartu ini wajib ditunjukkan kepada Security', 200, 480);
+                        ctx.fillText('saat keluar dan kembali ke pondok pesantren.', 200, 495);
+                        
+                        const link = document.createElement('a');
+                        link.download = `QR_Izin_${permit.nama_santri.replace(/\s+/g, '_')}.png`;
+                        link.href = canvas.toDataURL('image/png'); link.click();
+                    };
+
+                    if(qrImg && qrImg.complete && qrImg.naturalWidth !== 0) drawQR(qrImg); 
+                    else if(qrImg) qrImg.onload = () => drawQR(qrImg);
+                    else { const qrCanvas = document.querySelector('#qr-code-canvas canvas'); if(qrCanvas) drawQR(qrCanvas); }
+                },
+
                 initScanner() {
                     const qrReaderElement = document.getElementById('qr-reader');
                     if(!qrReaderElement) return;
 
-                    // Menggunakan Html5QrcodeScanner bawaan lib untuk handle kamera otomatis
-                    const config = {
-                        fps: 10, 
-                        qrbox: { width: 250, height: 250 },
-                        aspectRatio: 1.0,
-                        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
-                    };
-
+                    const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0, supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA] };
                     App.state.html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", config, false);
-                    
-                    App.state.html5QrcodeScanner.render(
-                        (decodedText) => this.handleScanSuccess(decodedText),
-                        (error) => { /* Abaikan error loop jika belum menemukan QR */ }
-                    );
+                    App.state.html5QrcodeScanner.render((decodedText) => this.handleScanSuccess(decodedText), (error) => {});
                 },
 
                 async handleScanSuccess(decodedText) {
-                    // Hindari multiple scan sekaligus
                     if(document.getElementById('scanner-loading').classList.contains('hidden') === false) return;
-                    
-                    // Bunyi / Getar jika support
                     if (navigator.vibrate) navigator.vibrate(200);
 
-                    // Tampilkan UI Loading & Jeda kamera (Pause backend call)
                     document.getElementById('scanner-loading').classList.remove('hidden');
                     document.getElementById('scanner-loading').classList.add('flex');
-                    
-                    if(App.state.html5QrcodeScanner) {
-                        App.state.html5QrcodeScanner.pause(true); // Pause scanning
-                    }
+                    if(App.state.html5QrcodeScanner) App.state.html5QrcodeScanner.pause(true);
 
                     const resultContainer = document.getElementById('scanner-result');
                     const controlContainer = document.getElementById('scanner-controls');
                     
                     try {
-                        // Tembak API
                         const res = await App.api.post('scanQR', { qr_token: decodedText });
                         const data = res.data;
-
-                        // UI Untuk Success (EXIT atau RETURN)
                         let icon = data.scan_type === 'EXIT' ? 'ph-sign-out' : 'ph-sign-in';
-                        let colorStr = 'text-green-600 bg-green-100 border-green-200'; // Default Hijau
-                        
-                        // Khusus jika Return Terlambat warnanya beda
-                        if(data.status_waktu.includes('TERLAMBAT')) {
-                            colorStr = data.status_waktu.includes('TOLERANSI') ? 'text-red-600 bg-red-100 border-red-200' : 'text-orange-600 bg-orange-100 border-orange-200';
-                        }
+                        let colorStr = 'text-green-600 bg-green-100 border-green-200';
+                        if(data.status_waktu.includes('TERLAMBAT')) colorStr = data.status_waktu.includes('TOLERANSI') ? 'text-red-600 bg-red-100 border-red-200' : 'text-orange-600 bg-orange-100 border-orange-200';
 
                         resultContainer.innerHTML = `
-                            <div class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 ${colorStr}">
-                                <i class="ph-fill ${icon}"></i>
-                            </div>
+                            <div class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 ${colorStr}"><i class="ph-fill ${icon}"></i></div>
                             <h3 class="font-bold text-xl text-slate-800 text-center uppercase tracking-wide">${data.nama_santri}</h3>
-                            
                             <div class="w-full mt-5 space-y-3">
-                                <div class="flex justify-between items-center py-2 border-b border-dashed border-slate-200">
-                                    <span class="text-sm text-slate-500">Tindakan</span>
-                                    <span class="font-bold text-slate-800">SCAN ${data.scan_type}</span>
-                                </div>
-                                <div class="flex justify-between items-center py-2 border-b border-dashed border-slate-200">
-                                    <span class="text-sm text-slate-500">Waktu Tercatat</span>
-                                    <span class="font-bold text-slate-800">${data.waktu}</span>
-                                </div>
-                                <div class="flex justify-between items-center py-2">
-                                    <span class="text-sm text-slate-500">Status</span>
-                                    <span class="font-bold text-[13px] uppercase px-2 py-1 rounded ${colorStr}">${data.status_waktu}</span>
-                                </div>
+                                <div class="flex justify-between items-center py-2 border-b border-dashed border-slate-200"><span class="text-sm text-slate-500">Tindakan</span><span class="font-bold text-slate-800">SCAN ${data.scan_type}</span></div>
+                                <div class="flex justify-between items-center py-2 border-b border-dashed border-slate-200"><span class="text-sm text-slate-500">Waktu Tercatat</span><span class="font-bold text-slate-800">${data.waktu}</span></div>
+                                <div class="flex justify-between items-center py-2"><span class="text-sm text-slate-500">Status</span><span class="font-bold text-[13px] uppercase px-2 py-1 rounded ${colorStr}">${data.status_waktu}</span></div>
                             </div>
                         `;
-
                     } catch (error) {
-                        // Vibrate panjang tanda error
                         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-
-                        // UI Untuk Error (Kedaluwarsa, 3rd Scan, Palsu)
                         resultContainer.innerHTML = `
-                            <div class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 text-red-600 bg-red-100 border-red-200">
-                                <i class="ph-fill ph-x-circle"></i>
-                            </div>
+                            <div class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 text-red-600 bg-red-100 border-red-200"><i class="ph-fill ph-x-circle"></i></div>
                             <h3 class="font-bold text-lg text-slate-800 text-center">Scan Ditolak</h3>
                             <p class="text-sm text-slate-500 text-center mt-2 p-3 bg-slate-50 rounded-lg w-full border border-slate-100">${error.message}</p>
                         `;
                     }
 
-                    // Tampilkan hasil & sembunyikan loading
                     document.getElementById('scanner-loading').classList.add('hidden');
                     document.getElementById('scanner-loading').classList.remove('flex');
                     document.getElementById('scanner-box').classList.add('hidden');
-                    
                     resultContainer.classList.remove('hidden');
-                    
-                    // Ganti tombol di bawah menjadi "Scan Berikutnya"
-                    controlContainer.innerHTML = `
-                        <button onclick="App.actions.resetScanner()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl transition shadow-lg flex items-center justify-center gap-2">
-                            <i class="ph ph-qr-code text-xl"></i> Scan Berikutnya
-                        </button>
-                    `;
+                    controlContainer.innerHTML = `<button onclick="App.actions.resetScanner()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl transition shadow-lg flex items-center justify-center gap-2"><i class="ph ph-qr-code text-xl"></i> Scan Berikutnya</button>`;
                 },
 
                 resetScanner() {
-                    // Kembalikan UI ke mode kamera
                     document.getElementById('scanner-result').classList.add('hidden');
                     document.getElementById('scanner-box').classList.remove('hidden');
-                    
                     document.getElementById('scanner-controls').innerHTML = `<p class="text-xs text-slate-500 mb-3">Pastikan izin dalam keadaan terang.</p>`;
-
-                    // Resume Kamera
-                    if(App.state.html5QrcodeScanner) {
-                        App.state.html5QrcodeScanner.resume();
-                    }
+                    if(App.state.html5QrcodeScanner) App.state.html5QrcodeScanner.resume();
                 }
             }
         };
