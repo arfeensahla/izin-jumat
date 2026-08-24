@@ -1,809 +1,94 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Perizinan Santri Al-Islam</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Google Fonts: Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Phosphor Icons -->
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-
-    <!-- QR Code Generator -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
+<!-- ... existing code ... -->
     <!-- NEW: HTML5 QR Code Scanner Library -->
     <script src="https://unpkg.com/html5-qrcode"></script>
 
+    <!-- NEW: Tom Select for Searchable Dropdowns -->
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.default.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+
     <script>
         tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Inter', 'sans-serif'] },
-                    colors: {
-                        primary: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#22c55e', 600: '#16a34a', 700: '#15803d' },
-                        dark: '#1e293b'
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
-        .hidden { display: none !important; }
-        
-        .loader {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #22c55e;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        .toast-enter { animation: slideInRight 0.3s ease-out forwards; }
-        
-        /* CSS Untuk override styling default library scanner */
-        #qr-reader { width: 100%; border: none !important; border-radius: 12px; overflow: hidden; background: #000; }
-        #qr-reader__scan_region { background: #000; min-height: 250px; }
+<!-- ... existing code ... -->
         #qr-reader__dashboard_section_csr button { background-color: #16a34a; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-family: 'Inter'; font-weight: 500; margin: 4px; }
         #qr-reader__dashboard_section_swaplink { color: #16a34a; text-decoration: none; font-weight: 500; margin-top:10px; display:inline-block; }
+        
+        /* CSS Tom Select Custom (Menyamakan dengan gaya input Tailwind) */
+        .ts-control { border: 1px solid #cbd5e1 !important; border-radius: 0.5rem !important; padding: 0.5rem 1rem !important; min-height: 42px; font-family: 'Inter', sans-serif; box-shadow: none !important; }
+        .ts-control.focus { border-color: #22c55e !important; box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2) !important; }
+        .ts-dropdown { border-radius: 0.5rem !important; border-color: #cbd5e1 !important; margin-top: 4px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); font-family: 'Inter', sans-serif; }
+        .ts-dropdown .option { padding: 0.5rem 1rem !important; }
+        .ts-dropdown .active { background-color: #f0fdf4 !important; color: #16a34a !important; }
     </style>
 </head>
 <body class="text-slate-800 antialiased h-screen overflow-hidden">
-
-    <!-- Toast Container -->
-    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
-
-    <!-- Modal Container -->
-    <div id="modal-container" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity opacity-0">
-        <div id="modal-content" class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-transform scale-95 overflow-hidden">
-            <!-- Modal Body Injected Here -->
-        </div>
-    </div>
-
-    <!-- Login View -->
-    <div id="view-login" class="flex h-screen items-center justify-center bg-slate-100 hidden">
-        <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 mx-4">
-            <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-100 text-primary-600 mb-4">
-                    <i class="ph ph-shield-check text-3xl"></i>
-                </div>
-                <h1 class="text-2xl font-bold text-slate-800">Perizinan Santri</h1>
-                <p class="text-slate-500 text-sm mt-1">Pondok Pesantren Modern Al-Islam</p>
-            </div>
-            
-            <form id="form-login" class="space-y-5">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Username</label>
-                    <input type="text" id="login-username" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition" placeholder="Masukkan username">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                    <input type="password" id="login-password" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition" placeholder="••••••••">
-                </div>
-                <button type="submit" id="btn-login" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2.5 rounded-lg transition duration-200 flex items-center justify-center gap-2">
-                    <span>Masuk</span>
-                    <div id="login-loader" class="loader hidden w-5 h-5 border-[2px]"></div>
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Main App View -->
-    <div id="view-app" class="flex h-screen w-full hidden">
-        
-        <div id="mobile-overlay" class="fixed inset-0 bg-slate-900/50 z-20 hidden lg:hidden" onclick="App.ui.toggleSidebar()"></div>
-
-        <!-- Sidebar -->
-        <aside id="sidebar" class="bg-dark text-slate-300 w-64 flex-shrink-0 flex flex-col transition-transform transform -translate-x-full lg:translate-x-0 absolute lg:relative z-30 h-full">
-            <div class="h-16 flex items-center px-6 bg-slate-900 font-bold text-white tracking-wider gap-3">
-                <i class="ph-fill ph-mosque text-xl text-primary-500"></i>
-                AL-ISLAM
-            </div>
-            
-            <div class="flex-1 overflow-y-auto py-4 px-3" id="sidebar-menu"></div>
-
-            <div class="p-4 bg-slate-900 border-t border-slate-800">
-                <div class="flex items-center gap-3 mb-4">
-                    <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-white font-bold" id="user-avatar">A</div>
-                    <div class="overflow-hidden">
-                        <p class="text-sm font-semibold text-white truncate" id="user-name">User Name</p>
-                        <p class="text-xs text-slate-400 truncate" id="user-role">Role</p>
-                    </div>
-                </div>
-                <button onclick="App.auth.logout()" class="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm bg-slate-800 hover:bg-red-500/10 hover:text-red-400 transition-colors">
-                    <i class="ph ph-sign-out"></i> Keluar
-                </button>
-            </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="flex-1 flex flex-col min-w-0 bg-slate-50">
-            <!-- Topbar -->
-            <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 z-10 flex-shrink-0">
-                <div class="flex items-center gap-4">
-                    <button class="lg:hidden text-slate-500 hover:text-slate-800" onclick="App.ui.toggleSidebar()">
-                        <i class="ph ph-list text-2xl"></i>
-                    </button>
-                    <h2 class="text-lg font-semibold text-slate-800" id="page-title">Dashboard</h2>
-                </div>
-                <div class="flex items-center gap-3">
-                    <span class="text-sm text-slate-500 hidden sm:block" id="current-date"></span>
-                </div>
-            </header>
-
-            <!-- Content Container -->
-            <div id="content-area" class="flex-1 overflow-y-auto p-4 lg:p-8"></div>
-        </main>
-    </div>
-
-    <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycby8bTXMgdLeVoCaT29KdqbQqIm0ms_LwzPc0G7hsXjUwPLYJe3J2aWc4pfORhfQ5v0Tpw/exec";
-
-        const App = {
-            state: {
-                user: null, token: null, currentView: 'dashboard',
-                html5QrcodeScanner: null // NEW: Save scanner instance
-            },
-
-            // --- API CLIENT ---
-            api: {
-                async post(action, data = {}) {
-                    try {
-                        const payload = { action, data };
-                        if (App.state.token) payload.data.token = App.state.token;
-
-                        const response = await fetch(API_URL, {
-                            method: "POST",
-                            headers: { "Content-Type": "text/plain;charset=utf-8" },
-                            body: JSON.stringify(payload)
-                        });
-
-                        const result = await response.json();
-                        if (!result.success) throw new Error(result.message || "Kesalahan server");
-                        return result;
-                    } catch (error) {
-                        throw new Error(error.message === "Failed to fetch" ? "Koneksi jaringan gagal." : error.message);
-                    }
-                }
-            },
-
-            // --- AUTHENTICATION ---
-            auth: {
-                init() {
-                    const savedToken = localStorage.getItem('al_islam_token');
-                    const savedUser = localStorage.getItem('al_islam_user');
-                    if (savedToken && savedUser) {
-                        App.state.token = savedToken;
-                        App.state.user = JSON.parse(savedUser);
-                        App.ui.showApp();
-                    } else { App.ui.showLogin(); }
-                    this.bindEvents();
-                },
-                bindEvents() {
-                    document.getElementById('form-login').addEventListener('submit', async (e) => {
-                        e.preventDefault();
-                        const btn = document.getElementById('btn-login'), loader = document.getElementById('login-loader');
-                        const username = document.getElementById('login-username').value, password = document.getElementById('login-password').value;
-                        btn.disabled = true; loader.classList.remove('hidden');
-
-                        try {
-                            const res = await App.api.post('login', { username, password });
-                            App.state.token = res.data.token; App.state.user = res.data.user;
-                            localStorage.setItem('al_islam_token', res.data.token);
-                            localStorage.setItem('al_islam_user', JSON.stringify(res.data.user));
-                            App.ui.showApp();
-                            // Redirect otomatis jika security
-                            if(App.state.user.role === 'SECURITY') App.router.navigate('scanner');
-                        } catch (error) { App.ui.showToast(error.message, 'error'); } 
-                        finally { btn.disabled = false; loader.classList.add('hidden'); }
-                    });
-                },
-                logout() {
-                    App.state.token = null; App.state.user = null;
-                    localStorage.removeItem('al_islam_token'); localStorage.removeItem('al_islam_user');
-                    document.getElementById('form-login').reset();
-                    // Matikan kamera jika logout saat scanner terbuka
-                    if(App.state.html5QrcodeScanner) {
-                        try { App.state.html5QrcodeScanner.clear(); } catch(e) {}
-                    }
-                    App.ui.showLogin();
-                }
-            },
-
-            // --- UI HELPERS ---
-            ui: {
-                showModal(htmlContent) {
-                    const container = document.getElementById('modal-container'), content = document.getElementById('modal-content');
-                    content.innerHTML = htmlContent;
-                    container.classList.remove('hidden');
-                    setTimeout(() => { container.classList.remove('opacity-0'); content.classList.remove('scale-95'); }, 10);
-                },
-                closeModal() {
-                    const container = document.getElementById('modal-container'), content = document.getElementById('modal-content');
-                    container.classList.add('opacity-0'); content.classList.add('scale-95');
-                    setTimeout(() => container.classList.add('hidden'), 300);
-                },
-                showLogin() { document.getElementById('view-app').classList.add('hidden'); document.getElementById('view-login').classList.remove('hidden'); },
-                showApp() {
-                    document.getElementById('view-login').classList.add('hidden'); document.getElementById('view-app').classList.remove('hidden');
-                    this.setupSidebar(); this.updateUserInfo();
-                    
-                    // Route khusus untuk SECURITY, langsung masuk ke scanner
-                    if(App.state.user.role === 'SECURITY') App.router.navigate('scanner');
-                    else App.router.navigate('dashboard');
-
-                    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-                    document.getElementById('current-date').textContent = new Date().toLocaleDateString('id-ID', options);
-                },
-                updateUserInfo() {
-                    const user = App.state.user; if(!user) return;
-                    document.getElementById('user-name').textContent = user.nama;
-                    document.getElementById('user-role').textContent = user.role.replace('_', ' ');
-                    document.getElementById('user-avatar').textContent = user.nama.charAt(0).toUpperCase();
-                },
-                toggleSidebar() {
-                    document.getElementById('sidebar').classList.toggle('-translate-x-full');
-                    document.getElementById('mobile-overlay').classList.toggle('hidden');
-                },
-                showToast(message, type = 'info') {
-                    const container = document.getElementById('toast-container');
-                    const toast = document.createElement('div');
-                    let bg = 'bg-blue-600', icon = 'ph-info';
-                    if(type === 'success') { bg = 'bg-primary-600'; icon = 'ph-check-circle'; }
-                    if(type === 'error') { bg = 'bg-red-600'; icon = 'ph-warning-circle'; }
-                    
-                    toast.className = `toast-enter flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white ${bg}`;
-                    toast.innerHTML = `<i class="ph ${icon} text-xl"></i><span class="text-sm font-medium">${message}</span>`;
-                    container.appendChild(toast);
-                    setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(100%)'; setTimeout(() => toast.remove(), 300); }, 3000);
-                },
-                setupSidebar() {
-                    const role = App.state.user.role;
-                    let menu = [];
-                    if (role === 'ADMIN') {
-                        menu = [
-                            { route: 'dashboard', icon: 'ph-squares-four', title: 'Dashboard' },
-                            { isHeader: true, title: 'Master Data' },
-                            { route: 'master-santri', icon: 'ph-users', title: 'Data Santri' },
-                            { route: 'master-kelas', icon: 'ph-chalkboard-teacher', title: 'Data Kelas' },
-                            { route: 'master-tahun', icon: 'ph-calendar-blank', title: 'Tahun Pelajaran' },
-                            { isHeader: true, title: 'Sistem' },
-                            { route: 'jadwal', icon: 'ph-calendar-check', title: 'Jadwal Perizinan' },
-                            { route: 'scanner', icon: 'ph-qr-code', title: 'Test Scanner' } // Untuk testing Admin
-                        ];
-                    } else if (role === 'SEKRETARIS_MUDIR') {
-                        menu = [
-                            { route: 'dashboard', icon: 'ph-squares-four', title: 'Dashboard' },
-                            { route: 'approval', icon: 'ph-check-square-offset', title: 'Approval Izin' }
-                        ];
-                    } else if (role === 'WALI_KELAS') {
-                        menu = [
-                            { route: 'dashboard', icon: 'ph-squares-four', title: 'Dashboard' },
-                            { route: 'pengajuan', icon: 'ph-paper-plane-tilt', title: 'Ajukan Izin' },
-                            { route: 'histori', icon: 'ph-clock-counter-clockwise', title: 'Histori Izin' }
-                        ];
-                    } else if (role === 'SECURITY') {
-                        menu = [
-                            { route: 'scanner', icon: 'ph-qr-code', title: 'Scan QR' },
-                            { route: 'dashboard', icon: 'ph-squares-four', title: 'Dashboard Info' }
-                        ];
-                    }
-
-                    const menuContainer = document.getElementById('sidebar-menu');
-                    menuContainer.innerHTML = '';
-                    menu.forEach(item => {
-                        if(item.isHeader) {
-                            menuContainer.innerHTML += `<div class="px-4 py-2 mt-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">${item.title}</div>`;
-                        } else {
-                            menuContainer.innerHTML += `
-                                <a href="#" onclick="App.router.navigate('${item.route}'); return false;" 
-                                   class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors group mb-1"
-                                   id="menu-${item.route}">
-                                    <i class="ph ${item.icon} text-lg group-hover:text-primary-500 transition-colors"></i>${item.title}
-                                </a>
-                            `;
-                        }
-                    });
-                }
-            },
-
-            // --- ROUTER & VIEWS ---
-            router: {
-                navigate(route) {
-                    // Bersihkan instance kamera setiap berpindah halaman agar resource terbebas
-                    if(App.state.html5QrcodeScanner) {
-                        try { App.state.html5QrcodeScanner.clear(); } catch(e) {}
-                        App.state.html5QrcodeScanner = null;
-                    }
-
-                    App.state.currentView = route;
-                    document.querySelectorAll('[id^="menu-"]').forEach(el => { el.classList.remove('bg-primary-500/10', 'text-primary-400'); el.classList.add('text-slate-300'); });
-                    const activeMenu = document.getElementById(`menu-${route}`);
-                    if(activeMenu) { activeMenu.classList.remove('text-slate-300'); activeMenu.classList.add('bg-primary-500/10', 'text-primary-400'); }
-
-                    if(window.innerWidth < 1024) { document.getElementById('sidebar').classList.add('-translate-x-full'); document.getElementById('mobile-overlay').classList.add('hidden'); }
-                    
-                    const titles = { 'dashboard': 'Dashboard', 'master-santri': 'Data Santri', 'master-kelas': 'Data Kelas', 'master-tahun': 'Tahun Pelajaran', 'jadwal': 'Jadwal Perizinan', 'scanner': 'Pos Security', 'approval': 'Approval Sekretaris', 'pengajuan': 'Ajukan Izin', 'histori': 'Histori Izin' };
-                    document.getElementById('page-title').textContent = titles[route] || 'Modul';
-                    
-                    const container = document.getElementById('content-area');
-                    container.innerHTML = `<div class="flex items-center justify-center h-full min-h-[400px]"><div class="loader w-8 h-8 border-[3px]"></div></div>`;
-                    
-                    setTimeout(() => {
-                        if (App.views[route]) App.views[route](container);
-                        else container.innerHTML = `<div class="text-center p-8"><h3 class="font-bold text-slate-600">Modul sedang disiapkan.</h3></div>`;
-                    }, 50);
-                }
-            },
-
-            views: {
-                'dashboard'(container) {
-                    let adminTools = App.state.user.role === 'ADMIN' ? 
-                        `<div class="mt-8 p-4 bg-orange-50 border border-orange-200 rounded-lg text-left">
-                            <h4 class="font-bold text-orange-800 mb-2"><i class="ph-fill ph-warning"></i> Developer Tools</h4>
-                            <p class="text-sm text-orange-700 mb-3">Gunakan fitur ini untuk membuat data dummy (Tahun Pelajaran, Kelas, dan Santri) agar aplikasi bisa langsung ditest.</p>
-                            <button onclick="App.actions.generateDummy()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded text-sm font-semibold transition shadow-sm">Generate Data Dummy</button>
-                        </div>` : '';
-
-                    container.innerHTML = `<div class="flex items-center justify-center h-64"><div class="loader w-10 h-10 border-[3px]"></div></div>`;
-
-                    App.api.post('getDashboardStats').then(res => {
-                        const stats = res.data;
-                        const roleName = App.state.user.role.replace('_', ' ');
-                        
-                        container.innerHTML = `
-                            <div class="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
-                                <div>
-                                    <h2 class="text-2xl font-bold text-slate-800">Dashboard ${roleName}</h2>
-                                    <p class="text-slate-500">Ringkasan data operasional perizinan santri hari ini.</p>
-                                </div>
-                                <button onclick="App.router.navigate('dashboard')" class="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 px-4 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition shadow-sm">
-                                    <i class="ph ph-arrows-clockwise text-lg"></i> Refresh Data
-                                </button>
-                            </div>
-                            
-                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-blue-500">
-                                    <p class="text-slate-500 text-xs font-bold mb-1 uppercase tracking-wider">Total Pengajuan</p>
-                                    <h3 class="text-3xl font-black text-slate-800">${stats.total}</h3>
-                                </div>
-                                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-green-500">
-                                    <p class="text-slate-500 text-xs font-bold mb-1 uppercase tracking-wider">Disetujui</p>
-                                    <h3 class="text-3xl font-black text-slate-800">${stats.disetujui}</h3>
-                                </div>
-                                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-red-500">
-                                    <p class="text-slate-500 text-xs font-bold mb-1 uppercase tracking-wider">Ditolak</p>
-                                    <h3 class="text-3xl font-black text-slate-800">${stats.ditolak}</h3>
-                                </div>
-                                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-orange-500">
-                                    <p class="text-slate-500 text-xs font-bold mb-1 uppercase tracking-wider">Menunggu</p>
-                                    <h3 class="text-3xl font-black text-slate-800">${stats.menunggu}</h3>
-                                </div>
-                            </div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div class="bg-slate-900 p-5 rounded-xl shadow-sm text-white relative overflow-hidden">
-                                    <i class="ph ph-sign-out text-6xl absolute -right-4 -bottom-4 text-slate-800 opacity-80"></i>
-                                    <p class="text-slate-400 text-xs font-bold mb-1 uppercase tracking-wider">Sudah Keluar (Exit)</p>
-                                    <h3 class="text-3xl font-black">${stats.keluar}</h3>
-                                </div>
-                                <div class="bg-primary-600 p-5 rounded-xl shadow-sm text-white relative overflow-hidden">
-                                    <i class="ph ph-sign-in text-6xl absolute -right-4 -bottom-4 text-primary-700 opacity-80"></i>
-                                    <p class="text-primary-100 text-xs font-bold mb-1 uppercase tracking-wider">Sudah Kembali (Return)</p>
-                                    <h3 class="text-3xl font-black">${stats.kembali}</h3>
-                                </div>
-                                <div class="bg-rose-500 p-5 rounded-xl shadow-sm text-white relative overflow-hidden">
-                                    <i class="ph ph-warning-circle text-6xl absolute -right-4 -bottom-4 text-rose-700 opacity-80"></i>
-                                    <p class="text-rose-100 text-xs font-bold mb-1 uppercase tracking-wider">Masih Di Luar</p>
-                                    <h3 class="text-3xl font-black">${stats.masih_diluar}</h3>
-                                </div>
-                            </div>
-                            ${adminTools}
-                        `;
-                    }).catch(err => {
-                        container.innerHTML = `<div class="p-6 text-center text-red-500 bg-red-50 rounded-xl border border-red-100 font-medium">Gagal memuat dashboard: ${err.message}</div>${adminTools}`;
-                    });
-                },
-                
-                'master-santri'(container) {
-                    App.api.post('getSantri').then(res => {
-                        let rows = '';
-                        if(res.data.length === 0) rows = `<tr><td colspan="6" class="p-8 text-center text-slate-500">Belum ada data santri</td></tr>`;
-                        else res.data.forEach(s => rows += `<tr class="border-b border-slate-100 hover:bg-slate-50"><td class="p-3">${s.nama_santri}</td><td class="p-3">${s.jenis_kelamin}</td><td class="p-3">${s.jenjang}</td><td class="p-3 font-medium text-slate-700">${s.nama_kelas}</td><td class="p-3">${s.kota_asal}</td><td class="p-3"><span class="px-2 py-1 rounded text-xs ${s.status_santri==='Aktif'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}">${s.status_santri}</span></td></tr>`);
-                        container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div class="p-4 border-b border-slate-200 flex justify-between items-center"><h3 class="font-bold text-slate-800">Direktori Santri</h3><button class="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-primary-700 transition">+ Tambah Santri</button></div><div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200"><tr><th class="p-3">NAMA SANTRI</th><th class="p-3">L/P</th><th class="p-3">JENJANG</th><th class="p-3">KELAS AKTIF</th><th class="p-3">KOTA ASAL</th><th class="p-3">STATUS</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-                    }).catch(err => App.ui.showToast(err.message, 'error'));
-                },
-                'master-kelas'(container) {
-                    App.api.post('getClasses').then(res => {
-                        let rows = '';
-                        if(res.data.length === 0) rows = `<tr><td colspan="4" class="p-8 text-center text-slate-500">Belum ada data kelas</td></tr>`;
-                        else res.data.forEach(c => rows += `<tr class="border-b border-slate-100 hover:bg-slate-50"><td class="p-3 font-semibold text-primary-600">${c.kelas_id}</td><td class="p-3">${c.nama_kelas}</td><td class="p-3">${c.jenjang}</td><td class="p-3">${c.tahun_pelajaran_id}</td></tr>`);
-                        container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div class="p-4 border-b border-slate-200"><h3 class="font-bold text-slate-800">Data Kelas</h3></div><div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200"><tr><th class="p-3">ID KELAS</th><th class="p-3">NAMA KELAS</th><th class="p-3">JENJANG</th><th class="p-3">TAHUN PELAJARAN</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-                    }).catch(err => App.ui.showToast(err.message, 'error'));
-                },
-                'master-tahun'(container) {
-                    App.api.post('getAcademicYears').then(res => {
-                        let rows = '';
-                        res.data.forEach(t => rows += `<tr class="border-b border-slate-100 hover:bg-slate-50"><td class="p-3">${t.nama_periode}</td><td class="p-3">${new Date(t.start_date).toLocaleDateString('id-ID')}</td><td class="p-3">${new Date(t.end_date).toLocaleDateString('id-ID')}</td><td class="p-3"><span class="px-2 py-1 rounded text-xs bg-green-100 text-green-700">${t.status}</span></td></tr>`);
-                        container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div class="p-4 border-b border-slate-200"><h3 class="font-bold text-slate-800">Tahun Pelajaran</h3></div><div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200"><tr><th class="p-3">PERIODE</th><th class="p-3">MULAI</th><th class="p-3">SELESAI</th><th class="p-3">STATUS</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-                    }).catch(err => App.ui.showToast(err.message, 'error'));
-                },
-                'jadwal'(container) {
-                    App.api.post('getSchedules').then(res => {
-                        let rows = '';
-                        res.data.forEach(j => rows += `<tr class="border-b border-slate-100 hover:bg-slate-50"><td class="p-3 font-semibold text-slate-700">${j.pekan}</td><td class="p-3">${j.jenjang}</td><td class="p-3">${j.gender}</td><td class="p-3 text-primary-600 font-medium">${j.hari}</td><td class="p-3"><span class="px-2 py-1 rounded text-xs bg-green-100 text-green-700">${j.status}</span></td></tr>`);
-                        container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div class="p-4 border-b border-slate-200 flex justify-between items-center"><h3 class="font-bold text-slate-800">Jadwal Perizinan Rutin (Otomatis)</h3></div><div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200"><tr><th class="p-3">PEKAN</th><th class="p-3">JENJANG</th><th class="p-3">GENDER</th><th class="p-3">HARI PERIZINAN</th><th class="p-3">STATUS</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-                    }).catch(err => App.ui.showToast(err.message, 'error'));
-                },
-                
-                'pengajuan'(container) { 
-                     // Mengambil data santri di kelas WALI KELAS dan seluruh data santri untuk fitur dropdown saudara
-                     Promise.all([
-                         App.api.post('getSantriByClass'),
-                         App.api.post('getAllSantriBasic')
-                     ]).then(([resClass, resAll]) => {
-                         let optionsSantri = '<option value="">-- Pilih Santri --</option>';
-                         if(resClass.data.length === 0) optionsSantri = '<option value="">(Belum ada santri di kelas Anda)</option>';
-                         resClass.data.forEach(s => { optionsSantri += `<option value="${s.santri_id}">${s.nama_santri}</option>`; });
-                         
-                         let optionsSaudara = '<option value="">-- Cari dan Pilih Kakak/Adik --</option>';
-                         resAll.data.forEach(s => { 
-                             optionsSaudara += `<option value="${s.santri_id}">${s.nama_santri} (${s.jenjang} - ${s.nama_kelas} - ${s.jenis_kelamin})</option>`; 
-                         });
-                         optionsSaudara += '<option value="NOT_FOUND" class="font-bold">Saudara Tidak Ditemukan (Input Manual)</option>';
-                         
-                         container.innerHTML = `<div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm p-6 sm:p-8 border border-slate-200">
-                             <h3 class="text-lg font-bold text-slate-800 mb-6 border-b border-slate-100 pb-4"><i class="ph-fill ph-paper-plane-tilt text-primary-500"></i> Form Pengajuan Izin</h3>
-                             <form id="form-izin" class="space-y-4">
-                                <div><label class="block text-sm font-medium mb-1">Pilih Santri *</label><select id="izin-santri" required class="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none">${optionsSantri}</select></div>
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div><label class="block text-sm font-medium mb-1">Tujuan *</label><input type="text" id="izin-tujuan" required class="w-full px-4 py-2 border rounded-lg" placeholder="Cth: Bandung"></div>
-                                    <div><label class="block text-sm font-medium mb-1">Keperluan *</label><input type="text" id="izin-keperluan" required class="w-full px-4 py-2 border rounded-lg" placeholder="Cth: Acara Keluarga"></div>
-                                </div>
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div><label class="block text-sm font-medium mb-1">Penjemput *</label><input type="text" id="izin-walisafar" required class="w-full px-4 py-2 border rounded-lg" placeholder="Nama Penjemput"></div>
-                                    <div><label class="block text-sm font-medium mb-1">Hubungan *</label>
-                                        <select id="izin-hubungan" required class="w-full px-4 py-2 border rounded-lg">
-                                            <option value="Ayah">Ayah</option><option value="Ibu">Ibu</option><option value="Kakak Kandung">Kakak Kandung</option><option value="Paman">Paman</option><option value="Lainnya">Lainnya...</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div id="hubungan-lainnya-container" class="hidden">
-                                    <label class="block text-sm font-medium mb-1">Sebutkan Hubungan Lainnya *</label><input type="text" id="izin-hubungan-lainnya" class="w-full px-4 py-2 border rounded-lg">
-                                </div>
-                                
-                                <div class="border-t border-slate-100 pt-4 mt-2">
-                                    <label class="flex items-center gap-2 cursor-pointer">
-                                        <input type="checkbox" id="izin-ikut-saudara" class="w-5 h-5 rounded text-primary-600 focus:ring-primary-500">
-                                        <span class="text-sm font-medium text-slate-700">Ikut Jadwal Saudara (Kakak/Adik)</span>
-                                    </label>
+<!-- ... existing code ... -->
                                     <div id="saudara-container" class="hidden mt-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
                                         <label class="block text-sm font-medium mb-1 text-slate-700">Pilih Kakak/Adik *</label>
-                                        <select id="izin-saudara" class="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm outline-none">
+                                        <select id="izin-saudara" autocomplete="off" class="w-full text-sm outline-none">
                                             ${optionsSaudara}
                                         </select>
                                         <div id="saudara-manual-container" class="hidden mt-3 pt-3 border-t border-slate-200">
-                                            <label class="block text-sm font-medium mb-1 text-slate-700">Nama Saudara (Manual) *</label>
-                                            <input type="text" id="izin-saudara-manual" class="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Ketik nama saudara...">
-                                            <p class="text-xs text-red-500 mt-1 font-medium"><i class="ph-fill ph-warning-circle"></i> Memerlukan verifikasi manual dari Sekretaris</p>
-                                        </div>
-                                    </div>
-                                </div>
+<!-- ... existing code ... -->
+                             document.getElementById('izin-hubungan').addEventListener('change', (e) => {
+                                 const container = document.getElementById('hubungan-lainnya-container');
+                                 if(e.target.value === 'Lainnya') { container.classList.remove('hidden'); document.getElementById('izin-hubungan-lainnya').required = true; }
+                                 else { container.classList.add('hidden'); document.getElementById('izin-hubungan-lainnya').required = false; }
+                             });
 
-                                <div class="pt-4 flex justify-end"><button type="submit" id="btn-submit-izin" class="bg-primary-600 hover:bg-primary-700 transition text-white font-medium py-2.5 px-6 rounded-lg shadow-sm">Kirim Pengajuan</button></div>
-                             </form></div>`;
-                         
-                         // Toggle Hubungan Lainnya
-                         document.getElementById('izin-hubungan').addEventListener('change', (e) => {
-                             const container = document.getElementById('hubungan-lainnya-container');
-                             if(e.target.value === 'Lainnya') { container.classList.remove('hidden'); document.getElementById('izin-hubungan-lainnya').required = true; }
-                             else { container.classList.add('hidden'); document.getElementById('izin-hubungan-lainnya').required = false; }
-                         });
+                             // INIT Tom Select untuk Dropdown Saudara
+                             const tomSelectInstance = new TomSelect("#izin-saudara", {
+                                 create: false,
+                                 sortField: { field: "text", direction: "asc" },
+                                 maxOptions: 50, // Membatasi render 50 hasil teratas agar tidak lag dengan 1000 data
+                                 placeholder: "-- Ketik Nama / Pilih Kakak atau Adik --"
+                             });
 
-                         // Toggle Ikut Saudara
-                         const inputSaudara = document.getElementById('izin-saudara');
-                         const manualContainer = document.getElementById('saudara-manual-container');
-                         const inputManual = document.getElementById('izin-saudara-manual');
+                             // Toggle Ikut Saudara
+                             const manualContainer = document.getElementById('saudara-manual-container');
+                             const inputManual = document.getElementById('izin-saudara-manual');
 
-                         document.getElementById('izin-ikut-saudara').addEventListener('change', (e) => {
-                             const container = document.getElementById('saudara-container');
-                             if(e.target.checked) {
-                                 container.classList.remove('hidden');
-                                 inputSaudara.required = true;
-                             } else {
-                                 container.classList.add('hidden');
-                                 inputSaudara.required = false;
-                                 inputSaudara.value = '';
-                                 manualContainer.classList.add('hidden');
-                                 inputManual.required = false;
-                             }
-                         });
+                             document.getElementById('izin-ikut-saudara').addEventListener('change', (e) => {
+                                 const container = document.getElementById('saudara-container');
+                                 if(e.target.checked) {
+                                     container.classList.remove('hidden');
+                                 } else {
+                                     container.classList.add('hidden');
+                                     tomSelectInstance.clear(); // Reset TomSelect
+                                     manualContainer.classList.add('hidden');
+                                     inputManual.required = false;
+                                 }
+                             });
 
-                         inputSaudara.addEventListener('change', (e) => {
-                             if(e.target.value === 'NOT_FOUND') {
-                                 manualContainer.classList.remove('hidden');
-                                 inputManual.required = true;
-                             } else {
-                                 manualContainer.classList.add('hidden');
-                                 inputManual.required = false;
-                             }
-                         });
+                             // Listener Tom Select (Ketik / Pilih)
+                             tomSelectInstance.on('change', (value) => {
+                                 if(value === 'NOT_FOUND') {
+                                     manualContainer.classList.remove('hidden');
+                                     inputManual.required = true;
+                                 } else {
+                                     manualContainer.classList.add('hidden');
+                                     inputManual.required = false;
+                                 }
+                             });
 
-                         document.getElementById('form-izin').addEventListener('submit', async (e) => {
-                             e.preventDefault(); const btn = document.getElementById('btn-submit-izin'); btn.innerHTML = '<div class="loader w-4 h-4 border-[2px] mx-auto"></div>'; btn.disabled = true;
-                             
-                             let keteranganLuar = '';
-                             let saudaraId = inputSaudara.value;
-                             
-                             if (document.getElementById('izin-ikut-saudara').checked && saudaraId === 'NOT_FOUND') {
-                                 keteranganLuar = '[PERLU VERIFIKASI] Saudara input manual: ' + inputManual.value;
-                                 saudaraId = ''; 
-                             }
+                             document.getElementById('form-izin').addEventListener('submit', async (e) => {
+                                 e.preventDefault(); 
+                                 
+                                 // Validasi Tambahan untuk Dropdown TomSelect
+                                 let saudaraId = tomSelectInstance.getValue();
+                                 if (document.getElementById('izin-ikut-saudara').checked && !saudaraId) {
+                                     App.ui.showToast('Silakan cari dan pilih Kakak/Adik terlebih dahulu', 'error');
+                                     return;
+                                 }
 
-                             try {
-                                 await App.api.post('createPermit', { 
-                                     santri_id: document.getElementById('izin-santri').value, 
-                                     keperluan: document.getElementById('izin-keperluan').value, 
-                                     tujuan: document.getElementById('izin-tujuan').value, 
-                                     wali_safar: document.getElementById('izin-walisafar').value, 
-                                     hubungan_wali: document.getElementById('izin-hubungan').value,
-                                     hubungan_lainnya: document.getElementById('izin-hubungan-lainnya').value,
-                                     ikut_saudara: document.getElementById('izin-ikut-saudara').checked,
-                                     saudara_id: saudaraId,
-                                     keterangan_luar_jadwal: keteranganLuar
-                                 });
-                                 App.ui.showToast('Pengajuan Terkirim!', 'success'); setTimeout(() => App.router.navigate('histori'), 800);
-                             } catch(err) { App.ui.showToast(err.message, 'error'); btn.innerHTML = 'Kirim Pengajuan'; btn.disabled = false; }
-                         });
-                     }).catch(err => App.ui.showToast(err.message, 'error'));
-                },
+                                 const btn = document.getElementById('btn-submit-izin'); btn.innerHTML = '<div class="loader w-4 h-4 border-[2px] mx-auto"></div>'; btn.disabled = true;
+                                 
+                                 let keteranganLuar = '';
+                                 
+                                 if (document.getElementById('izin-ikut-saudara').checked && saudaraId === 'NOT_FOUND') {
+                                     keteranganLuar = '[PERLU VERIFIKASI] Saudara input manual: ' + inputManual.value;
+                                     saudaraId = ''; 
+                                 }
 
-                'histori'(container) {
-                    App.api.post('getMyPermits').then(res => {
-                        let rows = '';
-                        if(res.data.length === 0) rows = `<tr><td colspan="7" class="p-8 text-center text-slate-500">Belum ada histori izin kelas Anda</td></tr>`;
-                        else res.data.forEach(p => {
-                            let statusBadge = p.status_pengajuan === 'DISETUJUI' ? 'bg-green-100 text-green-700' : (p.status_pengajuan === 'DITOLAK' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700');
-                            let btnQR = p.status_pengajuan === 'DISETUJUI' ? `<button onclick='App.actions.showQR(${JSON.stringify(p).replace(/'/g, "&#39;")})' class="text-primary-600 hover:text-primary-800 bg-primary-50 px-2 py-1 rounded" title="Lihat QR"><i class="ph ph-qr-code text-xl"></i></button>` : '-';
-                            rows += `<tr class="border-b border-slate-100 hover:bg-slate-50"><td class="p-3 font-medium text-slate-800">${p.nama_santri}</td><td class="p-3">${p.tanggal_izin_format}</td><td class="p-3">${p.keperluan}</td><td class="p-3">${p.tujuan}</td><td class="p-3">${p.wali_safar}</td><td class="p-3"><span class="px-2 py-1 rounded text-xs font-semibold ${statusBadge}">${p.status_pengajuan}</span></td><td class="p-3 text-center">${btnQR}</td></tr>`;
-                        });
-                        container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div class="p-4 border-b border-slate-200"><h3 class="font-bold text-slate-800">Histori Pengajuan Kelas Saya</h3></div><div class="overflow-x-auto"><table class="w-full text-sm text-left whitespace-nowrap"><thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200"><tr><th class="p-3">NAMA SANTRI</th><th class="p-3">TANGGAL IZIN</th><th class="p-3">KEPERLUAN</th><th class="p-3">TUJUAN</th><th class="p-3">PENJEMPUT</th><th class="p-3">STATUS</th><th class="p-3 text-center">QR CODE</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-                    }).catch(err => App.ui.showToast(err.message, 'error'));
-                },
-                
-                'approval'(container) {
-                    App.api.post('getPendingPermits').then(res => {
-                        if (res.data.length === 0) return container.innerHTML = `<div class="text-center p-10"><i class="ph ph-check-circle text-5xl text-slate-300"></i><p class="mt-2 text-slate-500">Tidak ada pengajuan masuk yang perlu diproses.</p></div>`;
-                        let html = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
-                        res.data.forEach(p => {
-                            html += `<div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
-                                <div class="absolute top-0 left-0 w-1 h-full bg-orange-400"></div>
-                                <h4 class="font-bold text-lg">${p.nama_santri} <span class="text-xs font-normal text-slate-500">(${p.jenjang})</span></h4>
-                                <div class="mt-3 space-y-1">
-                                    <p class="text-sm text-slate-600"><i class="ph-fill ph-info text-primary-500 mr-1"></i> Keperluan: <strong>${p.keperluan}</strong></p>
-                                    <p class="text-sm text-slate-600"><i class="ph-fill ph-map-pin text-red-500 mr-1"></i> Tujuan: ${p.tujuan}</p>
-                                    <p class="text-sm text-slate-600"><i class="ph-fill ph-users text-blue-500 mr-1"></i> Penjemput: ${p.wali_safar} (${p.hubungan_wali})</p>
-                                </div>
-                                <div class="flex gap-2 mt-5 pt-4 border-t border-slate-100">
-                                    <button onclick="App.actions.approve('${p.permit_id}')" class="flex-1 bg-green-500 hover:bg-green-600 transition text-white py-2 rounded-lg text-sm font-semibold shadow-sm">Setujui</button>
-                                    <button onclick="App.actions.reject('${p.permit_id}')" class="flex-1 bg-red-100 hover:bg-red-200 transition text-red-700 py-2 rounded-lg text-sm font-semibold">Tolak</button>
-                                </div></div>`;
-                        });
-                        container.innerHTML = html + `</div>`;
-                    }).catch(err => App.ui.showToast(err.message, 'error'));
-                },
-
-                'scanner'(container) {
-                    container.innerHTML = `
-                        <div class="max-w-md mx-auto flex flex-col items-center">
-                            <!-- Header Info -->
-                            <div class="bg-slate-900 w-full rounded-t-2xl text-white p-5 text-center">
-                                <h2 class="font-bold text-lg"><i class="ph ph-camera"></i> Pos Security Scanner</h2>
-                                <p class="text-xs text-slate-400 mt-1">Arahkan kamera ke QR Code Pas Digital</p>
-                            </div>
-
-                            <!-- Area Kamera -->
-                            <div id="scanner-box" class="w-full bg-black shadow-xl overflow-hidden relative">
-                                <div id="qr-reader" class="w-full min-h-[300px]"></div>
-                                
-                                <!-- Loading overlay -->
-                                <div id="scanner-loading" class="absolute inset-0 bg-slate-900/80 hidden flex-col items-center justify-center z-10">
-                                    <div class="loader w-10 h-10 border-[3px] border-t-primary-500 mb-3"></div>
-                                    <p class="text-white text-sm font-medium tracking-wider">Memverifikasi Data...</p>
-                                </div>
-                            </div>
-                            
-                            <!-- Container Hasil Scan -->
-                            <div id="scanner-result" class="w-full bg-white rounded-b-2xl shadow-xl p-6 hidden flex flex-col items-center border border-t-0 border-slate-200">
-                                <!-- Dynamic Result Here -->
-                            </div>
-                            
-                            <div id="scanner-controls" class="w-full p-4 text-center">
-                                <p class="text-xs text-slate-500 mb-3">Pastikan izin dalam keadaan terang.</p>
-                            </div>
-                        </div>
-                    `;
-                    setTimeout(() => App.actions.initScanner(), 100);
-                }
-            },
-
-            // --- ACTION HANDLERS ---
-            actions: {
-                generateDummy: async () => {
-                    if(!confirm('Buat data dummy (Tahun Pelajaran, Kelas, Santri)?')) return;
-                    try { App.ui.showToast('Memproses...', 'info'); await App.api.post('generateDummy'); App.ui.showToast('Data dummy berhasil dibuat!', 'success'); setTimeout(()=>window.location.reload(), 1500); } 
-                    catch(err) { App.ui.showToast(err.message, 'error'); }
-                },
-
-                approve: async (id) => { if(!confirm('Setujui izin ini?')) return; try { await App.api.post('approvePermit', {permit_id: id}); App.ui.showToast('Berhasil disetujui', 'success'); App.router.navigate('approval'); } catch(err){ App.ui.showToast(err.message, 'error'); } },
-                reject: async (id) => { const alasan = prompt('Alasan penolakan:'); if(!alasan) return; try { await App.api.post('rejectPermit', {permit_id: id, alasan}); App.ui.showToast('Izin ditolak', 'info'); App.router.navigate('approval'); } catch(err){ App.ui.showToast(err.message, 'error'); } },
-
-                showQR(permit) {
-                    App.state.currentPermitForQR = permit;
-                    const html = `
-                        <div class="p-6">
-                            <div class="flex justify-between items-center mb-4">
-                                <h3 class="font-bold text-lg text-slate-800">Pas Digital Santri</h3>
-                                <button onclick="App.ui.closeModal()" class="text-slate-400 hover:text-red-500 transition"><i class="ph ph-x text-xl"></i></button>
-                            </div>
-                            <div id="qr-card" class="bg-white border-2 border-slate-200 rounded-xl overflow-hidden shadow-sm mb-4 relative">
-                                <div class="bg-primary-600 text-white p-3 text-center">
-                                    <h4 class="font-bold text-[13px] tracking-wide">PONDOK PESANTREN MODERN AL-ISLAM</h4>
-                                    <p class="text-xs opacity-90">KARTU IZIN SANTRI</p>
-                                </div>
-                                <div class="p-4 flex flex-col gap-3">
-                                    <div class="text-center mb-2">
-                                        <h2 class="font-bold text-xl text-slate-800 uppercase">${permit.nama_santri}</h2>
-                                        <p class="text-sm text-slate-500 font-medium">${permit.jenjang} - ${permit.nama_kelas}</p>
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-3 text-sm border-t border-b border-slate-100 py-3">
-                                        <div><p class="text-slate-400 text-xs">Tanggal</p><p class="font-semibold text-slate-700">${permit.tanggal_izin_format}</p></div>
-                                        <div><p class="text-slate-400 text-xs">Keperluan</p><p class="font-semibold text-slate-700 truncate" title="${permit.keperluan}">${permit.keperluan}</p></div>
-                                        <div><p class="text-slate-400 text-xs">Jam Perizinan</p><p class="font-semibold text-slate-700">08.00 - 16.00 WIB</p></div>
-                                        <div><p class="text-slate-400 text-xs">Penjemput</p><p class="font-semibold text-slate-700">${permit.wali_safar} (${permit.hubungan_wali})</p></div>
-                                    </div>
-                                    <div class="flex justify-center items-center p-2">
-                                        <div id="qr-code-canvas" class="p-2 border border-slate-200 rounded-lg bg-white"></div>
-                                    </div>
-                                    <p class="text-[10px] text-center text-slate-400 leading-tight">Kartu ini wajib ditunjukkan kepada Security saat keluar dan kembali ke pondok pesantren.</p>
-                                </div>
-                            </div>
-                            <button onclick="App.actions.downloadQRPNG()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 rounded-lg transition flex items-center justify-center gap-2">
-                                <i class="ph ph-download-simple text-lg"></i> Unduh Gambar (PNG)
-                            </button>
-                        </div>
-                    `;
-                    App.ui.showModal(html);
-                    setTimeout(() => {
-                        new QRCode(document.getElementById("qr-code-canvas"), {
-                            text: permit.qr_token, width: 140, height: 140, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H
-                        });
-                    }, 100);
-                },
-
-                downloadQRPNG() {
-                    const permit = App.state.currentPermitForQR;
-                    if(!permit) return;
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 400; canvas.height = 580;
-                    const ctx = canvas.getContext('2d');
-                    
-                    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 400, 580);
-                    ctx.fillStyle = '#16a34a'; ctx.fillRect(0, 0, 400, 70);
-                    ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
-                    ctx.font = 'bold 15px Inter, sans-serif'; ctx.fillText('PONDOK PESANTREN MODERN AL-ISLAM', 200, 35);
-                    ctx.font = '12px Inter, sans-serif'; ctx.fillText('KARTU IZIN SANTRI', 200, 55);
-                    
-                    ctx.fillStyle = '#1e293b'; ctx.font = 'bold 22px Inter, sans-serif'; ctx.fillText(permit.nama_santri.toUpperCase(), 200, 110);
-                    ctx.fillStyle = '#64748b'; ctx.font = '16px Inter, sans-serif'; ctx.fillText(`${permit.jenjang} - ${permit.nama_kelas}`, 200, 135);
-                    
-                    ctx.beginPath(); ctx.moveTo(40, 155); ctx.lineTo(360, 155); ctx.strokeStyle = '#e2e8f0'; ctx.stroke();
-                    
-                    ctx.textAlign = 'left';
-                    ctx.fillStyle = '#94a3b8'; ctx.font = '12px Inter, sans-serif';
-                    ctx.fillText('Tanggal', 40, 185); ctx.fillText('Keperluan', 220, 185);
-                    ctx.fillText('Jam Perizinan', 40, 235); ctx.fillText('Penjemput', 220, 235);
-                    
-                    ctx.fillStyle = '#334155'; ctx.font = 'bold 14px Inter, sans-serif';
-                    ctx.fillText(permit.tanggal_izin_format, 40, 205); 
-                    let kep = permit.keperluan.length > 20 ? permit.keperluan.substring(0,20)+'...' : permit.keperluan;
-                    ctx.fillText(kep, 220, 205);
-                    
-                    ctx.fillText('08.00 - 16.00 WIB', 40, 255); 
-                    let penjemput = `${permit.wali_safar} (${permit.hubungan_wali})`;
-                    if(penjemput.length > 20) penjemput = penjemput.substring(0, 20) + '...';
-                    ctx.fillText(penjemput, 220, 255);
-                    
-                    ctx.beginPath(); ctx.moveTo(40, 280); ctx.lineTo(360, 280); ctx.stroke();
-
-                    const qrImg = document.querySelector('#qr-code-canvas img');
-                    const drawQR = (imgEl) => {
-                        ctx.drawImage(imgEl, 130, 300, 140, 140);
-                        ctx.textAlign = 'center'; ctx.fillStyle = '#94a3b8'; ctx.font = '10px Inter, sans-serif';
-                        ctx.fillText('Kartu ini wajib ditunjukkan kepada Security', 200, 480);
-                        ctx.fillText('saat keluar dan kembali ke pondok pesantren.', 200, 495);
-                        
-                        const link = document.createElement('a');
-                        link.download = `QR_Izin_${permit.nama_santri.replace(/\s+/g, '_')}.png`;
-                        link.href = canvas.toDataURL('image/png'); link.click();
-                    };
-
-                    if(qrImg && qrImg.complete && qrImg.naturalWidth !== 0) drawQR(qrImg); 
-                    else if(qrImg) qrImg.onload = () => drawQR(qrImg);
-                    else { const qrCanvas = document.querySelector('#qr-code-canvas canvas'); if(qrCanvas) drawQR(qrCanvas); }
-                },
-
-                initScanner() {
-                    const qrReaderElement = document.getElementById('qr-reader');
-                    if(!qrReaderElement) return;
-
-                    const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0, supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA] };
-                    App.state.html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", config, false);
-                    App.state.html5QrcodeScanner.render((decodedText) => this.handleScanSuccess(decodedText), (error) => {});
-                },
-
-                async handleScanSuccess(decodedText) {
-                    if(document.getElementById('scanner-loading').classList.contains('hidden') === false) return;
-                    if (navigator.vibrate) navigator.vibrate(200);
-
-                    document.getElementById('scanner-loading').classList.remove('hidden');
-                    document.getElementById('scanner-loading').classList.add('flex');
-                    if(App.state.html5QrcodeScanner) App.state.html5QrcodeScanner.pause(true);
-
-                    const resultContainer = document.getElementById('scanner-result');
-                    const controlContainer = document.getElementById('scanner-controls');
-                    
-                    try {
-                        const res = await App.api.post('scanQR', { qr_token: decodedText });
-                        const data = res.data;
-                        let icon = data.scan_type === 'EXIT' ? 'ph-sign-out' : 'ph-sign-in';
-                        let colorStr = 'text-green-600 bg-green-100 border-green-200';
-                        if(data.status_waktu.includes('TERLAMBAT')) colorStr = data.status_waktu.includes('TOLERANSI') ? 'text-red-600 bg-red-100 border-red-200' : 'text-orange-600 bg-orange-100 border-orange-200';
-
-                        resultContainer.innerHTML = `
-                            <div class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 ${colorStr}"><i class="ph-fill ${icon}"></i></div>
-                            <h3 class="font-bold text-xl text-slate-800 text-center uppercase tracking-wide">${data.nama_santri}</h3>
-                            <div class="w-full mt-5 space-y-3">
-                                <div class="flex justify-between items-center py-2 border-b border-dashed border-slate-200"><span class="text-sm text-slate-500">Tindakan</span><span class="font-bold text-slate-800">SCAN ${data.scan_type}</span></div>
-                                <div class="flex justify-between items-center py-2 border-b border-dashed border-slate-200"><span class="text-sm text-slate-500">Waktu Tercatat</span><span class="font-bold text-slate-800">${data.waktu}</span></div>
-                                <div class="flex justify-between items-center py-2"><span class="text-sm text-slate-500">Status</span><span class="font-bold text-[13px] uppercase px-2 py-1 rounded ${colorStr}">${data.status_waktu}</span></div>
-                            </div>
-                        `;
-                    } catch (error) {
-                        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                        resultContainer.innerHTML = `
-                            <div class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3 text-red-600 bg-red-100 border-red-200"><i class="ph-fill ph-x-circle"></i></div>
-                            <h3 class="font-bold text-lg text-slate-800 text-center">Scan Ditolak</h3>
-                            <p class="text-sm text-slate-500 text-center mt-2 p-3 bg-slate-50 rounded-lg w-full border border-slate-100">${error.message}</p>
-                        `;
-                    }
-
-                    document.getElementById('scanner-loading').classList.add('hidden');
-                    document.getElementById('scanner-loading').classList.remove('flex');
-                    document.getElementById('scanner-box').classList.add('hidden');
-                    resultContainer.classList.remove('hidden');
-                    controlContainer.innerHTML = `<button onclick="App.actions.resetScanner()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl transition shadow-lg flex items-center justify-center gap-2"><i class="ph ph-qr-code text-xl"></i> Scan Berikutnya</button>`;
-                },
-
-                resetScanner() {
-                    document.getElementById('scanner-result').classList.add('hidden');
-                    document.getElementById('scanner-box').classList.remove('hidden');
-                    document.getElementById('scanner-controls').innerHTML = `<p class="text-xs text-slate-500 mb-3">Pastikan izin dalam keadaan terang.</p>`;
-                    if(App.state.html5QrcodeScanner) App.state.html5QrcodeScanner.resume();
-                }
-            }
-        };
-
-        document.addEventListener('DOMContentLoaded', () => App.auth.init());
-    </script>
-</body>
-</html>
+                                 try {
+                                     await App.api.post('createPermit', { 
+<!-- ... existing code ... -->
