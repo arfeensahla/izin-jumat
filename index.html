@@ -346,9 +346,9 @@
             },
 
             views: {
-                renderDashboard(container) {
+                'dashboard'(container) {
                     let adminTools = App.state.user.role === 'ADMIN' ? `<div class="mt-8 p-4 bg-orange-50 border border-orange-200 rounded-lg text-left"><h4 class="font-bold text-orange-800 mb-2">Developer Tools</h4><p class="text-sm text-orange-700 mb-3">Gunakan fitur ini untuk membuat data dummy (Tahun Pelajaran, Kelas, dan Santri) agar aplikasi bisa langsung ditest.</p><button onclick="App.actions.generateDummy()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded text-sm font-semibold transition">Generate Data Dummy</button></div>` : '';
-                    container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 text-center relative"><div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"><i class="ph ph-rocket text-3xl text-slate-400"></i></div><h3 class="text-lg font-semibold text-slate-800">Dashboard ${App.state.user.role}</h3><p class="text-slate-500 mt-2">Selamat datang di Sistem Perizinan Santri Al-Islam.</p>${adminTools}</div>`; 
+                    container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 text-center relative"><div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"><i class="ph ph-rocket text-3xl text-slate-400"></i></div><h3 class="text-lg font-semibold text-slate-800">Dashboard ${App.state.user.role.replace('_', ' ')}</h3><p class="text-slate-500 mt-2">Selamat datang di Sistem Perizinan Santri Al-Islam.</p>${adminTools}</div>`; 
                 },
                 
                 'master-santri'(container) {
@@ -383,15 +383,25 @@
                 },
                 
                 'pengajuan'(container) { 
-                     App.api.post('getSantriByClass').then(res => {
-                         let options = '<option value="">-- Pilih Santri --</option>';
-                         if(res.data.length === 0) options = '<option value="">(Belum ada santri di kelas Anda)</option>';
-                         res.data.forEach(s => { options += `<option value="${s.santri_id}">${s.nama_santri}</option>`; });
+                     // Mengambil data santri di kelas WALI KELAS dan seluruh data santri untuk fitur dropdown saudara
+                     Promise.all([
+                         App.api.post('getSantriByClass'),
+                         App.api.post('getAllSantriBasic')
+                     ]).then(([resClass, resAll]) => {
+                         let optionsSantri = '<option value="">-- Pilih Santri --</option>';
+                         if(resClass.data.length === 0) optionsSantri = '<option value="">(Belum ada santri di kelas Anda)</option>';
+                         resClass.data.forEach(s => { optionsSantri += `<option value="${s.santri_id}">${s.nama_santri}</option>`; });
+                         
+                         let optionsSaudara = '<option value="">-- Cari dan Pilih Kakak/Adik --</option>';
+                         resAll.data.forEach(s => { 
+                             optionsSaudara += `<option value="${s.santri_id}">${s.nama_santri} (${s.jenjang} - ${s.nama_kelas} - ${s.jenis_kelamin})</option>`; 
+                         });
+                         optionsSaudara += '<option value="NOT_FOUND" class="font-bold">Saudara Tidak Ditemukan (Input Manual)</option>';
                          
                          container.innerHTML = `<div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm p-6 sm:p-8 border border-slate-200">
                              <h3 class="text-lg font-bold text-slate-800 mb-6 border-b border-slate-100 pb-4"><i class="ph-fill ph-paper-plane-tilt text-primary-500"></i> Form Pengajuan Izin</h3>
                              <form id="form-izin" class="space-y-4">
-                                <div><label class="block text-sm font-medium mb-1">Pilih Santri *</label><select id="izin-santri" required class="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none">${options}</select></div>
+                                <div><label class="block text-sm font-medium mb-1">Pilih Santri *</label><select id="izin-santri" required class="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none">${optionsSantri}</select></div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div><label class="block text-sm font-medium mb-1">Tujuan *</label><input type="text" id="izin-tujuan" required class="w-full px-4 py-2 border rounded-lg" placeholder="Cth: Bandung"></div>
                                     <div><label class="block text-sm font-medium mb-1">Keperluan *</label><input type="text" id="izin-keperluan" required class="w-full px-4 py-2 border rounded-lg" placeholder="Cth: Acara Keluarga"></div>
@@ -413,9 +423,16 @@
                                         <input type="checkbox" id="izin-ikut-saudara" class="w-5 h-5 rounded text-primary-600 focus:ring-primary-500">
                                         <span class="text-sm font-medium text-slate-700">Ikut Jadwal Saudara (Kakak/Adik)</span>
                                     </label>
-                                    <div id="saudara-container" class="hidden mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                                        <label class="block text-sm font-medium mb-1 text-slate-700">ID / Nama Saudara</label>
-                                        <input type="text" id="izin-saudara" class="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Masukkan nama saudara jika ada...">
+                                    <div id="saudara-container" class="hidden mt-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                        <label class="block text-sm font-medium mb-1 text-slate-700">Pilih Kakak/Adik *</label>
+                                        <select id="izin-saudara" class="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm outline-none">
+                                            ${optionsSaudara}
+                                        </select>
+                                        <div id="saudara-manual-container" class="hidden mt-3 pt-3 border-t border-slate-200">
+                                            <label class="block text-sm font-medium mb-1 text-slate-700">Nama Saudara (Manual) *</label>
+                                            <input type="text" id="izin-saudara-manual" class="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Ketik nama saudara...">
+                                            <p class="text-xs text-red-500 mt-1 font-medium"><i class="ph-fill ph-warning-circle"></i> Memerlukan verifikasi manual dari Sekretaris</p>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -430,14 +447,45 @@
                          });
 
                          // Toggle Ikut Saudara
+                         const inputSaudara = document.getElementById('izin-saudara');
+                         const manualContainer = document.getElementById('saudara-manual-container');
+                         const inputManual = document.getElementById('izin-saudara-manual');
+
                          document.getElementById('izin-ikut-saudara').addEventListener('change', (e) => {
                              const container = document.getElementById('saudara-container');
-                             if(e.target.checked) container.classList.remove('hidden');
-                             else container.classList.add('hidden');
+                             if(e.target.checked) {
+                                 container.classList.remove('hidden');
+                                 inputSaudara.required = true;
+                             } else {
+                                 container.classList.add('hidden');
+                                 inputSaudara.required = false;
+                                 inputSaudara.value = '';
+                                 manualContainer.classList.add('hidden');
+                                 inputManual.required = false;
+                             }
+                         });
+
+                         inputSaudara.addEventListener('change', (e) => {
+                             if(e.target.value === 'NOT_FOUND') {
+                                 manualContainer.classList.remove('hidden');
+                                 inputManual.required = true;
+                             } else {
+                                 manualContainer.classList.add('hidden');
+                                 inputManual.required = false;
+                             }
                          });
 
                          document.getElementById('form-izin').addEventListener('submit', async (e) => {
                              e.preventDefault(); const btn = document.getElementById('btn-submit-izin'); btn.innerHTML = '<div class="loader w-4 h-4 border-[2px] mx-auto"></div>'; btn.disabled = true;
+                             
+                             let keteranganLuar = '';
+                             let saudaraId = inputSaudara.value;
+                             
+                             if (document.getElementById('izin-ikut-saudara').checked && saudaraId === 'NOT_FOUND') {
+                                 keteranganLuar = '[PERLU VERIFIKASI] Saudara input manual: ' + inputManual.value;
+                                 saudaraId = ''; 
+                             }
+
                              try {
                                  await App.api.post('createPermit', { 
                                      santri_id: document.getElementById('izin-santri').value, 
@@ -447,7 +495,8 @@
                                      hubungan_wali: document.getElementById('izin-hubungan').value,
                                      hubungan_lainnya: document.getElementById('izin-hubungan-lainnya').value,
                                      ikut_saudara: document.getElementById('izin-ikut-saudara').checked,
-                                     saudara_id: document.getElementById('izin-saudara').value
+                                     saudara_id: saudaraId,
+                                     keterangan_luar_jadwal: keteranganLuar
                                  });
                                  App.ui.showToast('Pengajuan Terkirim!', 'success'); setTimeout(() => App.router.navigate('histori'), 800);
                              } catch(err) { App.ui.showToast(err.message, 'error'); btn.innerHTML = 'Kirim Pengajuan'; btn.disabled = false; }
