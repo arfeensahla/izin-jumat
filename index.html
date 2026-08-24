@@ -35,6 +35,32 @@
     <!-- 1. NOTIFICATION TOAST -->
     <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
 
+    <!-- MODAL FORM TAMBAH DATA (TAMBAHAN BARU) -->
+    <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center px-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden transform transition-all">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 id="modal-title" class="text-lg font-bold text-gray-800">Tambah Data</h3>
+                <button onclick="App.UI.closeModal()" class="text-gray-400 hover:text-red-500 transition">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="px-6 py-4 max-h-[70vh] overflow-y-auto">
+                <form id="modal-form" onsubmit="App.MasterData.submitForm(event)">
+                    <div id="modal-body" class="flex flex-col gap-4">
+                        <!-- Form inputs di-generate dinamis di sini -->
+                    </div>
+                    <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100">
+                        <button type="button" onclick="App.UI.closeModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Batal</button>
+                        <button type="submit" id="modal-btn-save" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-green-700 flex items-center">
+                            <span id="modal-btn-text">Simpan Data</span>
+                            <div id="modal-spinner" class="spinner ml-2 hidden !w-4 !h-4 !border-2"></div>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- 2. LOGIN VIEW -->
     <div id="view-login" class="h-screen flex items-center justify-center bg-gray-100 hidden">
         <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md mx-4">
@@ -397,35 +423,17 @@
                 },
 
                 showToast(message, type = 'info') {
-                    const container = document.getElementById('toast-container');
-                    const toast = document.createElement('div');
-                    
-                    const colors = {
-                        success: 'bg-green-100 border-green-500 text-green-800',
-                        error: 'bg-red-100 border-red-500 text-red-800',
-                        info: 'bg-blue-100 border-blue-500 text-blue-800'
-                    };
-                    const icons = {
-                        success: 'fa-check-circle',
-                        error: 'fa-exclamation-triangle',
-                        info: 'fa-info-circle'
-                    };
-
-                    toast.className = `flex items-center gap-3 p-4 border-l-4 rounded shadow-md transition-all duration-300 transform translate-x-full opacity-0 ${colors[type]}`;
-                    toast.innerHTML = `<i class="fa-solid ${icons[type]} text-lg"></i><span class="font-medium text-sm">${message}</span>`;
-                    
-                    container.appendChild(toast);
-                    
-                    // Animate in
-                    setTimeout(() => {
-                        toast.classList.remove('translate-x-full', 'opacity-0');
-                    }, 10);
-
-                    // Remove after 3s
+                    // ... existing toast logic ...
                     setTimeout(() => {
                         toast.classList.add('opacity-0');
                         setTimeout(() => toast.remove(), 300);
                     }, 3000);
+                },
+
+                // METHOD BARU UNTUK MODAL
+                closeModal() {
+                    document.getElementById('modal-container').classList.add('hidden');
+                    document.getElementById('modal-form').reset();
                 }
             },
 
@@ -466,15 +474,47 @@
             MasterData: {
                 currentEntity: null,
                 
+                // Skema Form Dinamis
+                schemas: {
+                    'TAHUN_PELAJARAN': [
+                        { name: 'nama_tahun', label: 'Nama Tahun Pelajaran (Misal: 2026/2027)', type: 'text', required: true }
+                    ],
+                    'KELAS': [
+                        { name: 'nama_kelas', label: 'Nama Kelas (Misal: VII-A)', type: 'text', required: true },
+                        { name: 'jenjang', label: 'Jenjang', type: 'select', options: ['SMP', 'SMA'], required: true },
+                        { name: 'tahun_pelajaran_id', label: 'ID Tahun Pelajaran', type: 'text', required: true, note: 'Ambil dari data Tahun Pelajaran' },
+                        { name: 'wali_kelas_id', label: 'ID Wali Kelas (User ID)', type: 'text', required: true, note: 'Ambil dari data Users' }
+                    ],
+                    'SANTRI': [
+                        { name: 'nama_santri', label: 'Nama Lengkap Santri', type: 'text', required: true },
+                        { name: 'jenis_kelamin', label: 'Jenis Kelamin', type: 'select', options: ['Laki-laki', 'Perempuan'], required: true },
+                        { name: 'jenjang', label: 'Jenjang', type: 'select', options: ['SMP', 'SMA'], required: true },
+                        { name: 'kelas_id', label: 'ID Kelas', type: 'text', required: true, note: 'Ambil dari data Kelas' },
+                        { name: 'kota_asal', label: 'Kota Asal', type: 'text', required: true },
+                        { name: 'nama_ayah', label: 'Nama Ayah', type: 'text', required: true },
+                        { name: 'nomor_telepon', label: 'Nomor Telepon WA (08...)', type: 'text', required: true }
+                    ],
+                    'USERS': [
+                        { name: 'username', label: 'Username Login', type: 'text', required: true },
+                        { name: 'password', label: 'Password (Minimal 6 karakter)', type: 'password', required: true },
+                        { name: 'nama', label: 'Nama Lengkap', type: 'text', required: true },
+                        { name: 'role', label: 'Hak Akses (Role)', type: 'select', options: ['ADMIN', 'WALI_KELAS', 'SEKRETARIS_MUDIR', 'SECURITY'], required: true },
+                        { name: 'jenjang', label: 'Jenjang (Opsional, khusus Wali Kelas)', type: 'select', options: ['', 'SMP', 'SMA'], required: false },
+                        { name: 'kelas_id', label: 'ID Kelas (Opsional, khusus Wali Kelas)', type: 'text', required: false }
+                    ]
+                },
+
                 async load(entity) {
                     this.currentEntity = entity;
                     document.getElementById('md-title').innerText = `Data ${entity.replace('_', ' ')}`;
                     document.getElementById('md-tbody').innerHTML = `<tr><td class="py-4 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat data...</td></tr>`;
                     document.getElementById('md-thead').innerHTML = '';
-                    document.getElementById('md-btn-add').classList.remove('hidden');
                     
-                    // Specific button action placeholder
-                    document.getElementById('md-btn-add').onclick = () => App.UI.showToast(`Fitur Tambah ${entity} akan segera hadir.`, 'info');
+                    const btnAdd = document.getElementById('md-btn-add');
+                    btnAdd.classList.remove('hidden');
+                    
+                    // Hubungkan tombol tambah dengan method showModal
+                    btnAdd.onclick = () => this.showModal();
 
                     const response = await App.API.post('getMasterData', { entity: entity });
                     
@@ -524,6 +564,85 @@
                         trBody += '</tr>';
                     });
                     tbody.innerHTML = trBody;
+                },
+
+                // Tampilkan Modal Form
+                showModal() {
+                    const entity = this.currentEntity;
+                    const schema = this.schemas[entity];
+                    if(!schema) {
+                        App.UI.showToast('Skema form belum dikonfigurasi untuk entitas ini.', 'error');
+                        return;
+                    }
+
+                    document.getElementById('modal-title').innerText = `Tambah ${entity.replace('_', ' ')}`;
+                    const container = document.getElementById('modal-body');
+                    container.innerHTML = '';
+
+                    // Generate HTML Form Dinamis
+                    schema.forEach(field => {
+                        let inputHtml = '';
+                        const requiredAttr = field.required ? 'required' : '';
+                        
+                        if (field.type === 'select') {
+                            let options = field.options.map(opt => `<option value="${opt}">${opt === '' ? '-- Kosongkan jika tidak perlu --' : opt}</option>`).join('');
+                            inputHtml = `<select id="field_${field.name}" name="${field.name}" class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-primary focus:border-primary" ${requiredAttr}>${options}</select>`;
+                        } else {
+                            inputHtml = `<input type="${field.type}" id="field_${field.name}" name="${field.name}" class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-primary focus:border-primary" ${requiredAttr}>`;
+                        }
+
+                        const noteHtml = field.note ? `<p class="text-xs text-gray-500 mt-1"><i class="fa-solid fa-circle-info mr-1"></i>${field.note}</p>` : '';
+
+                        container.innerHTML += `
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1" for="field_${field.name}">${field.label}</label>
+                                ${inputHtml}
+                                ${noteHtml}
+                            </div>
+                        `;
+                    });
+
+                    document.getElementById('modal-container').classList.remove('hidden');
+                },
+
+                // Submit Form ke Backend
+                async submitForm(e) {
+                    e.preventDefault();
+                    
+                    const btnSave = document.getElementById('modal-btn-save');
+                    const btnText = document.getElementById('modal-btn-text');
+                    const spinner = document.getElementById('modal-spinner');
+                    
+                    // Loading State
+                    btnSave.disabled = true;
+                    btnText.innerText = 'Menyimpan...';
+                    spinner.classList.remove('hidden');
+
+                    // Kumpulkan data dari form
+                    const formData = {};
+                    const schema = this.schemas[this.currentEntity];
+                    schema.forEach(field => {
+                        formData[field.name] = document.getElementById(`field_${field.name}`).value;
+                    });
+
+                    // Kirim ke API
+                    const response = await App.API.post('createMasterData', {
+                        entity: this.currentEntity,
+                        formData: formData
+                    });
+
+                    // Revert Loading State
+                    btnSave.disabled = false;
+                    btnText.innerText = 'Simpan Data';
+                    spinner.classList.add('hidden');
+
+                    if(response.success) {
+                        App.UI.showToast(response.message, 'success');
+                        App.UI.closeModal();
+                        this.load(this.currentEntity); // Reload tabel
+                    } else {
+                        App.UI.showToast(response.message, 'error');
+                    }
                 }
             },
 
