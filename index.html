@@ -1,453 +1,417 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Perizinan Al-Islam</title>
+    
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        emerald: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
 
-// --- CONFIGURATION & ENVIRONMENT ---
-// Di production Vite, ini diambil dari import.meta.env.VITE_API_BASE_URL
-const API_BASE_URL = ''; 
-const USE_MOCK_API = true; // Set false jika GAS sudah di-deploy
+    <!-- Load React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Load Babel for JSX parsing in browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-// --- CONSTANTS ---
-const ROLES = {
-  ADMIN: 'ADMIN',
-  WALI_KELAS: 'WALI_KELAS',
-  SEKRETARIS_MUDIR: 'SEKRETARIS_MUDIR',
-  SECURITY: 'SECURITY'
-};
+    <!-- Custom minimal CSS for animations -->
+    <style>
+        .animate-fade-in-down {
+            animation: fadeInDown 0.3s ease-out;
+        }
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
 
-// --- ICONS (SVG Inline to avoid external dependencies) ---
-const Icons = {
-  Home: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
-  Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-  FileText: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>,
-  Scan: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>,
-  Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
-  LogOut: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
-  Menu: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>,
-  CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>,
-  XCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-};
+    <script type="text/babel">
+        const { useState, useEffect, createContext, useContext } = React;
 
-// --- CONTEXTS ---
-const AuthContext = createContext(null);
-const ToastContext = createContext(null);
+        // --- CONFIGURATION & ENVIRONMENT ---
+        const API_BASE_URL = ''; 
+        const USE_MOCK_API = true;
 
-// --- API SERVICE ---
-const apiService = {
-  request: async (action, payload) => {
-    if (USE_MOCK_API) {
-      return new Promise((resolve, reject) => {
-        setTimeout(() => {
-          console.log(`[MOCK API] Action: ${action}`, payload);
-          if (action === 'login') {
-            if (payload.username === 'admin' && payload.password === '123') resolve({ success: true, data: { user_id: 'U001', username: 'admin', nama: 'Administrator', role: ROLES.ADMIN } });
-            else if (payload.username === 'walikelas' && payload.password === '123') resolve({ success: true, data: { user_id: 'U002', username: 'walikelas', nama: 'Ust. Ahmad', role: ROLES.WALI_KELAS, kelas_id: 'K01' } });
-            else if (payload.username === 'sekretaris' && payload.password === '123') resolve({ success: true, data: { user_id: 'U003', username: 'sekretaris', nama: 'Ust. Budi (Sekmud)', role: ROLES.SEKRETARIS_MUDIR } });
-            else if (payload.username === 'security' && payload.password === '123') resolve({ success: true, data: { user_id: 'U004', username: 'security', nama: 'Pak Satpam', role: ROLES.SECURITY } });
-            else reject(new Error("Username atau password salah"));
-          } else if (action === 'getDashboard') {
-             resolve({ success: true, data: { totalIzin: 15, disetujui: 10, ditolak: 2, menunggu: 3, keluar: 8, kembali: 2, terlambat: 0 } });
-          } else {
-             resolve({ success: true, data: {} });
-          }
-        }, 800);
-      });
-    }
+        // --- CONSTANTS ---
+        const ROLES = {
+            ADMIN: 'ADMIN',
+            WALI_KELAS: 'WALI_KELAS',
+            SEKRETARIS_MUDIR: 'SEKRETARIS_MUDIR',
+            SECURITY: 'SECURITY'
+        };
 
-    // Real API Call via GAS
-    try {
-      const response = await fetch(API_BASE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Avoid CORS preflight on GAS
-        body: JSON.stringify({ action, ...payload })
-      });
-      const data = await response.json();
-      if (!data.success) throw new Error(data.message || 'Terjadi kesalahan dari server.');
-      return data;
-    } catch (error) {
-      console.error('API Error:', error);
-      throw error;
-    }
-  }
-};
+        // --- ICONS (SVG Inline) ---
+        const Icons = {
+            Home: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+            Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+            FileText: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>,
+            Scan: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>,
+            Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+            LogOut: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
+            Menu: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>,
+            CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>,
+            XCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+        };
 
-// --- UI COMPONENTS ---
-const Card = ({ children, className = "" }) => (
-  <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 ${className}`}>{children}</div>
-);
+        // --- CONTEXTS ---
+        const AuthContext = createContext(null);
+        const ToastContext = createContext(null);
 
-const Button = ({ children, onClick, variant = 'primary', className = "", disabled, type="button", fullWidth }) => {
-  const baseStyle = "px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2";
-  const variants = {
-    primary: "bg-emerald-600 hover:bg-emerald-700 text-white focus:ring-emerald-500",
-    secondary: "bg-gray-100 hover:bg-gray-200 text-gray-800 focus:ring-gray-400",
-    danger: "bg-red-500 hover:bg-red-600 text-white focus:ring-red-500",
-  };
-  return (
-    <button type={type} onClick={onClick} disabled={disabled} className={`${baseStyle} ${variants[variant]} ${fullWidth ? 'w-full' : ''} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
-      {children}
-    </button>
-  );
-};
+        const apiService = {
+            request: async (action, payload) => {
+                if (USE_MOCK_API) {
+                    return new Promise((resolve, reject) => {
+                        setTimeout(() => {
+                            if (action === 'login') {
+                                if (payload.username === 'admin' && payload.password === '123') resolve({ success: true, data: { user_id: 'U001', username: 'admin', nama: 'Administrator', role: ROLES.ADMIN } });
+                                else if (payload.username === 'walikelas' && payload.password === '123') resolve({ success: true, data: { user_id: 'U002', username: 'walikelas', nama: 'Ust. Ahmad', role: ROLES.WALI_KELAS, kelas_id: 'K01' } });
+                                else if (payload.username === 'sekretaris' && payload.password === '123') resolve({ success: true, data: { user_id: 'U003', username: 'sekretaris', nama: 'Ust. Budi', role: ROLES.SEKRETARIS_MUDIR } });
+                                else if (payload.username === 'security' && payload.password === '123') resolve({ success: true, data: { user_id: 'U004', username: 'security', nama: 'Pak Satpam', role: ROLES.SECURITY } });
+                                else reject(new Error("Username atau password salah"));
+                            } else if (action === 'getDashboard') {
+                                resolve({ success: true, data: { totalIzin: 15, disetujui: 10, ditolak: 2, menunggu: 3, keluar: 8, kembali: 2, terlambat: 0 } });
+                            } else {
+                                resolve({ success: true, data: {} });
+                            }
+                        }, 800);
+                    });
+                }
+                
+                try {
+                    const response = await fetch(API_BASE_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action, ...payload })
+                    });
+                    const data = await response.json();
+                    if (!data.success) throw new Error(data.message || 'Terjadi kesalahan dari server.');
+                    return data;
+                } catch (error) {
+                    throw error;
+                }
+            }
+        };
 
-const Input = ({ label, type = "text", value, onChange, placeholder, required }) => (
-  <div className="mb-4">
-    {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
-    <input
-      type={type}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      required={required}
-      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-    />
-  </div>
-);
+        const Card = ({ children, className = "" }) => (
+            <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 ${className}`}>{children}</div>
+        );
 
-const StatCard = ({ title, value, icon, color = "bg-emerald-50 text-emerald-600" }) => (
-  <Card className="flex items-center gap-4">
-    <div className={`p-4 rounded-full ${color}`}>
-      {icon}
-    </div>
-    <div>
-      <p className="text-sm text-gray-500 font-medium">{title}</p>
-      <h3 className="text-2xl font-bold text-gray-800">{value}</h3>
-    </div>
-  </Card>
-);
+        const Button = ({ children, onClick, variant = 'primary', className = "", disabled, type="button", fullWidth }) => {
+            const baseStyle = "px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2";
+            const variants = {
+                primary: "bg-emerald-600 hover:bg-emerald-700 text-white focus:ring-emerald-500",
+                secondary: "bg-gray-100 hover:bg-gray-200 text-gray-800 focus:ring-gray-400",
+                danger: "bg-red-500 hover:bg-red-600 text-white focus:ring-red-500",
+            };
+            return (
+                <button type={type} onClick={onClick} disabled={disabled} className={`${baseStyle} ${variants[variant]} ${fullWidth ? 'w-full' : ''} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
+                    {children}
+                </button>
+            );
+        };
 
-const Toast = ({ message, type, onClose }) => {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 3000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
+        const Input = ({ label, type = "text", value, onChange, placeholder, required }) => (
+            <div className="mb-4">
+                {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
+                <input
+                    type={type}
+                    value={value}
+                    onChange={onChange}
+                    placeholder={placeholder}
+                    required={required}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                />
+            </div>
+        );
 
-  return (
-    <div className="fixed top-4 right-4 z-50 animate-fade-in-down">
-      <div className={`flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg text-white ${type === 'error' ? 'bg-red-500' : 'bg-gray-800'}`}>
-        {type === 'error' ? <Icons.XCircle /> : <Icons.CheckCircle />}
-        <span className="font-medium">{message}</span>
-      </div>
-    </div>
-  );
-};
+        const StatCard = ({ title, value, icon, color = "bg-emerald-50 text-emerald-600" }) => (
+            <Card className="flex items-center gap-4">
+                <div className={`p-4 rounded-full ${color}`}>{icon}</div>
+                <div>
+                    <p className="text-sm text-gray-500 font-medium">{title}</p>
+                    <h3 className="text-2xl font-bold text-gray-800">{value}</h3>
+                </div>
+            </Card>
+        );
 
-// --- LAYOUTS ---
-const SidebarItem = ({ icon: Icon, label, active, onClick }) => (
-  <button
-    onClick={onClick}
-    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${active ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
-  >
-    <Icon />
-    <span>{label}</span>
-  </button>
-);
+        const Toast = ({ message, type, onClose }) => {
+            useEffect(() => {
+                const timer = setTimeout(onClose, 3000);
+                return () => clearTimeout(timer);
+            }, [onClose]);
 
-const Layout = ({ children }) => {
-  const { user, logout } = useContext(AuthContext);
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
-  const [currentRoute, setCurrentRoute] = useState('dashboard');
+            return (
+                <div className="fixed top-4 right-4 z-50 animate-fade-in-down">
+                    <div className={`flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg text-white ${type === 'error' ? 'bg-red-500' : 'bg-gray-800'}`}>
+                        {type === 'error' ? <Icons.XCircle /> : <Icons.CheckCircle />}
+                        <span className="font-medium">{message}</span>
+                    </div>
+                </div>
+            );
+        };
 
-  if (!user) return null; // Should not reach here if not logged in
+        const SidebarItem = ({ icon: Icon, label, active, onClick }) => (
+            <button
+                onClick={onClick}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${active ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
+            >
+                <Icon />
+                <span>{label}</span>
+            </button>
+        );
 
-  const menuItems = {
-    [ROLES.ADMIN]: [
-      { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
-      { id: 'master_santri', label: 'Data Santri', icon: Icons.Users },
-      { id: 'perizinan', label: 'Semua Perizinan', icon: Icons.FileText },
-      { id: 'settings', label: 'Pengaturan', icon: Icons.Settings },
-    ],
-    [ROLES.WALI_KELAS]: [
-      { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
-      { id: 'pengajuan', label: 'Ajukan Izin', icon: Icons.FileText },
-      { id: 'histori', label: 'Histori Kelas', icon: Icons.Users },
-    ],
-    [ROLES.SEKRETARIS_MUDIR]: [
-      { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
-      { id: 'screening', label: 'Screening Izin', icon: Icons.FileText },
-    ],
-    [ROLES.SECURITY]: [
-      { id: 'scanner', label: 'Scan QR Code', icon: Icons.Scan },
-      { id: 'log', label: 'Riwayat Scan', icon: Icons.FileText },
-    ]
-  };
+        const Layout = ({ children }) => {
+            const { user, logout } = useContext(AuthContext);
+            const [isSidebarOpen, setSidebarOpen] = useState(false);
+            const [currentRoute, setCurrentRoute] = useState('dashboard');
 
-  const currentMenu = menuItems[user.role] || [];
+            if (!user) return null;
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
-      {/* Mobile Header */}
-      <div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center sticky top-0 z-20">
-        <div className="font-bold text-emerald-700">Al-Islam Permit</div>
-        <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-600">
-          <Icons.Menu />
-        </button>
-      </div>
+            const menuItems = {
+                [ROLES.ADMIN]: [
+                    { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
+                    { id: 'master_santri', label: 'Data Santri', icon: Icons.Users },
+                    { id: 'perizinan', label: 'Semua Perizinan', icon: Icons.FileText },
+                    { id: 'settings', label: 'Pengaturan', icon: Icons.Settings },
+                ],
+                [ROLES.WALI_KELAS]: [
+                    { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
+                    { id: 'pengajuan', label: 'Ajukan Izin', icon: Icons.FileText },
+                    { id: 'histori', label: 'Histori Kelas', icon: Icons.Users },
+                ],
+                [ROLES.SEKRETARIS_MUDIR]: [
+                    { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
+                    { id: 'screening', label: 'Screening Izin', icon: Icons.FileText },
+                ],
+                [ROLES.SECURITY]: [
+                    { id: 'scanner', label: 'Scan QR Code', icon: Icons.Scan },
+                    { id: 'log', label: 'Riwayat Scan', icon: Icons.FileText },
+                ]
+            };
 
-      {/* Sidebar */}
-      <div className={`fixed md:static inset-y-0 left-0 w-64 bg-white border-r transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out z-30 flex flex-col`}>
-        <div className="p-6 border-b hidden md:block">
-          <h1 className="font-bold text-xl text-emerald-700 leading-tight">Sistem Perizinan<br/><span className="text-sm text-gray-500 font-normal">PPM Al-Islam</span></h1>
-        </div>
-        <div className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-          <div className="mb-6 px-4 py-3 bg-emerald-50 rounded-lg text-sm">
-            <p className="text-gray-500">Masuk sebagai:</p>
-            <p className="font-semibold text-emerald-800">{user.nama}</p>
-            <p className="text-xs text-emerald-600 mt-1 uppercase tracking-wider font-bold">{user.role.replace('_', ' ')}</p>
-          </div>
-          {currentMenu.map(item => (
-            <SidebarItem
-              key={item.id}
-              icon={item.icon}
-              label={item.label}
-              active={currentRoute === item.id}
-              onClick={() => { setCurrentRoute(item.id); setSidebarOpen(false); }}
-            />
-          ))}
-        </div>
-        <div className="p-4 border-t">
-          <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-red-600 hover:bg-red-50 transition-colors">
-            <Icons.LogOut />
-            <span className="font-medium">Keluar</span>
-          </button>
-        </div>
-      </div>
+            const currentMenu = menuItems[user.role] || [];
 
-      {/* Main Content Area */}
-      {isSidebarOpen && <div className="fixed inset-0 bg-black/20 z-20 md:hidden" onClick={() => setSidebarOpen(false)} />}
-      <div className="flex-1 overflow-y-auto">
-        <main className="p-4 md:p-8 max-w-6xl mx-auto pb-24 md:pb-8">
-           {React.cloneElement(children, { currentRoute })}
-        </main>
-      </div>
-    </div>
-  );
-};
+            return (
+                <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+                    <div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center sticky top-0 z-20">
+                        <div className="font-bold text-emerald-700">Al-Islam Permit</div>
+                        <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-600"><Icons.Menu /></button>
+                    </div>
 
-// --- PAGES ---
-const DashboardAdmin = () => (
-  <div className="space-y-6">
-    <div>
-      <h2 className="text-2xl font-bold text-gray-800">Dashboard Admin</h2>
-      <p className="text-gray-500">Ringkasan perizinan pondok secara keseluruhan.</p>
-    </div>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard title="Total Pengajuan Hari Ini" value="42" icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
-      <StatCard title="Santri Keluar" value="28" icon={<Icons.Scan />} color="bg-yellow-50 text-yellow-600" />
-      <StatCard title="Santri Kembali" value="12" icon={<Icons.Users />} color="bg-emerald-50 text-emerald-600" />
-      <StatCard title="Terlambat" value="0" icon={<Icons.Settings />} color="bg-red-50 text-red-600" />
-    </div>
-    <Card>
-      <h3 className="font-semibold text-lg mb-4">Aktivitas Terbaru</h3>
-      <div className="text-center text-gray-500 py-8 border-2 border-dashed rounded-lg">
-        [Data Histori Aktivitas akan ditampilkan di sini]
-      </div>
-    </Card>
-  </div>
-);
+                    <div className={`fixed md:static inset-y-0 left-0 w-64 bg-white border-r transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out z-30 flex flex-col`}>
+                        <div className="p-6 border-b hidden md:block">
+                            <h1 className="font-bold text-xl text-emerald-700 leading-tight">Sistem Perizinan<br/><span className="text-sm text-gray-500 font-normal">PPM Al-Islam</span></h1>
+                        </div>
+                        <div className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+                            <div className="mb-6 px-4 py-3 bg-emerald-50 rounded-lg text-sm">
+                                <p className="text-gray-500">Masuk sebagai:</p>
+                                <p className="font-semibold text-emerald-800">{user.nama}</p>
+                                <p className="text-xs text-emerald-600 mt-1 uppercase tracking-wider font-bold">{user.role.replace('_', ' ')}</p>
+                            </div>
+                            {currentMenu.map(item => (
+                                <SidebarItem key={item.id} icon={item.icon} label={item.label} active={currentRoute === item.id} onClick={() => { setCurrentRoute(item.id); setSidebarOpen(false); }} />
+                            ))}
+                        </div>
+                        <div className="p-4 border-t">
+                            <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-red-600 hover:bg-red-50 transition-colors">
+                                <Icons.LogOut />
+                                <span className="font-medium">Keluar</span>
+                            </button>
+                        </div>
+                    </div>
 
-const DashboardWaliKelas = () => (
-  <div className="space-y-6">
-    <div>
-      <h2 className="text-2xl font-bold text-gray-800">Dashboard Wali Kelas</h2>
-      <p className="text-gray-500">Pantau status perizinan santri di kelas Anda.</p>
-    </div>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <StatCard title="Total Santri" value="32" icon={<Icons.Users />} color="bg-blue-50 text-blue-600" />
-      <StatCard title="Izin Menunggu" value="3" icon={<Icons.FileText />} color="bg-yellow-50 text-yellow-600" />
-      <StatCard title="Izin Disetujui" value="5" icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
-    </div>
-    <div className="flex gap-4">
-      <Button icon={<Icons.FileText />}>Ajukan Izin Baru</Button>
-    </div>
-  </div>
-);
+                    {isSidebarOpen && <div className="fixed inset-0 bg-black/20 z-20 md:hidden" onClick={() => setSidebarOpen(false)} />}
+                    <div className="flex-1 overflow-y-auto w-full">
+                        <main className="p-4 md:p-8 max-w-6xl mx-auto pb-24 md:pb-8">
+                             {React.cloneElement(children, { currentRoute })}
+                        </main>
+                    </div>
+                </div>
+            );
+        };
 
-const DashboardSecretary = () => {
-  const [stats, setStats] = useState({ totalIzin: 0, disetujui: 0, ditolak: 0, menunggu: 0, keluar: 0, kembali: 0, terlambat: 0 });
-  const [loading, setLoading] = useState(true);
+        const DashboardAdmin = () => (
+            <div className="space-y-6">
+                <div><h2 className="text-2xl font-bold text-gray-800">Dashboard Admin</h2><p className="text-gray-500">Ringkasan perizinan pondok secara keseluruhan.</p></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <StatCard title="Total Pengajuan" value="42" icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
+                    <StatCard title="Santri Keluar" value="28" icon={<Icons.Scan />} color="bg-yellow-50 text-yellow-600" />
+                    <StatCard title="Santri Kembali" value="12" icon={<Icons.Users />} color="bg-emerald-50 text-emerald-600" />
+                    <StatCard title="Terlambat" value="0" icon={<Icons.Settings />} color="bg-red-50 text-red-600" />
+                </div>
+                <Card><h3 className="font-semibold text-lg mb-4">Aktivitas Terbaru</h3><div className="text-center text-gray-500 py-8 border-2 border-dashed rounded-lg">[Data Histori Aktivitas]</div></Card>
+            </div>
+        );
 
-  const fetchDashboardData = async () => {
-    try {
-      const res = await apiService.request('getDashboard');
-      setStats(res.data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
+        const DashboardWaliKelas = () => (
+            <div className="space-y-6">
+                <div><h2 className="text-2xl font-bold text-gray-800">Dashboard Wali Kelas</h2><p className="text-gray-500">Pantau status perizinan santri di kelas Anda.</p></div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <StatCard title="Total Santri" value="32" icon={<Icons.Users />} color="bg-blue-50 text-blue-600" />
+                    <StatCard title="Izin Menunggu" value="3" icon={<Icons.FileText />} color="bg-yellow-50 text-yellow-600" />
+                    <StatCard title="Izin Disetujui" value="5" icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
+                </div>
+                <Button icon={<Icons.FileText />}>Ajukan Izin Baru</Button>
+            </div>
+        );
 
-  useEffect(() => {
-    fetchDashboardData();
-    // Near real-time polling (30s)
-    const interval = setInterval(fetchDashboardData, 30000);
-    return () => clearInterval(interval);
-  }, []);
+        const DashboardSecretary = () => {
+            const [stats, setStats] = useState({ menunggu: 0, disetujui: 0, keluar: 0, terlambat: 0 });
+            useEffect(() => {
+                apiService.request('getDashboard').then(res => setStats(res.data));
+            }, []);
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Dashboard Sekretaris Mudir</h2>
-          <p className="text-gray-500">Pemantauan real-time status izin santri pekan ini.</p>
-        </div>
-        <Button variant="secondary" onClick={fetchDashboardData} disabled={loading}>
-          {loading ? 'Memuat...' : 'Refresh Data'}
-        </Button>
-      </div>
+            return (
+                <div className="space-y-6">
+                    <div><h2 className="text-2xl font-bold text-gray-800">Dashboard Sekretaris Mudir</h2><p className="text-gray-500">Pemantauan real-time status izin santri.</p></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <StatCard title="Menunggu Screening" value={stats.menunggu} icon={<Icons.FileText />} color="bg-yellow-50 text-yellow-600" />
+                        <StatCard title="Izin Disetujui" value={stats.disetujui} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
+                        <StatCard title="Santri Keluar" value={stats.keluar} icon={<Icons.Scan />} color="bg-blue-50 text-blue-600" />
+                        <StatCard title="Terlambat" value={stats.terlambat} icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
+                    </div>
+                </div>
+            );
+        };
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Menunggu Screening" value={stats.menunggu} icon={<Icons.FileText />} color="bg-yellow-50 text-yellow-600" />
-        <StatCard title="Izin Disetujui" value={stats.disetujui} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
-        <StatCard title="Santri Keluar" value={stats.keluar} icon={<Icons.Scan />} color="bg-blue-50 text-blue-600" />
-        <StatCard title="Santri Terlambat" value={stats.terlambat} icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
-      </div>
+        const ScannerSecurity = () => (
+            <div className="max-w-md mx-auto space-y-6 mt-4 text-center">
+                <h2 className="text-2xl font-bold text-gray-800">Scanner Keamanan</h2>
+                <Card className="aspect-square bg-gray-900 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden">
+                    <div className="absolute inset-4 border-2 border-dashed border-emerald-500/50 rounded-xl" />
+                    <Icons.Scan />
+                    <p className="text-emerald-500 mt-4 text-sm">Meminta akses kamera...</p>
+                </Card>
+                <div className="flex gap-2">
+                    <Button fullWidth variant="secondary">Riwayat Hari Ini</Button>
+                    <Button fullWidth variant="danger">Lapor Masalah</Button>
+                </div>
+            </div>
+        );
 
-      <Card>
-        <h3 className="font-semibold text-lg mb-4">Daftar Menunggu Screening (Preview)</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-gray-600 border-b">
-                <th className="p-3">Nama Santri</th>
-                <th className="p-3">Kelas</th>
-                <th className="p-3">Keperluan</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colSpan="5" className="text-center p-8 text-gray-500">Data segera dihubungkan ke backend (Phase 6)</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </div>
-  );
-};
+        const LoginPage = () => {
+            const { login } = useContext(AuthContext);
+            const { showToast } = useContext(ToastContext);
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [loading, setLoading] = useState(false);
 
-const ScannerSecurity = () => (
-  <div className="max-w-md mx-auto space-y-6 mt-4">
-    <div className="text-center">
-      <h2 className="text-2xl font-bold text-gray-800">Scanner Keamanan</h2>
-      <p className="text-gray-500">Arahkan kamera ke QR Code Santri</p>
-    </div>
-    <Card className="aspect-square bg-gray-900 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden">
-      {/* Visual placeholder for Camera */}
-      <div className="absolute inset-4 border-2 border-dashed border-emerald-500/50 rounded-xl" />
-      <Icons.Scan />
-      <p className="text-emerald-500 mt-4 text-sm font-medium">Meminta akses kamera...</p>
-      <p className="text-xs text-gray-500 mt-2">(Scanner diimplementasi penuh di Phase 8)</p>
-    </Card>
-    <div className="flex gap-2">
-      <Button fullWidth variant="secondary">Riwayat Hari Ini</Button>
-      <Button fullWidth variant="danger">Lapor Masalah</Button>
-    </div>
-  </div>
-);
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                try {
+                    const res = await apiService.request('login', { username, password });
+                    login(res.data);
+                    showToast(`Selamat datang, ${res.data.nama}`, 'success');
+                } catch (err) {
+                    showToast(err.message, 'error');
+                } finally {
+                    setLoading(false);
+                }
+            };
 
-const LoginPage = () => {
-  const { login } = useContext(AuthContext);
-  const { showToast } = useContext(ToastContext);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+            return (
+                <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+                    <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+                        <div className="mx-auto w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center text-white mb-4 shadow-lg shadow-emerald-200">
+                            <Icons.FileText />
+                        </div>
+                        <h2 className="text-3xl font-extrabold text-gray-900">PPM Al-Islam</h2>
+                        <p className="mt-2 text-sm text-gray-600">Sistem Management Perizinan Keluar Santri</p>
+                    </div>
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await apiService.request('login', { username, password });
-      login(res.data);
-      showToast(`Selamat datang, ${res.data.nama}`, 'success');
-    } catch (err) {
-      showToast(err.message, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+                    <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+                        <Card className="py-8 px-4 sm:px-10">
+                            <form className="space-y-6" onSubmit={handleSubmit}>
+                                <Input label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="Masukkan username" />
+                                <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" />
+                                
+                                <div className="bg-blue-50 text-blue-800 p-3 rounded text-xs">
+                                    <strong>Mode Mock Aktif.</strong> Coba login dengan: <br/>
+                                    admin/123, walikelas/123, sekretaris/123, security/123
+                                </div>
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="mx-auto w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center text-white mb-4 shadow-lg shadow-emerald-200">
-          <Icons.FileText />
-        </div>
-        <h2 className="text-3xl font-extrabold text-gray-900">PPM Al-Islam</h2>
-        <p className="mt-2 text-sm text-gray-600">Sistem Management Perizinan Keluar Santri</p>
-      </div>
+                                <Button type="submit" fullWidth disabled={loading}>
+                                    {loading ? 'Memverifikasi...' : 'Masuk ke Sistem'}
+                                </Button>
+                            </form>
+                        </Card>
+                    </div>
+                </div>
+            );
+        };
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <Card className="py-8 px-4 sm:px-10">
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <Input label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="Masukkan username" />
-            <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" />
+        const MainRouter = ({ currentRoute }) => {
+            const { user } = useContext(AuthContext);
+
+            if (currentRoute === 'dashboard') {
+                switch (user.role) {
+                    case ROLES.ADMIN: return <DashboardAdmin />;
+                    case ROLES.WALI_KELAS: return <DashboardWaliKelas />;
+                    case ROLES.SEKRETARIS_MUDIR: return <DashboardSecretary />;
+                    case ROLES.SECURITY: return <ScannerSecurity />;
+                    default: return <div>Unknown Role</div>;
+                }
+            }
+
+            if (currentRoute === 'scanner') return <ScannerSecurity />;
             
-            {USE_MOCK_API && (
-              <div className="bg-blue-50 text-blue-800 p-3 rounded text-xs">
-                <strong>Mode Mock Aktif.</strong> Coba login dengan: <br/>
-                admin/123, walikelas/123, sekretaris/123, security/123
-              </div>
-            )}
+            return (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <Icons.FileText />
+                    <h3 className="mt-4 text-lg font-medium text-gray-900">Modul {currentRoute}</h3>
+                    <p className="mt-1 text-gray-500">Modul ini akan dibangun pada fase pengembangan berikutnya sesuai PRD.</p>
+                </div>
+            );
+        };
 
-            <Button type="submit" fullWidth disabled={loading}>
-              {loading ? 'Memverifikasi...' : 'Masuk ke Sistem'}
-            </Button>
-          </form>
-        </Card>
-      </div>
-    </div>
-  );
-};
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [toast, setToast] = useState(null);
 
-const MainRouter = ({ currentRoute }) => {
-  const { user } = useContext(AuthContext);
+            const showToast = (message, type = 'success') => setToast({ message, type });
 
-  if (currentRoute === 'dashboard') {
-    switch (user.role) {
-      case ROLES.ADMIN: return <DashboardAdmin />;
-      case ROLES.WALI_KELAS: return <DashboardWaliKelas />;
-      case ROLES.SEKRETARIS_MUDIR: return <DashboardSecretary />;
-      case ROLES.SECURITY: return <ScannerSecurity />; // Security defaults to scanner
-      default: return <div>Unknown Role</div>;
-    }
-  }
+            return (
+                <ToastContext.Provider value={{ showToast }}>
+                    <AuthContext.Provider value={{ user, login: setUser, logout: () => setUser(null) }}>
+                        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+                        
+                        {!user ? <LoginPage /> : (
+                            <Layout>
+                                <MainRouter />
+                            </Layout>
+                        )}
+                    </AuthContext.Provider>
+                </ToastContext.Provider>
+            );
+        }
 
-  if (currentRoute === 'scanner') return <ScannerSecurity />;
-  
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <Icons.FileText />
-      <h3 className="mt-4 text-lg font-medium text-gray-900">Modul {currentRoute}</h3>
-      <p className="mt-1 text-gray-500">Modul ini akan dibangun pada fase pengembangan berikutnya sesuai PRD.</p>
-    </div>
-  );
-};
-
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [toast, setToast] = useState(null);
-
-  const showToast = (message, type = 'success') => setToast({ message, type });
-
-  const authValue = {
-    user,
-    login: (userData) => setUser(userData),
-    logout: () => setUser(null)
-  };
-
-  return (
-    <ToastContext.Provider value={{ showToast }}>
-      <AuthContext.Provider value={authValue}>
-        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-        
-        {!user ? (
-          <LoginPage />
-        ) : (
-          <Layout>
-            <MainRouter />
-          </Layout>
-        )}
-      </AuthContext.Provider>
-    </ToastContext.Provider>
-  );
-}
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
