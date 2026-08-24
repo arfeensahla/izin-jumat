@@ -2,387 +2,525 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Perizinan Santri Al-Islam</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sistem Perizinan Santri | Al-Islam</title>
+    <!-- Tailwind CSS (Foundation Styling) -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#166534', // Hijau pesantren
+                        secondary: '#bbf7d0',
+                        accent: '#facc15'
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        .sidebar-link { display: flex; align-items: center; padding: 0.75rem 1rem; color: #d1d5db; border-radius: 0.375rem; transition: all 0.2s; margin-bottom: 0.25rem;}
-        .sidebar-link:hover, .sidebar-link.active { background-color: #374151; color: white; }
-        .sidebar-link i { width: 1.5rem; text-align: center; margin-right: 0.75rem; }
-        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #10b981; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #qr-popup { display: none; }
-        #qr-popup.active { display: flex; }
+        /* Base styles */
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f3f4f6; }
+        .hidden { display: none !important; }
+        .spinner { border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s ease-in-out infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="text-gray-800 h-screen flex overflow-hidden">
+<body class="text-gray-800 antialiased h-screen overflow-hidden">
 
-    <div id="login-view" class="w-full h-full flex items-center justify-center bg-gray-100 absolute z-50">
-        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+    <!-- 1. NOTIFICATION TOAST -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <!-- 2. LOGIN VIEW -->
+    <div id="view-login" class="h-screen flex items-center justify-center bg-gray-100 hidden">
+        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md mx-4">
             <div class="text-center mb-8">
-                <h1 class="text-2xl font-bold text-green-700">Pondok Pesantren<br>Modern Al-Islam</h1>
-                <p class="text-sm text-gray-500 mt-2">Sistem Management Perizinan Santri</p>
+                <div class="bg-primary text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-mosque text-2xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-900">Perizinan Al-Islam</h1>
+                <p class="text-sm text-gray-500 mt-1">Sistem Management Perizinan Keluar Santri</p>
             </div>
-            <form id="login-form" onsubmit="handleLogin(event)">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                    <input type="text" id="username" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none" required>
+
+            <form id="form-login" onsubmit="App.Auth.handleLogin(event)">
+                <div class="mb-5">
+                    <label class="block text-sm font-medium text-gray-700 mb-2" for="username">Username</label>
+                    <input type="text" id="username" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="Masukkan username" required>
                 </div>
                 <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                    <input type="password" id="password" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none" required>
+                    <label class="block text-sm font-medium text-gray-700 mb-2" for="password">Password</label>
+                    <input type="password" id="password" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="Masukkan password" required>
                 </div>
-                <button type="submit" id="login-btn" class="w-full bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition flex justify-center items-center">
-                    <span>Masuk Aplikasi</span>
+                <button type="submit" id="btn-login" class="w-full bg-primary hover:bg-green-800 text-white font-semibold py-3 px-4 rounded-lg flex justify-center items-center transition">
+                    <span id="text-login">Masuk Sistem</span>
+                    <div id="spinner-login" class="spinner ml-2 hidden"></div>
                 </button>
             </form>
         </div>
     </div>
 
-    <div id="app-layout" class="w-full h-full flex hidden">
-        <aside class="w-64 bg-gray-900 text-white flex flex-col h-full shadow-xl z-20">
-            <div class="p-6 border-b border-gray-800">
-                <h2 class="text-xl font-bold text-green-500">Al-Islam</h2>
-                <p class="text-xs text-gray-400 mt-1">Sistem Perizinan</p>
+    <!-- 3. DASHBOARD SHELL (APP VIEW) -->
+    <div id="view-app" class="h-screen flex flex-col md:flex-row hidden">
+        
+        <!-- Sidebar -->
+        <aside id="sidebar" class="bg-primary text-white w-full md:w-64 flex-shrink-0 flex flex-col transition-all duration-300 transform -translate-x-full md:translate-x-0 fixed md:static h-full z-40">
+            <div class="p-4 flex items-center justify-between border-b border-green-700">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-mosque text-xl"></i>
+                    <span class="font-bold tracking-wider">AL-ISLAM</span>
+                </div>
+                <button class="md:hidden text-white" onclick="App.UI.toggleSidebar()">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
             </div>
-            <div class="p-4 flex items-center space-x-3 border-b border-gray-800">
-                <div class="w-10 h-10 rounded-full bg-green-600 flex items-center justify-center font-bold text-lg" id="user-initial">A</div>
-                <div>
-                    <p class="text-sm font-medium leading-none" id="user-name">User Name</p>
-                    <p class="text-xs text-gray-400 mt-1" id="user-role">Role</p>
+            
+            <div class="p-4 flex items-center gap-3 border-b border-green-700 bg-green-900 bg-opacity-30">
+                <div class="w-10 h-10 rounded-full bg-green-700 flex items-center justify-center font-bold" id="user-initial">A</div>
+                <div class="flex flex-col">
+                    <span class="font-semibold text-sm truncate" id="user-name">Loading...</span>
+                    <span class="text-xs text-green-300" id="user-role">Role</span>
                 </div>
             </div>
-            <nav class="flex-1 p-4 overflow-y-auto" id="sidebar-menu"></nav>
-            <div class="p-4 border-t border-gray-800">
-                <button onclick="handleLogout()" class="w-full flex items-center text-red-400 hover:text-red-300 hover:bg-gray-800 p-2 rounded transition">
-                    <i class="fas fa-sign-out-alt w-6"></i><span>Keluar</span>
+
+            <nav class="flex-1 overflow-y-auto py-4 px-2" id="sidebar-nav">
+                <!-- Navigation items injected dynamically by Role -->
+            </nav>
+
+            <div class="p-4 border-t border-green-700">
+                <button onclick="App.Auth.handleLogout()" class="w-full flex items-center gap-3 px-4 py-2 text-sm text-green-100 hover:bg-green-700 rounded-lg transition">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>Logout</span>
                 </button>
             </div>
         </aside>
-        <main class="flex-1 flex flex-col h-full overflow-hidden bg-gray-50">
-            <header class="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center z-10">
-                <h1 class="text-xl font-semibold text-gray-800" id="page-title">Dashboard</h1>
+
+        <!-- Main Content Wrapper -->
+        <div class="flex-1 flex flex-col min-w-0 bg-gray-50 h-full overflow-hidden">
+            <!-- Topbar Mobile -->
+            <header class="bg-white shadow-sm h-16 flex items-center justify-between px-4 md:hidden z-30">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-mosque text-primary"></i>
+                    <span class="font-bold text-gray-800">Al-Islam</span>
+                </div>
+                <button class="text-gray-600 hover:text-primary" onclick="App.UI.toggleSidebar()">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
             </header>
-            <div class="flex-1 overflow-y-auto p-6 relative" id="main-content"></div>
-        </main>
-    </div>
 
-    <div id="qr-popup" class="fixed inset-0 bg-black bg-opacity-60 z-[100] items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full overflow-hidden relative">
-            <button onclick="closeQRModal()" class="absolute top-3 right-3 text-white hover:text-gray-200 z-10"><i class="fas fa-times fa-lg"></i></button>
-            <div id="qr-card-container" class="bg-white relative">
-                <div class="bg-green-700 p-5 text-center text-white rounded-t-xl">
-                    <h2 class="font-bold text-sm leading-tight tracking-wide">PONDOK PESANTREN<br>MODERN AL-ISLAM</h2>
-                    <p class="text-xs text-green-200 mt-1 uppercase font-semibold tracking-widest">Kartu Izin Keluar</p>
-                </div>
-                <div class="p-5">
-                    <div class="grid grid-cols-2 gap-4 mb-4 border-b border-dashed pb-4">
-                        <div><p class="text-[10px] text-gray-500 uppercase">Nama Santri</p><p class="text-sm font-bold text-gray-800 leading-tight" id="modal-santri-nama">-</p></div>
-                        <div><p class="text-[10px] text-gray-500 uppercase">Jenjang / Kelas</p><p class="text-sm font-bold text-gray-800 leading-tight" id="modal-santri-kelas">-</p></div>
-                        <div><p class="text-[10px] text-gray-500 uppercase">Tanggal Izin</p><p class="text-sm font-bold text-gray-800 leading-tight" id="modal-santri-tanggal">-</p></div>
-                        <div><p class="text-[10px] text-gray-500 uppercase">Keperluan</p><p class="text-sm font-bold text-gray-800 leading-tight truncate" id="modal-santri-keperluan">-</p></div>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <div class="flex-1 pr-4">
-                            <p class="text-[10px] text-gray-500 uppercase">Wali Safar (Penjemput)</p><p class="text-sm font-bold text-gray-800 leading-tight mb-3" id="modal-santri-wali">-</p>
-                            <div class="bg-gray-50 p-2 rounded border inline-block"><p class="text-[10px] text-gray-500 text-center uppercase mb-1">Jam Resmi Izin</p><p class="text-sm font-black text-green-700 text-center">08.00 - 16.00</p></div>
-                        </div>
-                        <div class="bg-white p-1 rounded-lg border shadow-sm"><div id="modal-qr-code"></div></div>
-                    </div>
-                </div>
-                <div class="bg-gray-100 py-2 px-4 text-center rounded-b-xl"><p class="text-[10px] text-gray-500">Tunjukkan QR Code ini kepada Security saat keluar & kembali.</p></div>
-            </div>
-            <div class="p-4 border-t bg-gray-50">
-                <button onclick="downloadQRPNG()" class="w-full bg-blue-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-700 flex items-center justify-center shadow-sm"><i class="fas fa-download mr-2"></i> Unduh Gambar (PNG)</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // URL BARU ANDA YANG SUDAH DIPERBARUI
-        const API_URL = "https://script.google.com/macros/s/AKfycbxvAOtmIhJs807NRg_Q_4t2KpARj-yzEzDIoC__1Dw6QnD5zq-qF0ggsjTGqp7xarDX1g/exec";
-        
-        let state = { user: null, token: null, activeData: null };
-
-        const showLoading = (btnId, text = "Memproses...") => {
-            const btn = document.getElementById(btnId); if(!btn) return;
-            btn.disabled = true; btn.dataset.original = btn.innerHTML;
-            btn.innerHTML = `<div class="loader mr-2 border-white border-t-transparent inline-block align-middle"></div> ${text}`;
-        };
-        const hideLoading = (btnId) => {
-            const btn = document.getElementById(btnId); if(!btn) return;
-            btn.disabled = false; btn.innerHTML = btn.dataset.original;
-        };
-
-        window.onload = () => {
-            const savedToken = localStorage.getItem('auth_token');
-            const savedUser = localStorage.getItem('auth_user');
-            if (savedToken && savedUser) { state.token = savedToken; state.user = JSON.parse(savedUser); initApp(); }
-        };
-
-        const initApp = () => {
-            document.getElementById('login-view').classList.add('hidden');
-            document.getElementById('app-layout').classList.remove('hidden');
-            document.getElementById('user-name').innerText = state.user.nama;
-            document.getElementById('user-role').innerText = state.user.role.replace('_', ' ');
-            document.getElementById('user-initial').innerText = state.user.nama.charAt(0).toUpperCase();
-            renderSidebar(); navigate('dashboard');
-        };
-
-        const renderSidebar = () => {
-            const menuEl = document.getElementById('sidebar-menu');
-            let menus = [{ id: 'dashboard', label: 'Dashboard', icon: 'fa-home', roles: ['ADMIN', 'WALI_KELAS', 'SEKRETARIS_MUDIR', 'SECURITY'] }];
-            if (state.user.role === 'ADMIN') {
-                menus.push(
-                    { id: 'master_santri', label: 'Data Santri', icon: 'fa-users', roles: ['ADMIN'] },
-                    { id: 'jadwal', label: 'Jadwal Perizinan', icon: 'fa-clock', roles: ['ADMIN'] }
-                );
-            }
-            if (state.user.role === 'WALI_KELAS') {
-                menus.push(
-                    { id: 'ajukan_izin', label: 'Ajukan Izin', icon: 'fa-paper-plane', roles: ['WALI_KELAS'] },
-                    { id: 'histori_izin', label: 'Histori Izin', icon: 'fa-history', roles: ['WALI_KELAS'] }
-                );
-            }
-            if (state.user.role === 'SEKRETARIS_MUDIR') {
-                menus.push({ id: 'approval', label: 'Approval Izin', icon: 'fa-check-double', roles: ['SEKRETARIS_MUDIR'] });
-            }
-
-            let html = '';
-            menus.forEach(m => {
-                if(m.roles.includes(state.user.role)) html += `<a href="#" onclick="navigate('${m.id}')" id="menu-${m.id}" class="sidebar-link"><i class="fas ${m.icon}"></i> <span>${m.label}</span></a>`;
-            });
-            menuEl.innerHTML = html;
-        };
-
-        const navigate = (route) => {
-            document.querySelectorAll('.sidebar-link').forEach(el => el.classList.remove('active', 'bg-gray-800'));
-            const activeMenu = document.getElementById(`menu-${route}`);
-            if(activeMenu) activeMenu.classList.add('active', 'bg-gray-800');
-
-            const titleEl = document.getElementById('page-title');
-            const content = document.getElementById('main-content');
-            if(!titleEl || !content) return; 
-
-            content.innerHTML = `<div class="flex justify-center items-center h-full"><div class="loader border-gray-300 border-t-green-500 w-12 h-12"></div></div>`;
-
-            if(App.views[route]) { App.views[route](content, titleEl); } 
-            else {
-                titleEl.innerText = "Dashboard";
-                content.innerHTML = `<div class="bg-white p-8 rounded-xl shadow-sm text-center">
-                    <i class="fas fa-tools fa-3x text-gray-300 mb-4"></i><h3 class="text-xl font-bold text-gray-700">Fitur sedang disiapkan</h3>
-                </div>`;
-            }
-        };
-
-        const handleLogin = async (e) => {
-            e.preventDefault(); showLoading('login-btn', 'Memverifikasi...');
-            const payload = { action: 'login', username: document.getElementById('username').value, password: document.getElementById('password').value };
-            try {
-                const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
-                const data = await res.json();
-                if (data.success) {
-                    localStorage.setItem('auth_token', data.data.token); localStorage.setItem('auth_user', JSON.stringify(data.data.user));
-                    state.token = data.data.token; state.user = data.data.user; initApp();
-                } else alert(data.message);
-            } catch (err) { alert("Terjadi kesalahan koneksi."); } finally { hideLoading('login-btn'); }
-        };
-
-        const handleLogout = () => { localStorage.clear(); location.reload(); };
-
-        const apiCall = async (action, payload = {}) => {
-            payload.action = action; payload.token = state.token;
-            try {
-                const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
-                return await res.json();
-            } catch (err) { return { success: false, message: "Koneksi ke server gagal." }; }
-        };
-
-        const App = {
-            views: {
-                dashboard: (container, titleEl) => {
-                    titleEl.innerText = "Dashboard";
-                    let extraBtn = state.user.role === 'ADMIN' ? `
-                        <div class="mt-8 bg-orange-50 p-4 border border-orange-200 rounded-lg">
-                            <h4 class="font-bold text-orange-800 mb-2">Developer Tools</h4>
-                            <p class="text-sm text-orange-600 mb-3">Isi otomatis data sampel (Kelas dan Santri) agar fitur bisa diuji coba.</p>
-                            <button onclick="generateDummyData()" id="btn-dummy" class="bg-orange-600 text-white px-4 py-2 rounded shadow text-sm hover:bg-orange-700">Buat Data Dummy Otomatis</button>
-                        </div>` : '';
-                    container.innerHTML = `<div class="bg-white p-8 rounded-xl shadow-sm text-center"><i class="fas fa-hand-sparkles fa-3x text-green-500 mb-4"></i><h3 class="text-xl font-bold text-gray-700">Ahlan wa Sahlan, ${state.user.nama}</h3><p class="text-gray-500 mt-2">Sistem Management Perizinan Santri Al-Islam</p></div>${extraBtn}`;
-                },
+            <!-- Main Scrollable Area -->
+            <main class="flex-1 overflow-y-auto p-4 md:p-8" id="main-content">
                 
-                master_santri: async (container, titleEl) => {
-                    titleEl.innerText = "Data Santri";
-                    const res = await apiCall('getSantri');
-                    if(!res.success) return container.innerHTML = `<div class="text-red-500">${res.message}</div>`;
-                    let rows = res.data.map(item => `<tr class="border-b hover:bg-gray-50"><td class="p-3 text-sm">${item.nama}</td><td class="p-3 text-sm">${item.jk}</td><td class="p-3 text-sm">${item.jenjang}</td><td class="p-3 text-sm font-medium text-blue-600">${item.nama_kelas || '-'}</td><td class="p-3 text-sm">${item.kota}</td><td class="p-3 text-sm"><span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">${item.status}</span></td></tr>`).join('');
-                    container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border overflow-hidden"><table class="w-full text-left border-collapse"><thead class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold"><tr><th class="p-4">Nama Santri</th><th class="p-4">L/P</th><th class="p-4">Jenjang</th><th class="p-4">Kelas</th><th class="p-4">Kota Asal</th><th class="p-4">Status</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="p-8 text-center text-gray-400">Belum ada data</td></tr>'}</tbody></table></div>`;
-                },
+                <!-- PAGE: DASHBOARD -->
+                <div id="page-dash" class="app-page">
+                    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-2">Dashboard Utama</h2>
+                        <p class="text-gray-600">Sistem Management Perizinan Keluar Santri.</p>
+                        <p class="text-gray-600 mt-4 font-semibold text-sm bg-blue-50 p-3 rounded text-blue-800">
+                            <i class="fa-solid fa-circle-check mr-2"></i> Phase 1 & 2 Aktif. API URL berhasil dikonfigurasi.
+                        </p>
+                    </div>
+                </div>
 
-                jadwal: async (container, titleEl) => {
-                    titleEl.innerText = "Jadwal Perizinan";
-                    const res = await apiCall('getSchedules');
-                    if(!res.success) return container.innerHTML = `<div class="text-red-500">${res.message}</div>`;
-                    let rows = res.data.map(item => `<div class="bg-white p-4 rounded-xl shadow-sm border flex items-center justify-between"><div class="flex items-center"><div class="bg-indigo-100 text-indigo-700 w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg mr-4">P${item.pekan}</div><div><h4 class="font-bold text-gray-800">${item.jenjang} - ${item.gender}</h4><p class="text-sm text-gray-500"><i class="far fa-clock"></i> ${item.jam_resmi}</p></div></div><span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-bold">Aktif</span></div>`).join('');
-                    container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">${rows}</div>`;
-                },
-
-                ajukan_izin: async (container, titleEl) => {
-                    titleEl.innerText = "Form Pengajuan Izin";
-                    const res = await apiCall('getSantriByClass');
-                    let santriOptions = '<option value="">-- Pilih Santri --</option>';
-                    if(res.success && res.data.length > 0) res.data.forEach(s => { santriOptions += `<option value="${s.santri_id}">${s.nama} (${s.jk})</option>`; });
-
-                    container.innerHTML = `
-                        <div class="bg-white rounded-xl shadow-sm border p-6 max-w-2xl mx-auto">
-                            <form id="form-izin" onsubmit="submitIzin(event)">
-                                <div class="mb-4"><label class="block text-sm font-medium text-gray-700 mb-1">Pilih Santri *</label><select id="santri_id" required class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-green-500">${santriOptions}</select></div>
-                                <div class="mb-4"><label class="block text-sm font-medium text-gray-700 mb-1">Keperluan *</label><textarea id="keperluan" required rows="2" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-green-500" placeholder="Misal: Acara keluarga, dll"></textarea></div>
-                                <div class="mb-4"><label class="block text-sm font-medium text-gray-700 mb-1">Tujuan / Alamat *</label><input type="text" id="tujuan" required class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-green-500"></div>
-                                <div class="grid grid-cols-2 gap-4 mb-4">
-                                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Penjemput *</label><input type="text" id="wali_safar" required class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-green-500"></div>
-                                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Hubungan *</label><select id="hubungan_wali" onchange="toggleHubunganLainnya()" required class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-green-500"><option value="">-- Pilih --</option><option value="Ayah">Ayah</option><option value="Ibu">Ibu</option><option value="Kakak Kandung">Kakak Kandung</option><option value="Lainnya">Lainnya</option></select></div>
-                                </div>
-                                <div class="mb-4 hidden" id="div-hubungan-lainnya"><label class="block text-sm font-medium text-gray-700 mb-1">Sebutkan *</label><input type="text" id="hubungan_lainnya" class="w-full border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-green-500"></div>
-                                <div class="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                                    <label class="flex items-center cursor-pointer"><input type="checkbox" id="ikut_jadwal_saudara" onchange="toggleSaudara()" class="w-5 h-5 text-blue-600 rounded"><span class="ml-2 font-medium text-blue-800">Ikut Jadwal Saudara</span></label>
-                                    <div id="div-saudara" class="hidden mt-3"><label class="block text-sm text-blue-800 mb-1">Nama Saudara *</label><input type="text" id="saudara_santri_id" class="w-full border rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500"></div>
-                                </div>
-                                <button type="submit" id="btn-submit-izin" class="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700">Kirim Pengajuan</button>
-                            </form>
+                <!-- PAGE: MASTER DATA -->
+                <div id="page-master" class="app-page hidden flex flex-col gap-4">
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
+                        <h2 class="text-xl font-bold text-gray-800">Master Data</h2>
+                        <div class="flex gap-2">
+                            <button onclick="App.MasterData.load('TAHUN_PELAJARAN')" class="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-primary hover:text-white transition">Tahun Pelajaran</button>
+                            <button onclick="App.MasterData.load('KELAS')" class="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-primary hover:text-white transition">Kelas</button>
+                            <button onclick="App.MasterData.load('SANTRI')" class="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-primary hover:text-white transition">Santri</button>
+                            <button onclick="App.MasterData.load('USERS')" class="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-primary hover:text-white transition">Users</button>
                         </div>
-                    `;
-                },
+                    </div>
 
-                approval: async (container, titleEl) => {
-                    titleEl.innerText = "Approval Pengajuan";
-                    const res = await apiCall('getPendingPermits');
-                    if(!res.success) return container.innerHTML = `<div class="text-red-500">${res.message}</div>`;
-                    if(res.data.length === 0) return container.innerHTML = `<div class="text-center p-8 bg-white rounded-xl shadow-sm border text-gray-500">Tidak ada pengajuan.</div>`;
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 id="md-title" class="text-lg font-semibold text-gray-800">Pilih Data</h3>
+                            <button id="md-btn-add" class="hidden bg-primary text-white px-3 py-1.5 rounded text-sm hover:bg-green-700 transition">
+                                <i class="fa-solid fa-plus mr-1"></i> Tambah Data
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead id="md-thead" class="bg-gray-50 border-y border-gray-200 text-sm text-gray-600">
+                                    <!-- Table headers injected here -->
+                                </thead>
+                                <tbody id="md-tbody" class="text-sm divide-y divide-gray-100">
+                                    <tr><td class="py-4 text-center text-gray-500">Pilih tab master data di atas untuk memuat data.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
 
-                    let cards = res.data.map(item => `
-                        <div class="bg-white rounded-xl shadow-sm border p-5 relative">
-                            <span class="absolute top-4 right-4 bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded">MENUNGGU</span>
-                            <h4 class="font-bold text-lg text-gray-800 mb-1">${item.nama_santri}</h4>
-                            <p class="text-sm text-blue-600 font-medium mb-3">Kelas ${item.nama_kelas} (${item.jenjang})</p>
-                            <div class="bg-gray-50 p-3 rounded-lg text-sm space-y-2 mb-4">
-                                <p><span class="text-gray-500">Keperluan:</span> <span class="font-medium">${item.keperluan}</span></p>
-                                <p><span class="text-gray-500">Tujuan:</span> <span class="font-medium">${item.tujuan}</span></p>
-                                <p><span class="text-gray-500">Penjemput:</span> <span class="font-medium">${item.wali_safar} (${item.hubungan_wali})</span></p>
-                                ${item.ikut_jadwal_saudara === 'TRUE' ? `<p class="text-blue-600 text-xs font-bold">Ikut Jadwal Saudara</p>` : ''}
-                            </div>
-                            <div class="flex space-x-3">
-                                <button onclick="actionApproval('${item.permit_id}', 'APPROVE')" class="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-green-700">Setujui</button>
-                                <button onclick="actionApproval('${item.permit_id}', 'REJECT')" class="flex-1 bg-red-100 text-red-600 py-2 rounded-lg text-sm font-bold hover:bg-red-200">Tolak</button>
-                            </div>
-                        </div>`).join('');
-                    container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-6">${cards}</div>`;
-                },
+            </main>
+        </div>
+        
+        <!-- Mobile Sidebar Overlay -->
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden md:hidden" onclick="App.UI.toggleSidebar()"></div>
+    </div>
 
-                histori_izin: async (container, titleEl) => {
-                    titleEl.innerText = "Histori Pengajuan";
-                    const res = await apiCall('getMyPermits');
-                    if(!res.success) return container.innerHTML = `<div class="text-red-500">${res.message}</div>`;
-                    
-                    let rows = res.data.map(item => {
-                        let statusBadge = item.status === 'MENUNGGU APPROVAL' ? '<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-bold">Menunggu</span>' : (item.status === 'DISETUJUI' ? '<span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">Disetujui</span>' : `<span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-bold" title="${item.alasan}">Ditolak</span>`);
-                        let actionBtn = item.status === 'DISETUJUI' ? `<button onclick='openQRModal(${JSON.stringify(item)})' class="text-blue-600 hover:text-blue-800"><i class="fas fa-qrcode fa-lg"></i></button>` : '-';
-                        return `<tr class="border-b hover:bg-gray-50"><td class="p-3 text-sm font-medium">${item.nama_santri}</td><td class="p-3 text-sm">${item.tanggal_izin || '-'}</td><td class="p-3 text-sm text-gray-500 truncate max-w-xs">${item.keperluan}</td><td class="p-3 text-sm">${item.wali_safar}</td><td class="p-3 text-sm">${statusBadge}</td><td class="p-3 text-sm text-center">${actionBtn}</td></tr>`;
-                    }).join('');
-                    container.innerHTML = `<div class="bg-white rounded-xl shadow-sm border overflow-hidden"><table class="w-full text-left border-collapse"><thead class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold"><tr><th class="p-4">Santri</th><th class="p-4">Tanggal</th><th class="p-4">Keperluan</th><th class="p-4">Penjemput</th><th class="p-4">Status</th><th class="p-4 text-center">QR Card</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="p-8 text-center text-gray-400">Belum ada histori pengajuan</td></tr>'}</tbody></table></div>`;
+    <!-- ============================================================================== -->
+    <!-- APPLICATION LOGIC (MODULES) -->
+    <!-- ============================================================================== -->
+    <script>
+        const App = {
+            // 1. CONFIGURATION
+            Config: {
+                API_URL: 'https://script.google.com/macros/s/AKfycbw7uGghBuDXMNUjhUrOVltKlPVYMHQ47jvXF2NNu_VLHjzuRM4sxWXE0i24jF2gTute0A/exec'
+            },
+
+            // 2. STATE MANAGEMENT
+            State: {
+                user: null,
+                token: localStorage.getItem('auth_token') || null
+            },
+
+            // 3. API SERVICE LAYER
+            API: {
+                async post(action, data = {}) {
+                    const payload = {
+                        action: action,
+                        token: App.State.token,
+                        data: data
+                    };
+
+                    try {
+                        const response = await fetch(App.Config.API_URL, {
+                            method: 'POST',
+                            body: JSON.stringify(payload)
+                        });
+                        
+                        if (!response.ok) throw new Error("Koneksi ke server gagal");
+                        const result = await response.json();
+                        
+                        // Handle Token Expired
+                        if (!result.success && result.code === 'UNAUTHORIZED') {
+                            App.Auth.forceLogout();
+                        }
+                        
+                        return result;
+                    } catch (error) {
+                        console.error('API Error:', error);
+                        return { success: false, message: 'Terjadi kesalahan jaringan. Periksa koneksi Anda.' };
+                    }
                 }
+            },
+
+            // 4. AUTHENTICATION MODULE
+            Auth: {
+                async handleLogin(e) {
+                    e.preventDefault();
+                    
+                    const userVal = document.getElementById('username').value;
+                    const passVal = document.getElementById('password').value;
+                    const btnText = document.getElementById('text-login');
+                    const spinner = document.getElementById('spinner-login');
+                    const btn = document.getElementById('btn-login');
+                    
+                    // UI Loading State
+                    btn.disabled = true;
+                    btn.classList.add('opacity-80');
+                    btnText.innerText = 'Memproses...';
+                    spinner.classList.remove('hidden');
+
+                    const response = await App.API.post('login', { username: userVal, password: passVal });
+                    
+                    // Revert UI Loading
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-80');
+                    btnText.innerText = 'Masuk Sistem';
+                    spinner.classList.add('hidden');
+
+                    if (response.success) {
+                        App.State.token = response.data.token;
+                        App.State.user = response.data;
+                        localStorage.setItem('auth_token', response.data.token);
+                        localStorage.setItem('user_data', JSON.stringify(response.data));
+                        
+                        App.UI.showToast('Login berhasil!', 'success');
+                        App.UI.renderApp();
+                    } else {
+                        App.UI.showToast(response.message, 'error');
+                    }
+                },
+
+                async handleLogout() {
+                    if(!confirm('Apakah Anda yakin ingin keluar?')) return;
+                    App.UI.showToast('Sedang keluar sistem...', 'info');
+                    await App.API.post('logout'); // Fire and forget
+                    this.forceLogout();
+                },
+
+                forceLogout() {
+                    App.State.token = null;
+                    App.State.user = null;
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('user_data');
+                    App.UI.showLogin();
+                },
+
+                async checkSession() {
+                    if (!App.State.token) {
+                        App.UI.showLogin();
+                        return;
+                    }
+
+                    // Recover user data from local to speed up initial load
+                    const savedUser = localStorage.getItem('user_data');
+                    if (savedUser) {
+                        App.State.user = JSON.parse(savedUser);
+                        App.UI.renderApp();
+                    }
+
+                    // Verify with backend silently
+                    const response = await App.API.post('getCurrentUser');
+                    if (response.success) {
+                        App.State.user = response.data;
+                        localStorage.setItem('user_data', JSON.stringify(response.data));
+                        App.UI.updateUserInfo();
+                    } else {
+                        this.forceLogout();
+                    }
+                }
+            },
+
+            // 5. UI CONTROLLER
+            UI: {
+                showLogin() {
+                    document.getElementById('view-app').classList.add('hidden');
+                    document.getElementById('view-login').classList.remove('hidden');
+                    // Reset form
+                    document.getElementById('form-login').reset();
+                },
+
+                renderApp() {
+                    document.getElementById('view-login').classList.add('hidden');
+                    document.getElementById('view-app').classList.remove('hidden');
+                    this.updateUserInfo();
+                    this.renderSidebar();
+                },
+
+                updateUserInfo() {
+                    if (!App.State.user) return;
+                    const name = App.State.user.nama || 'User';
+                    document.getElementById('user-name').innerText = name;
+                    document.getElementById('user-role').innerText = App.State.user.role.replace('_', ' ');
+                    document.getElementById('user-initial').innerText = name.charAt(0).toUpperCase();
+                },
+
+                renderSidebar() {
+                    const role = App.State.user.role;
+                    const navContainer = document.getElementById('sidebar-nav');
+                    let menus = [];
+
+                    // Role-Based Menu Definition
+                    if (role === 'ADMIN') {
+                        menus = [
+                            { id: 'dash', label: 'Dashboard', icon: 'fa-chart-pie' },
+                            { id: 'master', label: 'Master Data', icon: 'fa-database' },
+                            { id: 'jadwal', label: 'Jadwal Perizinan', icon: 'fa-calendar-alt' },
+                            { id: 'laporan', label: 'Laporan', icon: 'fa-print' },
+                            { id: 'settings', label: 'Pengaturan', icon: 'fa-cog' }
+                        ];
+                    } else if (role === 'WALI_KELAS') {
+                        menus = [
+                            { id: 'dash', label: 'Dashboard Kelas', icon: 'fa-home' },
+                            { id: 'pengajuan', label: 'Ajukan Izin', icon: 'fa-plus-circle' },
+                            { id: 'histori', label: 'Histori Santri', icon: 'fa-history' }
+                        ];
+                    } else if (role === 'SEKRETARIS_MUDIR') {
+                        menus = [
+                            { id: 'dash', label: 'Dashboard Real-Time', icon: 'fa-chart-line' },
+                            { id: 'approval', label: 'Screening & Approval', icon: 'fa-check-double' }
+                        ];
+                    } else if (role === 'SECURITY') {
+                        menus = [
+                            { id: 'scan', label: 'SCAN QR', icon: 'fa-qrcode' },
+                            { id: 'monitor', label: 'Monitoring Keluar', icon: 'fa-binoculars' }
+                        ];
+                    }
+
+                    // Build DOM
+                    navContainer.innerHTML = '';
+                    menus.forEach((menu, index) => {
+                        const activeClass = index === 0 ? 'bg-green-700 text-white' : 'text-green-100 hover:bg-green-800';
+                        const a = document.createElement('a');
+                        a.href = '#';
+                        a.className = `flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition ${activeClass}`;
+                        a.innerHTML = `<i class="fa-solid ${menu.icon} w-5 text-center"></i><span class="font-medium text-sm">${menu.label}</span>`;
+                        
+                        a.onclick = (e) => {
+                            e.preventDefault();
+                            // Update active styles
+                            Array.from(navContainer.children).forEach(child => {
+                                child.classList.remove('bg-green-700', 'text-white');
+                                child.classList.add('text-green-100');
+                            });
+                            a.classList.remove('text-green-100');
+                            a.classList.add('bg-green-700', 'text-white');
+                            App.UI.toggleSidebar(true);
+                            
+                            // Route to page
+                            App.Pages.switch(menu.id);
+                        };
+
+                        navContainer.appendChild(a);
+                    });
+                },
+
+                toggleSidebar(forceClose = false) {
+                    const sidebar = document.getElementById('sidebar');
+                    const overlay = document.getElementById('sidebar-overlay');
+                    
+                    if (forceClose || !sidebar.classList.contains('-translate-x-full')) {
+                        // Close
+                        sidebar.classList.add('-translate-x-full');
+                        overlay.classList.add('hidden');
+                    } else {
+                        // Open
+                        sidebar.classList.remove('-translate-x-full');
+                        overlay.classList.remove('hidden');
+                    }
+                },
+
+                showToast(message, type = 'info') {
+                    const container = document.getElementById('toast-container');
+                    const toast = document.createElement('div');
+                    
+                    const colors = {
+                        success: 'bg-green-100 border-green-500 text-green-800',
+                        error: 'bg-red-100 border-red-500 text-red-800',
+                        info: 'bg-blue-100 border-blue-500 text-blue-800'
+                    };
+                    const icons = {
+                        success: 'fa-check-circle',
+                        error: 'fa-exclamation-triangle',
+                        info: 'fa-info-circle'
+                    };
+
+                    toast.className = `flex items-center gap-3 p-4 border-l-4 rounded shadow-md transition-all duration-300 transform translate-x-full opacity-0 ${colors[type]}`;
+                    toast.innerHTML = `<i class="fa-solid ${icons[type]} text-lg"></i><span class="font-medium text-sm">${message}</span>`;
+                    
+                    container.appendChild(toast);
+                    
+                    // Animate in
+                    setTimeout(() => {
+                        toast.classList.remove('translate-x-full', 'opacity-0');
+                    }, 10);
+
+                    // Remove after 3s
+                    setTimeout(() => {
+                        toast.classList.add('opacity-0');
+                        setTimeout(() => toast.remove(), 300);
+                    }, 3000);
+                }
+            },
+
+            // 6. PAGE ROUTER (NEW)
+            Pages: {
+                switch(pageId) {
+                    document.querySelectorAll('.app-page').forEach(el => el.classList.add('hidden'));
+                    const target = document.getElementById(`page-${pageId}`);
+                    
+                    if(target) {
+                        target.classList.remove('hidden');
+                    } else {
+                        // Fallback for unimplemented modules
+                        document.getElementById('page-dash').classList.remove('hidden');
+                        App.UI.showToast('Modul dalam tahap pengembangan (MVP).', 'info');
+                    }
+
+                    if(pageId === 'master') App.MasterData.init();
+                }
+            },
+
+            // 7. MASTER DATA MODULE (NEW)
+            MasterData: {
+                currentEntity: null,
+                
+                init() {
+                    // Load default tab if none loaded
+                    if(!this.currentEntity) this.load('TAHUN_PELAJARAN');
+                },
+
+                async load(entity) {
+                    this.currentEntity = entity;
+                    document.getElementById('md-title').innerText = `Data ${entity.replace('_', ' ')}`;
+                    document.getElementById('md-tbody').innerHTML = `<tr><td class="py-4 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat data...</td></tr>`;
+                    document.getElementById('md-thead').innerHTML = '';
+                    document.getElementById('md-btn-add').classList.remove('hidden');
+                    
+                    // Specific button action placeholder
+                    document.getElementById('md-btn-add').onclick = () => App.UI.showToast(`Fitur Tambah ${entity} akan segera hadir.`, 'info');
+
+                    const response = await App.API.post('getMasterData', { entity: entity });
+                    
+                    if(response.success) {
+                        this.renderTable(response.data);
+                    } else {
+                        document.getElementById('md-tbody').innerHTML = `<tr><td class="py-4 text-center text-red-500">Gagal memuat data: ${response.message}</td></tr>`;
+                    }
+                },
+
+                renderTable(data) {
+                    const thead = document.getElementById('md-thead');
+                    const tbody = document.getElementById('md-tbody');
+                    
+                    if(!data || data.length === 0) {
+                        tbody.innerHTML = `<tr><td class="py-4 text-center text-gray-500">Belum ada data tersedia.</td></tr>`;
+                        return;
+                    }
+
+                    // Generate Headers dynamically from object keys (excluding sensitive/internal fields)
+                    const keys = Object.keys(data[0]).filter(k => k !== 'password_hash' && k !== 'session_token' && !k.endsWith('_id'));
+                    
+                    let trHead = '<tr>';
+                    keys.forEach(k => {
+                        trHead += `<th class="py-3 px-4 font-semibold uppercase tracking-wider">${k.replace(/_/g, ' ')}</th>`;
+                    });
+                    trHead += '</tr>';
+                    thead.innerHTML = trHead;
+
+                    // Generate Rows
+                    let trBody = '';
+                    data.forEach(row => {
+                        trBody += '<tr class="hover:bg-gray-50 transition">';
+                        keys.forEach(k => {
+                            let val = row[k];
+                            // Format dates if any
+                            if(val && typeof val === 'string' && val.includes('T') && val.includes('Z')) {
+                                val = new Date(val).toLocaleDateString('id-ID');
+                            }
+                            // Status formatting
+                            if(k === 'status' || k === 'status_santri') {
+                                const color = val === 'AKTIF' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+                                val = `<span class="px-2 py-1 text-xs font-semibold rounded-full ${color}">${val}</span>`;
+                            }
+                            trBody += `<td class="py-3 px-4 text-gray-700">${val || '-'}</td>`;
+                        });
+                        trBody += '</tr>';
+                    });
+                    tbody.innerHTML = trBody;
+                }
+            },
+
+            // 8. INITIALIZATION
+            init() {
+                console.log("App Initializing - Phase 1");
+                if (this.Config.API_URL === 'ISI_URL_WEB_APP_ANDA_DISINI') {
+                    this.UI.showToast('WARNING: Konfigurasi API URL belum diatur.', 'error');
+                }
+                this.Auth.checkSession();
             }
         };
 
-        window.generateDummyData = async () => {
-            if(!confirm("Buat Data Dummy?")) return;
-            showLoading('btn-dummy', 'Sedang memproses...');
-            const res = await apiCall('generateDummy');
-            hideLoading('btn-dummy');
-            if(res.success) { alert("Berhasil!"); navigate('dashboard'); } else alert("Gagal: " + res.message);
-        };
-
-        window.toggleHubunganLainnya = () => {
-            const val = document.getElementById('hubungan_wali').value;
-            const div = document.getElementById('div-hubungan-lainnya');
-            const input = document.getElementById('hubungan_lainnya');
-            if (val === 'Lainnya') { div.classList.remove('hidden'); input.required = true; } else { div.classList.add('hidden'); input.required = false; }
-        };
-
-        window.toggleSaudara = () => {
-            const isChecked = document.getElementById('ikut_jadwal_saudara').checked;
-            const div = document.getElementById('div-saudara');
-            const input = document.getElementById('saudara_santri_id');
-            if (isChecked) { div.classList.remove('hidden'); input.required = true; } else { div.classList.add('hidden'); input.required = false; }
-        };
-
-        window.submitIzin = async (e) => {
-            e.preventDefault();
-            const payload = { santri_id: document.getElementById('santri_id').value, keperluan: document.getElementById('keperluan').value, tujuan: document.getElementById('tujuan').value, wali_safar: document.getElementById('wali_safar').value, hubungan_wali: document.getElementById('hubungan_wali').value, hubungan_lainnya: document.getElementById('hubungan_lainnya').value || '', ikut_jadwal_saudara: document.getElementById('ikut_jadwal_saudara').checked, saudara_santri_id: document.getElementById('saudara_santri_id').value || '' };
-            showLoading('btn-submit-izin');
-            const res = await apiCall('createPermit', payload);
-            hideLoading('btn-submit-izin');
-            if(res.success) { alert("Pengajuan berhasil dikirim!"); navigate('histori_izin'); } else alert("Gagal: " + res.message);
-        };
-
-        window.actionApproval = async (permit_id, status) => {
-            let alasan = "";
-            if (status === 'REJECT') { alasan = prompt("Alasan penolakan:"); if(!alasan) return; } 
-            else { if(!confirm("Setujui izin ini?")) return; }
-            const res = await apiCall('executeApproval', { permit_id, status, alasan });
-            if(res.success) { alert("Berhasil diproses!"); navigate('approval'); } else alert("Error: " + res.message);
-        };
-
-        window.openQRModal = (permitData) => {
-            state.activeData = permitData;
-            document.getElementById('modal-santri-nama').innerText = permitData.nama_santri;
-            document.getElementById('modal-santri-kelas').innerText = `${permitData.jenjang} - ${permitData.nama_kelas}`;
-            document.getElementById('modal-santri-tanggal').innerText = permitData.tanggal_izin;
-            document.getElementById('modal-santri-keperluan').innerText = permitData.keperluan || "-";
-            document.getElementById('modal-santri-wali').innerText = `${permitData.wali_safar} (${permitData.hubungan_wali})`;
-            
-            const qrContainer = document.getElementById('modal-qr-code');
-            qrContainer.innerHTML = '';
-            new QRCode(qrContainer, { text: permitData.qr_token, width: 90, height: 90, colorDark : "#000", colorLight : "#fff", correctLevel : QRCode.CorrectLevel.H });
-            document.getElementById('qr-popup').classList.add('active');
-        };
-
-        window.closeQRModal = () => { document.getElementById('qr-popup').classList.remove('active'); state.activeData = null; };
-
-        window.downloadQRPNG = () => {
-            if(!state.activeData) return;
-            const permitData = state.activeData;
-            const canvas = document.createElement("canvas"); canvas.width = 450; canvas.height = 250; const ctx = canvas.getContext("2d");
-
-            ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#15803d"; ctx.fillRect(0, 0, canvas.width, 70);
-            ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.font = "bold 16px Arial"; ctx.fillText("PONDOK PESANTREN MODERN AL-ISLAM", 225, 30);
-            ctx.fillStyle = "#bbf7d0"; ctx.font = "bold 12px Arial"; ctx.letterSpacing = "2px"; ctx.fillText("KARTU IZIN KELUAR", 225, 50);
-
-            ctx.fillStyle = "#6b7280"; ctx.textAlign = "left"; ctx.font = "10px Arial";
-            ctx.fillText("NAMA SANTRI", 20, 100); ctx.fillText("JENJANG / KELAS", 160, 100); ctx.fillText("TANGGAL IZIN", 20, 140); ctx.fillText("KEPERLUAN", 160, 140); ctx.fillText("PENJEMPUT", 20, 180); ctx.fillText("JAM RESMI", 20, 220);
-
-            ctx.fillStyle = "#1f2937"; ctx.font = "bold 13px Arial";
-            ctx.fillText(permitData.nama_santri, 20, 115); ctx.fillText(`${permitData.jenjang} - ${permitData.nama_kelas}`, 160, 115); ctx.fillText(permitData.tanggal_izin, 20, 155);
-            
-            let keperluan = permitData.keperluan || "-"; if(keperluan.length > 20) keperluan = keperluan.substring(0, 17) + "...";
-            ctx.fillText(keperluan, 160, 155); ctx.fillText(`${permitData.wali_safar} (${permitData.hubungan_wali})`, 20, 195);
-            
-            ctx.fillStyle = "#15803d"; ctx.font = "bold 14px Arial"; ctx.fillText("08.00 - 16.00", 20, 235);
-
-            const qrCanvas = document.querySelector("#modal-qr-code canvas");
-            if (qrCanvas) {
-                ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 2; ctx.strokeRect(325, 115, 100, 100);
-                ctx.drawImage(qrCanvas, 330, 120, 90, 90);
-                ctx.fillStyle = "#9ca3af"; ctx.textAlign = "center"; ctx.font = "9px Arial"; ctx.fillText("Scan untuk Exit/Return", 375, 230);
-            }
-
-            const link = document.createElement('a'); link.download = `Kartu_Izin_${permitData.nama_santri.replace(/\s+/g, '_')}.png`; link.href = canvas.toDataURL("image/png"); link.click();
-        };
+        // Boot the app when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => App.init());
     </script>
 </body>
 </html>
