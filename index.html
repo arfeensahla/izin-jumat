@@ -125,21 +125,11 @@
                     </div>
                 </div>
 
-                <!-- PAGE: MASTER DATA -->
+                <!-- PAGE: MASTER DATA (DYNAMIC SHELL) -->
                 <div id="page-master" class="app-page hidden flex flex-col gap-4">
-                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
-                        <h2 class="text-xl font-bold text-gray-800">Master Data</h2>
-                        <div class="flex gap-2">
-                            <button onclick="App.MasterData.load('TAHUN_PELAJARAN')" class="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-primary hover:text-white transition">Tahun Pelajaran</button>
-                            <button onclick="App.MasterData.load('KELAS')" class="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-primary hover:text-white transition">Kelas</button>
-                            <button onclick="App.MasterData.load('SANTRI')" class="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-primary hover:text-white transition">Santri</button>
-                            <button onclick="App.MasterData.load('USERS')" class="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-primary hover:text-white transition">Users</button>
-                        </div>
-                    </div>
-
                     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                         <div class="flex justify-between items-center mb-4">
-                            <h3 id="md-title" class="text-lg font-semibold text-gray-800">Pilih Data</h3>
+                            <h3 id="md-title" class="text-lg font-semibold text-gray-800">Master Data</h3>
                             <button id="md-btn-add" class="hidden bg-primary text-white px-3 py-1.5 rounded text-sm hover:bg-green-700 transition">
                                 <i class="fa-solid fa-plus mr-1"></i> Tambah Data
                             </button>
@@ -150,7 +140,7 @@
                                     <!-- Table headers injected here -->
                                 </thead>
                                 <tbody id="md-tbody" class="text-sm divide-y divide-gray-100">
-                                    <tr><td class="py-4 text-center text-gray-500">Pilih tab master data di atas untuk memuat data.</td></tr>
+                                    <tr><td class="py-4 text-center text-gray-500">Pilih menu master data di sidebar untuk memuat data.</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -318,51 +308,69 @@
                     const navContainer = document.getElementById('sidebar-nav');
                     let menus = [];
 
-                    // Role-Based Menu Definition
+                    // Role-Based Menu Definition with Sections
                     if (role === 'ADMIN') {
                         menus = [
-                            { id: 'dash', label: 'Dashboard', icon: 'fa-chart-pie' },
-                            { id: 'master', label: 'Master Data', icon: 'fa-database' },
-                            { id: 'jadwal', label: 'Jadwal Perizinan', icon: 'fa-calendar-alt' },
-                            { id: 'laporan', label: 'Laporan', icon: 'fa-print' },
-                            { id: 'settings', label: 'Pengaturan', icon: 'fa-cog' }
+                            { id: 'dash', label: 'Dashboard', icon: 'fa-chart-pie', type: 'menu' },
+                            { label: 'MASTER DATA', type: 'header' },
+                            { id: 'master_TAHUN_PELAJARAN', label: 'Tahun Pelajaran', icon: 'fa-calendar', type: 'menu' },
+                            { id: 'master_KELAS', label: 'Data Kelas', icon: 'fa-chalkboard-teacher', type: 'menu' },
+                            { id: 'master_SANTRI', label: 'Data Santri', icon: 'fa-users', type: 'menu' },
+                            { id: 'master_USERS', label: 'Data Users', icon: 'fa-user-shield', type: 'menu' },
+                            { label: 'OPERASIONAL', type: 'header' },
+                            { id: 'jadwal', label: 'Jadwal Perizinan', icon: 'fa-calendar-alt', type: 'menu' },
+                            { id: 'laporan', label: 'Laporan', icon: 'fa-print', type: 'menu' },
+                            { id: 'settings', label: 'Pengaturan', icon: 'fa-cog', type: 'menu' }
                         ];
                     } else if (role === 'WALI_KELAS') {
                         menus = [
-                            { id: 'dash', label: 'Dashboard Kelas', icon: 'fa-home' },
-                            { id: 'pengajuan', label: 'Ajukan Izin', icon: 'fa-plus-circle' },
-                            { id: 'histori', label: 'Histori Santri', icon: 'fa-history' }
+                            { id: 'dash', label: 'Dashboard Kelas', icon: 'fa-home', type: 'menu' },
+                            { label: 'PERIZINAN', type: 'header' },
+                            { id: 'pengajuan', label: 'Ajukan Izin', icon: 'fa-plus-circle', type: 'menu' },
+                            { id: 'histori', label: 'Histori Santri', icon: 'fa-history', type: 'menu' }
                         ];
                     } else if (role === 'SEKRETARIS_MUDIR') {
                         menus = [
-                            { id: 'dash', label: 'Dashboard Real-Time', icon: 'fa-chart-line' },
-                            { id: 'approval', label: 'Screening & Approval', icon: 'fa-check-double' }
+                            { id: 'dash', label: 'Dashboard Real-Time', icon: 'fa-chart-line', type: 'menu' },
+                            { label: 'VERIFIKASI', type: 'header' },
+                            { id: 'approval', label: 'Screening & Approval', icon: 'fa-check-double', type: 'menu' }
                         ];
                     } else if (role === 'SECURITY') {
                         menus = [
-                            { id: 'scan', label: 'SCAN QR', icon: 'fa-qrcode' },
-                            { id: 'monitor', label: 'Monitoring Keluar', icon: 'fa-binoculars' }
+                            { id: 'scan', label: 'SCAN QR', icon: 'fa-qrcode', type: 'menu' },
+                            { label: 'MONITORING', type: 'header' },
+                            { id: 'monitor', label: 'Santri di Luar', icon: 'fa-binoculars', type: 'menu' }
                         ];
                     }
 
                     // Build DOM
                     navContainer.innerHTML = '';
                     menus.forEach((menu, index) => {
-                        const activeClass = index === 0 ? 'bg-green-700 text-white' : 'text-green-100 hover:bg-green-800';
+                        // Render Section Header
+                        if (menu.type === 'header') {
+                            const header = document.createElement('div');
+                            header.className = 'px-4 py-2 mt-4 mb-1 text-xs font-bold text-green-300 opacity-70 tracking-wider';
+                            header.innerText = menu.label;
+                            navContainer.appendChild(header);
+                            return;
+                        }
+
+                        // Render Menu Items
+                        const activeClass = menu.id === 'dash' ? 'bg-green-700 text-white menu-active' : 'text-green-100 hover:bg-green-800';
                         const a = document.createElement('a');
                         a.href = '#';
-                        a.className = `flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition ${activeClass}`;
+                        a.className = `flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition menu-item ${activeClass}`;
                         a.innerHTML = `<i class="fa-solid ${menu.icon} w-5 text-center"></i><span class="font-medium text-sm">${menu.label}</span>`;
                         
                         a.onclick = (e) => {
                             e.preventDefault();
                             // Update active styles
-                            Array.from(navContainer.children).forEach(child => {
-                                child.classList.remove('bg-green-700', 'text-white');
+                            document.querySelectorAll('.menu-item').forEach(child => {
+                                child.classList.remove('bg-green-700', 'text-white', 'menu-active');
                                 child.classList.add('text-green-100');
                             });
                             a.classList.remove('text-green-100');
-                            a.classList.add('bg-green-700', 'text-white');
+                            a.classList.add('bg-green-700', 'text-white', 'menu-active');
                             App.UI.toggleSidebar(true);
                             
                             // Route to page
@@ -425,7 +433,19 @@
             Pages: {
                 switch(pageId) {
                     document.querySelectorAll('.app-page').forEach(el => el.classList.add('hidden'));
-                    const target = document.getElementById(`page-${pageId}`);
+                    
+                    let targetId = `page-${pageId}`;
+                    let isMasterData = false;
+                    let masterEntity = null;
+
+                    // Dynamic detection for Master Data routes
+                    if (pageId.startsWith('master_')) {
+                        targetId = 'page-master';
+                        isMasterData = true;
+                        masterEntity = pageId.replace('master_', '');
+                    }
+
+                    const target = document.getElementById(targetId);
                     
                     if(target) {
                         target.classList.remove('hidden');
@@ -435,7 +455,10 @@
                         App.UI.showToast('Modul dalam tahap pengembangan (MVP).', 'info');
                     }
 
-                    if(pageId === 'master') App.MasterData.init();
+                    // Trigger data fetch if a master data menu is clicked
+                    if(isMasterData && masterEntity) {
+                        App.MasterData.load(masterEntity);
+                    }
                 }
             },
 
@@ -443,11 +466,6 @@
             MasterData: {
                 currentEntity: null,
                 
-                init() {
-                    // Load default tab if none loaded
-                    if(!this.currentEntity) this.load('TAHUN_PELAJARAN');
-                },
-
                 async load(entity) {
                     this.currentEntity = entity;
                     document.getElementById('md-title').innerText = `Data ${entity.replace('_', ' ')}`;
