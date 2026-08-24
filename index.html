@@ -35,7 +35,7 @@
     <!-- 1. NOTIFICATION TOAST -->
     <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
 
-    <!-- MODAL FORM TAMBAH DATA (TAMBAHAN BARU) -->
+    <!-- MODAL FORM TAMBAH DATA -->
     <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center px-4">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden transform transition-all">
             <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
@@ -146,7 +146,7 @@
                         <h2 class="text-2xl font-bold text-gray-800 mb-2">Dashboard Utama</h2>
                         <p class="text-gray-600">Sistem Management Perizinan Keluar Santri.</p>
                         <p class="text-gray-600 mt-4 font-semibold text-sm bg-blue-50 p-3 rounded text-blue-800">
-                            <i class="fa-solid fa-circle-check mr-2"></i> Phase 1 & 2 Aktif. API URL berhasil dikonfigurasi.
+                            <i class="fa-solid fa-circle-check mr-2"></i> Phase 1, 2 & 4 Aktif. Master Data & Jadwal Perizinan siap digunakan.
                         </p>
                     </div>
                 </div>
@@ -173,6 +173,39 @@
                     </div>
                 </div>
 
+                <!-- PAGE: JADWAL PERIZINAN -->
+                <div id="page-jadwal" class="app-page hidden flex flex-col gap-4">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800">Pengaturan Jadwal Perizinan Jumat</h3>
+                                <p class="text-xs text-gray-500 mt-1">Jadwal mingguan otomatis yang menentukan tanggal dan giliran penjemputan santri.</p>
+                            </div>
+                            <button onclick="App.Jadwal.load()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded text-sm transition">
+                                <i class="fa-solid fa-rotate mr-1"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="bg-gray-50 border-y border-gray-200 text-sm text-gray-600">
+                                    <tr>
+                                        <th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">Pekan</th>
+                                        <th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">Jenjang</th>
+                                        <th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">Gender</th>
+                                        <th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">Hari</th>
+                                        <th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">Jam Resmi</th>
+                                        <th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">Status</th>
+                                        <th class="py-3 px-4 font-semibold uppercase tracking-wider text-xs">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="jadwal-tbody" class="text-sm divide-y divide-gray-100">
+                                    <tr><td colspan="7" class="py-4 text-center text-gray-500">Memuat data jadwal...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
             </main>
         </div>
         
@@ -185,18 +218,15 @@
     <!-- ============================================================================== -->
     <script>
         const App = {
-            // 1. CONFIGURATION
             Config: {
                 API_URL: 'https://script.google.com/macros/s/AKfycbw7uGghBuDXMNUjhUrOVltKlPVYMHQ47jvXF2NNu_VLHjzuRM4sxWXE0i24jF2gTute0A/exec'
             },
 
-            // 2. STATE MANAGEMENT
             State: {
                 user: null,
                 token: localStorage.getItem('auth_token') || null
             },
 
-            // 3. API SERVICE LAYER
             API: {
                 async post(action, data = {}) {
                     const payload = {
@@ -214,7 +244,6 @@
                         if (!response.ok) throw new Error("Koneksi ke server gagal");
                         const result = await response.json();
                         
-                        // Handle Token Expired
                         if (!result.success && result.code === 'UNAUTHORIZED') {
                             App.Auth.forceLogout();
                         }
@@ -227,7 +256,6 @@
                 }
             },
 
-            // 4. AUTHENTICATION MODULE
             Auth: {
                 async handleLogin(e) {
                     e.preventDefault();
@@ -238,7 +266,6 @@
                     const spinner = document.getElementById('spinner-login');
                     const btn = document.getElementById('btn-login');
                     
-                    // UI Loading State
                     btn.disabled = true;
                     btn.classList.add('opacity-80');
                     btnText.innerText = 'Memproses...';
@@ -246,7 +273,6 @@
 
                     const response = await App.API.post('login', { username: userVal, password: passVal });
                     
-                    // Revert UI Loading
                     btn.disabled = false;
                     btn.classList.remove('opacity-80');
                     btnText.innerText = 'Masuk Sistem';
@@ -268,7 +294,7 @@
                 async handleLogout() {
                     if(!confirm('Apakah Anda yakin ingin keluar?')) return;
                     App.UI.showToast('Sedang keluar sistem...', 'info');
-                    await App.API.post('logout'); // Fire and forget
+                    await App.API.post('logout');
                     this.forceLogout();
                 },
 
@@ -286,14 +312,12 @@
                         return;
                     }
 
-                    // Recover user data from local to speed up initial load
                     const savedUser = localStorage.getItem('user_data');
                     if (savedUser) {
                         App.State.user = JSON.parse(savedUser);
                         App.UI.renderApp();
                     }
 
-                    // Verify with backend silently
                     const response = await App.API.post('getCurrentUser');
                     if (response.success) {
                         App.State.user = response.data;
@@ -305,12 +329,10 @@
                 }
             },
 
-            // 5. UI CONTROLLER
             UI: {
                 showLogin() {
                     document.getElementById('view-app').classList.add('hidden');
                     document.getElementById('view-login').classList.remove('hidden');
-                    // Reset form
                     document.getElementById('form-login').reset();
                 },
 
@@ -334,7 +356,6 @@
                     const navContainer = document.getElementById('sidebar-nav');
                     let menus = [];
 
-                    // Role-Based Menu Definition with Sections
                     if (role === 'ADMIN') {
                         menus = [
                             { id: 'dash', label: 'Dashboard', icon: 'fa-chart-pie', type: 'menu' },
@@ -369,10 +390,8 @@
                         ];
                     }
 
-                    // Build DOM
                     navContainer.innerHTML = '';
-                    menus.forEach((menu, index) => {
-                        // Render Section Header
+                    menus.forEach((menu) => {
                         if (menu.type === 'header') {
                             const header = document.createElement('div');
                             header.className = 'px-4 py-2 mt-4 mb-1 text-xs font-bold text-green-300 opacity-70 tracking-wider';
@@ -381,7 +400,6 @@
                             return;
                         }
 
-                        // Render Menu Items
                         const activeClass = menu.id === 'dash' ? 'bg-green-700 text-white menu-active' : 'text-green-100 hover:bg-green-800';
                         const a = document.createElement('a');
                         a.href = '#';
@@ -390,7 +408,6 @@
                         
                         a.onclick = (e) => {
                             e.preventDefault();
-                            // Update active styles
                             document.querySelectorAll('.menu-item').forEach(child => {
                                 child.classList.remove('bg-green-700', 'text-white', 'menu-active');
                                 child.classList.add('text-green-100');
@@ -399,7 +416,6 @@
                             a.classList.add('bg-green-700', 'text-white', 'menu-active');
                             App.UI.toggleSidebar(true);
                             
-                            // Route to page
                             App.Pages.switch(menu.id);
                         };
 
@@ -412,32 +428,35 @@
                     const overlay = document.getElementById('sidebar-overlay');
                     
                     if (forceClose || !sidebar.classList.contains('-translate-x-full')) {
-                        // Close
                         sidebar.classList.add('-translate-x-full');
                         overlay.classList.add('hidden');
                     } else {
-                        // Open
                         sidebar.classList.remove('-translate-x-full');
                         overlay.classList.remove('hidden');
                     }
                 },
 
                 showToast(message, type = 'info') {
-                    // ... existing toast logic ...
+                    const container = document.getElementById('toast-container');
+                    const toast = document.createElement('div');
+                    const bg = type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-gray-800';
+                    toast.className = `${bg} text-white px-4 py-3 rounded-lg shadow-lg text-sm flex items-center justify-between gap-4 transition-all duration-300 transform translate-y-2 opacity-0`;
+                    toast.innerHTML = `<span>${message}</span><button onclick="this.parentElement.remove()" class="text-white opacity-80 hover:opacity-100"><i class="fa-solid fa-times"></i></button>`;
+                    container.appendChild(toast);
+                    
+                    setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
                     setTimeout(() => {
                         toast.classList.add('opacity-0');
                         setTimeout(() => toast.remove(), 300);
-                    }, 3000);
+                    }, 4000);
                 },
 
-                // METHOD BARU UNTUK MODAL
                 closeModal() {
                     document.getElementById('modal-container').classList.add('hidden');
                     document.getElementById('modal-form').reset();
                 }
             },
 
-            // 6. PAGE ROUTER (NEW)
             Pages: {
                 switch(pageId) {
                     document.querySelectorAll('.app-page').forEach(el => el.classList.add('hidden'));
@@ -446,7 +465,6 @@
                     let isMasterData = false;
                     let masterEntity = null;
 
-                    // Dynamic detection for Master Data routes
                     if (pageId.startsWith('master_')) {
                         targetId = 'page-master';
                         isMasterData = true;
@@ -458,23 +476,21 @@
                     if(target) {
                         target.classList.remove('hidden');
                     } else {
-                        // Fallback for unimplemented modules
                         document.getElementById('page-dash').classList.remove('hidden');
                         App.UI.showToast('Modul dalam tahap pengembangan (MVP).', 'info');
                     }
 
-                    // Trigger data fetch if a master data menu is clicked
                     if(isMasterData && masterEntity) {
                         App.MasterData.load(masterEntity);
+                    } else if(pageId === 'jadwal') {
+                        App.Jadwal.load();
                     }
                 }
             },
 
-            // 7. MASTER DATA MODULE (NEW)
             MasterData: {
                 currentEntity: null,
                 
-                // Skema Form Dinamis
                 schemas: {
                     'TAHUN_PELAJARAN': [
                         { name: 'nama_tahun', label: 'Nama Tahun Pelajaran (Misal: 2026/2027)', type: 'text', required: true }
@@ -512,8 +528,6 @@
                     
                     const btnAdd = document.getElementById('md-btn-add');
                     btnAdd.classList.remove('hidden');
-                    
-                    // Hubungkan tombol tambah dengan method showModal
                     btnAdd.onclick = () => this.showModal();
 
                     const response = await App.API.post('getMasterData', { entity: entity });
@@ -535,7 +549,6 @@
                         return;
                     }
 
-                    // Ambil kunci unik dari objek data pertama, saring kolom internal sistem yang sensitif
                     const keys = Object.keys(data[0]).filter(k => k !== 'password_hash' && k !== 'session_token');
                     
                     let trHead = '<tr>';
@@ -545,21 +558,18 @@
                     trHead += '</tr>';
                     thead.innerHTML = trHead;
 
-                    // Generate Rows dengan penanganan aman untuk berbagai tipe nilai
                     let trBody = '';
                     data.forEach(row => {
                         trBody += '<tr class="hover:bg-gray-50 transition">';
                         keys.forEach(k => {
                             let val = row[k];
                             
-                            // Format tanggal ISO jika ada
                             if(val && typeof val === 'string' && (val.includes('T') && val.includes('Z') || !isNaN(Date.parse(val)) && val.length > 10)) {
                                 try {
                                     val = new Date(val).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-                                } catch(e) { /* fallback */ }
+                                } catch(e) {}
                             }
                             
-                            // Format badge status jika kolom status
                             if(k === 'status' || k === 'status_santri') {
                                 const color = val === 'AKTIF' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
                                 val = `<span class="px-2 py-1 text-xs font-semibold rounded-full ${color}">${val}</span>`;
@@ -572,7 +582,6 @@
                     tbody.innerHTML = trBody;
                 },
 
-                // Tampilkan Modal Form
                 showModal() {
                     const entity = this.currentEntity;
                     const schema = this.schemas[entity];
@@ -585,7 +594,6 @@
                     const container = document.getElementById('modal-body');
                     container.innerHTML = '';
 
-                    // Generate HTML Form Dinamis
                     schema.forEach(field => {
                         let inputHtml = '';
                         const requiredAttr = field.required ? 'required' : '';
@@ -611,7 +619,6 @@
                     document.getElementById('modal-container').classList.remove('hidden');
                 },
 
-                // Submit Form ke Backend
                 async submitForm(e) {
                     e.preventDefault();
                     
@@ -619,25 +626,21 @@
                     const btnText = document.getElementById('modal-btn-text');
                     const spinner = document.getElementById('modal-spinner');
                     
-                    // Loading State
                     btnSave.disabled = true;
                     btnText.innerText = 'Menyimpan...';
                     spinner.classList.remove('hidden');
 
-                    // Kumpulkan data dari form
                     const formData = {};
                     const schema = this.schemas[this.currentEntity];
                     schema.forEach(field => {
                         formData[field.name] = document.getElementById(`field_${field.name}`).value;
                     });
 
-                    // Kirim ke API
                     const response = await App.API.post('createMasterData', {
                         entity: this.currentEntity,
                         formData: formData
                     });
 
-                    // Revert Loading State
                     btnSave.disabled = false;
                     btnText.innerText = 'Simpan Data';
                     spinner.classList.add('hidden');
@@ -645,24 +648,80 @@
                     if(response.success) {
                         App.UI.showToast(response.message, 'success');
                         App.UI.closeModal();
-                        this.load(this.currentEntity); // Reload tabel
+                        this.load(this.currentEntity);
                     } else {
                         App.UI.showToast(response.message, 'error');
                     }
                 }
             },
 
-            // 8. INITIALIZATION
-            init() {
-                console.log("App Initializing - Phase 1");
-                if (this.Config.API_URL === 'ISI_URL_WEB_APP_ANDA_DISINI') {
-                    this.UI.showToast('WARNING: Konfigurasi API URL belum diatur.', 'error');
+            Jadwal: {
+                async load() {
+                    const tbody = document.getElementById('jadwal-tbody');
+                    tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat jadwal perizinan...</td></tr>`;
+
+                    const response = await App.API.post('getSchedules');
+                    if(response.success) {
+                        this.renderTable(response.data);
+                    } else {
+                        tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-red-500">Gagal memuat jadwal: ${response.message}</td></tr>`;
+                    }
+                },
+
+                renderTable(data) {
+                    const tbody = document.getElementById('jadwal-tbody');
+                    if(!data || data.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-gray-500">Belum ada konfigurasi jadwal.</td></tr>`;
+                        return;
+                    }
+
+                    let tr = '';
+                    data.forEach(item => {
+                        const statusBadge = item.status === 'AKTIF' 
+                            ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">AKTIF</span>' 
+                            : '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">NONAKTIF</span>';
+
+                        tr += `
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="py-3 px-4 font-bold text-gray-800">${item.pekan}</td>
+                                <td class="py-3 px-4 text-gray-700">${item.jenjang}</td>
+                                <td class="py-3 px-4 text-gray-700">${item.gender}</td>
+                                <td class="py-3 px-4 text-gray-700">${item.hari}</td>
+                                <td class="py-3 px-4 text-gray-700">${item.jam_mulai} - ${item.jam_selesai}</td>
+                                <td class="py-3 px-4">${statusBadge}</td>
+                                <td class="py-3 px-4">
+                                    <button onclick="App.Jadwal.toggleStatus('${item.jadwal_id}', '${item.status}')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1 rounded transition">
+                                        Ubah Status
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    tbody.innerHTML = tr;
+                },
+
+                async toggleStatus(jadwalId, currentStatus) {
+                    const newStatus = currentStatus === 'AKTIF' ? 'NONAKTIF' : 'AKTIF';
+                    const response = await App.API.post('updateSchedule', {
+                        jadwal_id: jadwalId,
+                        status: newStatus
+                    });
+
+                    if(response.success) {
+                        App.UI.showToast(response.message, 'success');
+                        this.load();
+                    } else {
+                        App.UI.showToast(response.message, 'error');
+                    }
                 }
+            },
+
+            init() {
+                console.log("App Initializing - Phase 4 Active");
                 this.Auth.checkSession();
             }
         };
 
-        // Boot the app when DOM is ready
         document.addEventListener('DOMContentLoaded', () => App.init());
     </script>
 </body>
