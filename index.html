@@ -28,6 +28,7 @@
     <script type="text/babel">
         const { useState, useEffect, createContext, useContext, useMemo } = React;
 
+        // API URL Google Apps Script Anda (PASTIKAN TIDAK BERUBAH)
         const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbyddspvXA3vpGmDpHYjm5-uOlbEdSbDTYygeHsNv192SokqVrEKwBxiZAkYXVscTomM/exec';
         
         const ROLES = {
@@ -96,22 +97,89 @@
             );
         };
 
+        // REVISI 3: Menambahkan asterik merah jika input required
         const Input = ({ label, type = "text", value, onChange, placeholder, required, name, readOnly }) => (
             <div className="mb-4">
-                {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
+                {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</label>}
                 <input name={name} type={type} value={value} onChange={onChange} placeholder={placeholder} required={required} readOnly={readOnly} className={`w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors ${readOnly ? 'bg-gray-100' : 'bg-white'}`} />
             </div>
         );
 
+        // REVISI 3: Menambahkan asterik merah jika select required
         const Select = ({ label, value, onChange, options, required, name, disabled }) => (
             <div className="mb-4">
-                {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
+                {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</label>}
                 <select disabled={disabled} name={name} value={value} onChange={onChange} required={required} className={`w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}>
                     <option value="">-- Pilih --</option>
                     {options.map((opt, idx) => typeof opt === 'object' ? <option key={idx} value={opt.value}>{opt.label}</option> : <option key={idx} value={opt}>{opt}</option>)}
                 </select>
             </div>
         );
+
+        // REVISI 1: Komponen Dropdown Cerdas (Bisa diketik untuk mencari)
+        const SearchableSelect = ({ label, value, onChange, options, required, placeholder = "-- Ketik untuk mencari --" }) => {
+            const [isOpen, setIsOpen] = useState(false);
+            const [searchTerm, setSearchTerm] = useState('');
+            const wrapperRef = React.useRef(null);
+
+            const selectedOption = useMemo(() => options.find(opt => opt.value === value), [options, value]);
+
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+                        setIsOpen(false);
+                    }
+                };
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+            }, []);
+
+            const filteredOptions = options.filter(opt => opt.label.toLowerCase().includes(searchTerm.toLowerCase()));
+
+            return (
+                <div className="mb-4 relative" ref={wrapperRef}>
+                    {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</label>}
+                    <div className="relative">
+                        <input
+                            type="text"
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white cursor-text"
+                            placeholder={placeholder}
+                            value={isOpen ? searchTerm : (selectedOption ? selectedOption.label : '')}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value);
+                                setIsOpen(true);
+                                if (e.target.value === '') onChange({ target: { value: '' } }); 
+                            }}
+                            onFocus={() => { setIsOpen(true); setSearchTerm(''); }}
+                        />
+                        <div className="absolute right-3 top-3 text-gray-400 pointer-events-none">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </div>
+                    </div>
+                    {isOpen && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            {filteredOptions.length === 0 ? (
+                                <div className="p-3 text-sm text-gray-500 text-center">Tidak ditemukan</div>
+                            ) : (
+                                filteredOptions.map((opt, idx) => (
+                                    <div
+                                        key={idx}
+                                        className={`px-4 py-2 text-sm cursor-pointer hover:bg-emerald-50 hover:text-emerald-700 ${value === opt.value ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-700'}`}
+                                        onClick={() => {
+                                            onChange({ target: { value: opt.value } });
+                                            setIsOpen(false);
+                                            setSearchTerm('');
+                                        }}
+                                    >
+                                        {opt.label}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        };
 
         const StatCard = ({ title, value, icon, color = "bg-emerald-50 text-emerald-600" }) => (
             <Card className="flex items-center gap-4">
@@ -230,7 +298,6 @@
             );
         };
 
-        // --- PHASE 2 COMPONENTS ---
         const MasterSantriPage = () => {
             const { showToast } = useContext(ToastContext);
             const [data, setData] = useState([]);
@@ -415,7 +482,6 @@
             );
         };
 
-        // --- PHASE 3 COMPONENTS ---
         const KenaikanKelasPage = () => {
             const { showToast } = useContext(ToastContext);
             const [santriData, setSantriData] = useState([]);
@@ -440,530 +506,4 @@
                         setSantriData(resSantri.data.filter(s => s.status === 'Aktif'));
                         setTpData(resTp.data.filter(t => t.status === 'Aktif'));
                         if (resTp.data.length > 0) {
-                            const aktif = resTp.data.find(t => t.status === 'Aktif');
-                            if (aktif) setSelectedTp(aktif.tp_id);
-                        }
-                        setKelasData(resKelas.data);
-                    } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
-                };
-                fetchDeps();
-            }, []);
-
-            const handlePreview = () => {
-                if (!selectedTp || !fromKelas || !toKelas) return showToast('Pilih TP, Kelas Asal, dan Kelas Tujuan', 'error');
-                const targetSantri = santriData.filter(s => s.kelas === fromKelas);
-                const draft = targetSantri.map(s => ({
-                    santri_id: s.santri_id, nama: s.nama, kelas_lama: s.kelas, kelas_baru: toKelas, status_baru: toKelas === 'LULUS' ? 'Lulus' : 'Aktif'
-                }));
-                setPreviewData(draft);
-                showToast(`Menemukan ${draft.length} santri untuk diproses.`, 'success');
-            };
-
-            const handleIndividualChange = (idx, field, value) => {
-                const updated = [...previewData];
-                updated[idx][field] = value;
-                setPreviewData(updated);
-            };
-
-            const handleSubmit = async () => {
-                if (previewData.length === 0) return;
-                if (!confirm("Apakah Anda yakin memproses kenaikan kelas ini? Proses ini akan mencatat histori di database.")) return;
-                setProcessing(true);
-                try {
-                    const payload = { mutations: previewData.map(d => ({ santri_id: d.santri_id, tp_id: selectedTp, kelas_baru: d.kelas_baru, status_baru: d.status_baru })) };
-                    const res = await apiService.request('saveKenaikanKelas', payload);
-                    showToast(res.message, 'success');
-                    setPreviewData([]);
-                    setFromKelas('');
-                    setToKelas('');
-                } catch (e) { showToast(e.message, 'error'); } finally { setProcessing(false); }
-            };
-
-            return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div><h2 className="text-2xl font-bold text-gray-800">Proses Kenaikan Kelas</h2><p className="text-gray-500">Pindahkan kelas santri secara massal dengan aman (histori tahun lalu terjaga).</p></div>
-                    <Card>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                            <Select label="Tahun Pelajaran Target" options={tpData.map(t => ({value: t.tp_id, label: t.nama_periode}))} value={selectedTp} onChange={(e) => setSelectedTp(e.target.value)} disabled={loading} />
-                            <Select label="Dari Kelas (Lama)" options={kelasData.map(k => k.nama_kelas)} value={fromKelas} onChange={(e) => setFromKelas(e.target.value)} disabled={loading} />
-                            <Select label="Ke Kelas (Baru)" options={[...kelasData.map(k => k.nama_kelas), 'LULUS', 'TIDAK NAIK']} value={toKelas} onChange={(e) => setToKelas(e.target.value)} disabled={loading} />
-                            <div className="flex items-end"><Button fullWidth onClick={handlePreview} disabled={loading || !selectedTp || !fromKelas || !toKelas}>Tampilkan Preview</Button></div>
-                        </div>
-                        {previewData.length > 0 && (
-                            <div className="mt-8 border-t pt-4 animate-fade-in-down">
-                                <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-emerald-800">Preview Pemindahan ({previewData.length} Santri)</h3><Button onClick={handleSubmit} disabled={processing}>{processing ? 'Memproses...' : 'Simpan Perubahan Permanen'}</Button></div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left text-sm border-collapse">
-                                        <thead><tr className="bg-gray-50 border-b"><th className="p-3">Nama Santri</th><th className="p-3">Kelas Lama</th><th className="p-3">Ubah Kelas Baru (Koreksi)</th><th className="p-3">Ubah Status</th></tr></thead>
-                                        <tbody>
-                                            {previewData.map((d, idx) => (
-                                                <tr key={idx} className="border-b bg-emerald-50"><td className="p-3 font-medium">{d.nama}</td><td className="p-3">{d.kelas_lama}</td><td className="p-3"><select className="w-full p-1 border rounded" value={d.kelas_baru} onChange={(e) => handleIndividualChange(idx, 'kelas_baru', e.target.value)}><option value="LULUS">LULUS</option><option value="TIDAK NAIK">TIDAK NAIK</option>{kelasData.map(k => <option key={k.nama_kelas} value={k.nama_kelas}>{k.nama_kelas}</option>)}</select></td><td className="p-3"><select className="w-full p-1 border rounded" value={d.status_baru} onChange={(e) => handleIndividualChange(idx, 'status_baru', e.target.value)}><option value="Aktif">Aktif</option><option value="Lulus">Lulus</option><option value="Nonaktif">Nonaktif</option></select></td></tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
-                    </Card>
-                </div>
-            );
-        };
-
-        // --- PHASE 4 COMPONENTS ---
-        const JadwalPerizinanPage = () => {
-            const { showToast } = useContext(ToastContext);
-            const [data, setData] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [isModalOpen, setIsModalOpen] = useState(false);
-            const [formData, setFormData] = useState({});
-
-            const fetchData = async () => {
-                setLoading(true);
-                try {
-                    const res = await apiService.request('getJadwal');
-                    setData(res.data || []);
-                } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
-            };
-            useEffect(() => { fetchData(); }, []);
-
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                try {
-                    const res = await apiService.request('saveJadwal', formData);
-                    showToast(res.message, 'success');
-                    setIsModalOpen(false);
-                    fetchData();
-                } catch (e) { showToast(e.message, 'error'); }
-            };
-
-            return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div className="flex justify-between items-center">
-                        <div><h2 className="text-2xl font-bold text-gray-800">Jadwal Perizinan</h2><p className="text-gray-500">Konfigurasi otomatis jadwal pekanan (Default: Jumat).</p></div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {loading ? <div className="col-span-2 p-8 text-center text-gray-500">Memuat Jadwal...</div> : data.map((item, idx) => (
-                            <Card key={idx} className="relative overflow-hidden border-l-4 border-emerald-500">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="text-sm font-bold text-emerald-600 tracking-wider">PEKAN {item.pekan}</p>
-                                        <h3 className="text-xl font-bold text-gray-800 mt-1">{item.jenjang} - {item.gender}</h3>
-                                        <div className="flex items-center gap-2 mt-3 text-sm text-gray-600"><Icons.Calendar /> <span>Hari: <strong>{item.hari}</strong></span></div>
-                                        <div className="flex items-center gap-2 mt-1 text-sm text-gray-600"><Icons.Clock /> <span>Jam: <strong>{item.jam_mulai} - {item.jam_selesai}</strong></span></div>
-                                    </div>
-                                    <button onClick={() => { setFormData(item); setIsModalOpen(true); }} className="p-2 bg-gray-100 hover:bg-emerald-50 text-gray-600 hover:text-emerald-600 rounded-lg transition-colors"><Icons.Edit /></button>
-                                </div>
-                            </Card>
-                        ))}
-                    </div>
-                    <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={`Edit Jadwal Pekan ${formData.pekan || ''}`}>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <Input label="Jenjang (Terjadwal)" value={formData.jenjang || ''} readOnly />
-                            <Input label="Gender (Terjadwal)" value={formData.gender || ''} readOnly />
-                            <Select label="Hari Perizinan" options={['Jumat', 'Sabtu', 'Minggu']} value={formData.hari || ''} onChange={(e) => setFormData({...formData, hari: e.target.value})} required />
-                            <div className="grid grid-cols-2 gap-4">
-                                <Input label="Jam Mulai" type="time" value={formData.jam_mulai || ''} onChange={(e) => setFormData({...formData, jam_mulai: e.target.value})} required />
-                                <Input label="Jam Selesai (Resmi)" type="time" value={formData.jam_selesai || ''} onChange={(e) => setFormData({...formData, jam_selesai: e.target.value})} required />
-                            </div>
-                            <div className="pt-4 flex justify-end gap-2 border-t"><Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>Batal</Button><Button type="submit">Simpan Jadwal</Button></div>
-                        </form>
-                    </Modal>
-                </div>
-            );
-        };
-
-        // --- PHASE 5 COMPONENTS ---
-        const helper = {
-            getNextFriday: () => {
-                const d = new Date();
-                d.setDate(d.getDate() + ((5 + 7 - d.getDay()) % 7 || 7)); // 5 = Jumat
-                return d;
-            },
-            getWeekOfMonth: (date) => {
-                const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-                return Math.ceil((date.getDate() + firstDay) / 7);
-            },
-            // FORMAT TANGGAL LEBIH SIMPEL: Jum, 28 Ags 2026
-            formatDate: (date) => date.toLocaleDateString('id-ID', { weekday: 'short', year: 'numeric', month: 'short', day: '2-digit' })
-        };
-
-        const AjukanIzinPage = ({ setCurrentRoute }) => {
-            const { user } = useContext(AuthContext);
-            const { showToast } = useContext(ToastContext);
-            const [santriData, setSantriData] = useState([]);
-            const [jadwalData, setJadwalData] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [submitting, setSubmitting] = useState(false);
-
-            const nextFriday = useMemo(() => helper.getNextFriday(), []);
-            const weekNumber = useMemo(() => {
-                let week = helper.getWeekOfMonth(nextFriday);
-                return week > 4 ? '4' : week.toString();
-            }, [nextFriday]);
-
-            const initialForm = { santri_id: '', keperluan: '', tujuan: '', wali_safar: '', hubungan_wali: '', hubungan_lainnya: '', ikut_jadwal_saudara: false, saudara_santri_id: '', keterangan_luar_jadwal: '' };
-            const [form, setForm] = useState(initialForm);
-
-            useEffect(() => {
-                const fetchDeps = async () => {
-                    try {
-                        const [resSantri, resJadwal] = await Promise.all([
-                            apiService.request('getSantri'),
-                            apiService.request('getJadwal')
-                        ]);
-                        setSantriData(resSantri.data.filter(s => s.status === 'Aktif'));
-                        setJadwalData(resJadwal.data);
-                    } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
-                };
-                fetchDeps();
-            }, []);
-
-            const selectedSantri = useMemo(() => santriData.find(s => s.santri_id === form.santri_id), [santriData, form.santri_id]);
-            const selectedSaudara = useMemo(() => santriData.find(s => s.santri_id === form.saudara_santri_id), [santriData, form.saudara_santri_id]);
-            
-            const statusJadwal = useMemo(() => {
-                if (!selectedSantri || jadwalData.length === 0) return null;
-                const targetSantri = (form.ikut_jadwal_saudara && selectedSaudara) ? selectedSaudara : selectedSantri;
-                const rule = jadwalData.find(j => j.pekan === weekNumber);
-                if (!rule) return 'Di Luar Jadwal';
-                return (targetSantri.jenjang === rule.jenjang && targetSantri.jk === rule.gender) ? 'Sesuai Jadwal' : 'Di Luar Jadwal';
-            }, [selectedSantri, selectedSaudara, form.ikut_jadwal_saudara, jadwalData, weekNumber]);
-
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                if (statusJadwal === 'Di Luar Jadwal' && !form.keterangan_luar_jadwal) return showToast("Keterangan Di Luar Jadwal wajib diisi!", "error");
-                if (form.hubungan_wali === 'Lainnya' && !form.hubungan_lainnya) return showToast("Detail hubungan Lainnya wajib diisi!", "error");
-                if (form.ikut_jadwal_saudara && !form.saudara_santri_id) return showToast("Pilih santri saudara yang diikuti jadwalnya!", "error");
-
-                setSubmitting(true);
-                try {
-                    const payload = { ...form, nama_santri: selectedSantri.nama, kelas: selectedSantri.kelas, tanggal_izin: helper.formatDate(nextFriday), status_jadwal: statusJadwal };
-                    await apiService.request('savePermit', payload);
-                    showToast('Pengajuan berhasil dikirim! Menunggu approval.', 'success');
-                    setForm(initialForm);
-                    setCurrentRoute('histori');
-                } catch (e) { showToast(e.message, 'error'); } finally { setSubmitting(false); }
-            };
-
-            const santriOptions = santriData.filter(s => user.role !== ROLES.WALI_KELAS || s.kelas === user.kelas_id || true).map(s => ({ value: s.santri_id, label: `${s.nama} (${s.kelas})` }));
-            const hubunganOptions = ['Ayah', 'Ibu', 'Kakak Kandung', 'Adik Kandung', 'Kakek', 'Nenek', 'Paman', 'Bibi', 'Saudara', 'Wali', 'Lainnya'];
-
-            if (loading) return <div className="p-8 text-center text-gray-500 animate-pulse">Menyiapkan Form (Membaca data dari Google Sheets)...</div>;
-
-            return (
-                <div className="space-y-6 animate-fade-in-down max-w-4xl">
-                    <div><h2 className="text-2xl font-bold text-gray-800">Ajukan Izin Keluar</h2><p className="text-gray-500">Sistem otomatis menghitung penjadwalan pekan ini berdasarkan identitas santri.</p></div>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <Card><h3 className="text-lg font-bold text-gray-700 border-b pb-2 mb-4">1. Identitas Santri</h3><Select name="santri_id" label="Pilih Santri di Kelas Anda" required options={santriOptions} value={form.santri_id} onChange={(e) => setForm({...form, santri_id: e.target.value})} />{selectedSantri && (<div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4 grid grid-cols-3 gap-4 text-sm mt-4"><div><p className="text-gray-500">Jenjang</p><p className="font-bold text-emerald-800">{selectedSantri.jenjang}</p></div><div><p className="text-gray-500">Kelas</p><p className="font-bold text-emerald-800">{selectedSantri.kelas}</p></div><div><p className="text-gray-500">Gender</p><p className="font-bold text-emerald-800">{selectedSantri.jk}</p></div></div>)}</Card>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6"><Card><h3 className="text-lg font-bold text-gray-700 border-b pb-2 mb-4">2. Detail Perizinan</h3><div className="mb-4"><label className="block text-sm font-medium text-gray-700 mb-1">Keperluan Izin <span className="text-red-500">*</span></label><textarea required rows="2" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none" value={form.keperluan} onChange={(e) => setForm({...form, keperluan: e.target.value})} placeholder="Contoh: Menghadiri pernikahan keluarga"></textarea></div><Input label="Tujuan Keluar (Tempat/Kota)" required value={form.tujuan} onChange={(e) => setForm({...form, tujuan: e.target.value})} placeholder="Contoh: Bandung" /></Card><Card><h3 className="text-lg font-bold text-gray-700 border-b pb-2 mb-4">3. Wali Safar (Penjemput)</h3><Input label="Nama Wali Safar" required value={form.wali_safar} onChange={(e) => setForm({...form, wali_safar: e.target.value})} placeholder="Nama penjemput" /><Select label="Hubungan Wali Safar" required options={hubunganOptions} value={form.hubungan_wali} onChange={(e) => setForm({...form, hubungan_wali: e.target.value})} />{form.hubungan_wali === 'Lainnya' && (<Input label="Detail Hubungan Lainnya" required value={form.hubungan_lainnya} onChange={(e) => setForm({...form, hubungan_lainnya: e.target.value})} placeholder="Sebutkan hubungannya..." />)}</Card></div>
-                        {selectedSantri && (<Card className={statusJadwal === 'Sesuai Jadwal' ? 'border-emerald-300 ring-1 ring-emerald-300' : 'border-yellow-400 ring-1 ring-yellow-400'}><div className="flex flex-col md:flex-row justify-between items-start gap-4 border-b pb-4 mb-4"><div><h3 className="text-lg font-bold text-gray-800">4. Analisis Penjadwalan</h3><p className="text-sm text-gray-600 mt-1">Tanggal Izin: <strong className="text-gray-900">{helper.formatDate(nextFriday)}</strong> (Pekan {weekNumber})</p></div><div className={`px-4 py-2 rounded-full font-bold text-sm ${statusJadwal === 'Sesuai Jadwal' ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'}`}>Status: {statusJadwal}</div></div><div className="space-y-4"><label className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"><input type="checkbox" className="w-5 h-5 text-emerald-600 rounded" checked={form.ikut_jadwal_saudara} onChange={(e) => setForm({...form, ikut_jadwal_saudara: e.target.checked, saudara_santri_id: ''})} /><span className="font-medium text-gray-700">Mengikuti Jadwal Kakak / Adik</span></label>{form.ikut_jadwal_saudara && (<div className="pl-8 p-4 bg-blue-50 border border-blue-100 rounded-lg animate-fade-in-down"><Select label="Pilih Santri Saudara" options={santriData.filter(s => s.santri_id !== form.santri_id).map(s => ({value: s.santri_id, label: `${s.nama} (${s.kelas} - ${s.jk})`}))} value={form.saudara_santri_id} onChange={(e) => setForm({...form, saudara_santri_id: e.target.value})} />{selectedSaudara && <p className="text-xs text-blue-700 mt-1">Sistem menggunakan jadwal <strong>{selectedSaudara.jenjang} - {selectedSaudara.jk}</strong>.</p>}</div>)}{statusJadwal === 'Di Luar Jadwal' && (<div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg"><label className="block text-sm font-bold text-yellow-800 mb-2">Karena izin di luar jadwal, wajib mengisi alasan berikut:</label><textarea required rows="2" className="w-full px-4 py-2 rounded-lg border border-yellow-300 focus:ring-2 focus:ring-yellow-500 outline-none" value={form.keterangan_luar_jadwal} onChange={(e) => setForm({...form, keterangan_luar_jadwal: e.target.value})} placeholder="Alasan izin di luar pekan yang ditentukan..."></textarea></div>)}</div></Card>)}
-                        <Button type="submit" disabled={!selectedSantri || submitting} fullWidth className="py-4 text-lg shadow-lg">{submitting ? 'Memproses ke Database...' : 'Kirim Pengajuan Izin'}</Button>
-                    </form>
-                </div>
-            );
-        };
-
-        const HistoriKelasPage = () => {
-            const { showToast } = useContext(ToastContext);
-            const [permits, setPermits] = useState([]);
-            const [loading, setLoading] = useState(true);
-
-            useEffect(() => {
-                const fetchPermits = async () => {
-                    try { const res = await apiService.request('getPermits'); setPermits(res.data); } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
-                };
-                fetchPermits();
-            }, []);
-
-            const getStatusBadge = (status) => {
-                const styles = { 'MENUNGGU_APPROVAL': 'bg-yellow-100 text-yellow-800 border-yellow-200', 'DISETUJUI': 'bg-emerald-100 text-emerald-800 border-emerald-200', 'DITOLAK': 'bg-red-100 text-red-800 border-red-200' };
-                return <span className={`px-2 py-1 text-xs font-bold rounded-full border ${styles[status] || 'bg-gray-100'}`}>{status.replace('_', ' ')}</span>;
-            };
-
-            return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div><h2 className="text-2xl font-bold text-gray-800">Histori Pengajuan Kelas</h2><p className="text-gray-500">Pantau status approval perizinan yang telah diajukan.</p></div>
-                    <Card>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
-                                <thead><tr className="bg-gray-50 text-gray-700 border-b"><th className="p-4 font-semibold">Tgl Izin</th><th className="p-4 font-semibold">Nama Santri</th><th className="p-4 font-semibold">Keperluan & Tujuan</th><th className="p-4 font-semibold">Wali Safar</th><th className="p-4 font-semibold">Status</th><th className="p-4 font-semibold">Aksi</th></tr></thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {loading ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Memuat data dari server...</td></tr> : 
-                                     permits.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Belum ada histori pengajuan.</td></tr> :
-                                     permits.map((p, idx) => (
-                                        <tr key={idx} className="hover:bg-gray-50"><td className="p-4 font-medium text-gray-800">{p.tanggal_izin}</td><td className="p-4"><p className="font-bold text-gray-700">{p.nama_santri}</p><p className="text-xs text-gray-500">{p.kelas}</p></td><td className="p-4"><p className="text-gray-800 truncate w-48">{p.keperluan}</p><p className="text-xs text-gray-500">Tujuan: {p.tujuan}</p></td><td className="p-4 text-gray-600">{p.wali_safar} ({p.hubungan_wali})</td><td className="p-4">{getStatusBadge(p.status_pengajuan)}</td><td className="p-4">{p.status_pengajuan === 'DISETUJUI' ? <button className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-medium hover:bg-emerald-700">QR Code</button> : <span className="text-xs text-gray-400 italic">Menunggu</span>}</td></tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Card>
-                </div>
-            );
-        };
-
-        // --- PHASE 6 COMPONENTS ---
-        const DashboardSecretary = () => {
-            const { showToast } = useContext(ToastContext);
-            const [stats, setStats] = useState({ total_pekan: 0, disetujui_pekan: 0, ditolak_pekan: 0, menunggu_pekan: 0, sudah_keluar: 0, sudah_kembali: 0, masih_di_luar: 0, terlambat: 0, total_bulan: 0 });
-            const [loading, setLoading] = useState(true);
-            const [lastUpdate, setLastUpdate] = useState(new Date());
-
-            const fetchStats = async () => {
-                try {
-                    const res = await apiService.request('getDashboardStats');
-                    setStats(res.data);
-                    setLastUpdate(new Date());
-                } catch (e) { console.error(e); } finally { setLoading(false); }
-            };
-
-            // Polling every 30 seconds
-            useEffect(() => {
-                fetchStats();
-                const interval = setInterval(fetchStats, 30000);
-                return () => clearInterval(interval);
-            }, []);
-
-            return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div className="flex justify-between items-end">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-800">Dashboard Sekretaris</h2>
-                            {/* WAKTU DIPERSIMPEL: 11:47 */}
-                            <p className="text-sm text-gray-500 mt-1">Update terakhir: {lastUpdate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
-                        </div>
-                        <Button variant="secondary" onClick={() => { setLoading(true); fetchStats(); }} icon={<Icons.Clock />}>{loading ? 'Menyinkronkan...' : 'Refresh Manual'}</Button>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <StatCard title="Total Izin (Bulan Ini)" value={stats.total_bulan} icon={<Icons.Calendar />} color="bg-blue-50 text-blue-600" />
-                        <StatCard title="Menunggu Approval" value={stats.menunggu_pekan} icon={<Icons.FileText />} color="bg-yellow-50 text-yellow-600" />
-                        <StatCard title="Disetujui (Pekan Ini)" value={stats.disetujui_pekan} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
-                        <StatCard title="Ditolak (Pekan Ini)" value={stats.ditolak_pekan} icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6 border-t pt-6">
-                        <StatCard title="Sudah Keluar" value={stats.sudah_keluar} icon={<Icons.Scan />} color="bg-gray-100 text-gray-600" />
-                        <StatCard title="Sudah Kembali" value={stats.sudah_kembali} icon={<Icons.Home />} color="bg-emerald-100 text-emerald-700" />
-                        <StatCard title="Masih Di Luar" value={stats.masih_di_luar} icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600" />
-                        <StatCard title="Terlambat (Bulan Ini)" value={stats.terlambat} icon={<Icons.Clock />} color="bg-red-100 text-red-700" />
-                    </div>
-                </div>
-            );
-        };
-
-        const ScreeningIzinPage = () => {
-            const { user } = useContext(AuthContext);
-            const { showToast } = useContext(ToastContext);
-            const [permits, setPermits] = useState([]);
-            const [santriList, setSantriList] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [selectedPermit, setSelectedPermit] = useState(null);
-            const [rejectReason, setRejectReason] = useState('');
-            const [processing, setProcessing] = useState(false);
-
-            const fetchPermits = async () => {
-                setLoading(true);
-                try {
-                    // SEKALIGUS MENGAMBIL DATA SANTRI UNTUK NAMA SAUDARA
-                    const [resPermits, resSantri] = await Promise.all([
-                        apiService.request('getPermits'),
-                        apiService.request('getSantri')
-                    ]);
-                    
-                    setPermits(resPermits.data.filter(p => p.status_pengajuan === 'MENUNGGU_APPROVAL'));
-                    setSantriList(resSantri.data);
-                } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
-            };
-            useEffect(() => { fetchPermits(); }, []);
-
-            const handleAction = async (action) => {
-                if (action === 'REJECT' && !rejectReason) return showToast("Alasan penolakan wajib diisi!", "error");
-                if (action === 'APPROVE' && !confirm("Yakin menyetujui izin ini? QR Code akan otomatis diterbitkan.")) return;
-
-                setProcessing(true);
-                try {
-                    const payload = { permit_id: selectedPermit.permit_id, action, alasan: rejectReason, username: user.nama };
-                    const res = await apiService.request('processApproval', payload);
-                    showToast(res.message, 'success');
-                    setSelectedPermit(null);
-                    setRejectReason('');
-                    fetchPermits();
-                } catch (e) { showToast(e.message, 'error'); } finally { setProcessing(false); }
-            };
-
-            return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div><h2 className="text-2xl font-bold text-gray-800">Screening Perizinan</h2><p className="text-gray-500">Tinjau dan berikan persetujuan untuk santri yang akan keluar.</p></div>
-                    
-                    {loading ? <div className="p-12 text-center text-gray-500">Membaca antrean izin dari server...</div> :
-                     permits.length === 0 ? <div className="p-12 text-center bg-white rounded-xl border border-dashed border-gray-300 text-gray-500">Yeay! Tidak ada antrean perizinan saat ini.</div> :
-                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {permits.map((p, idx) => (
-                            <Card key={idx} className="flex flex-col justify-between border-l-4 border-yellow-400">
-                                <div>
-                                    <div className="flex justify-between items-start mb-4 border-b pb-4">
-                                        <div>
-                                            <h3 className="text-xl font-bold text-gray-900">{p.nama_santri}</h3>
-                                            <p className="text-sm text-gray-500">{p.kelas} • Tgl Izin: <strong>{p.tanggal_izin}</strong></p>
-                                        </div>
-                                        <span className={`px-3 py-1 text-xs font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                                            {p.status_jadwal}
-                                        </span>
-                                    </div>
-                                    <div className="space-y-2 text-sm text-gray-700 mb-6">
-                                        <p><span className="text-gray-500 w-24 inline-block">Keperluan:</span> <strong>{p.keperluan}</strong></p>
-                                        <p><span className="text-gray-500 w-24 inline-block">Tujuan:</span> <strong>{p.tujuan}</strong></p>
-                                        <p><span className="text-gray-500 w-24 inline-block">Penjemput:</span> <strong>{p.wali_safar} ({p.hubungan_wali})</strong></p>
-                                        
-                                        {p.status_jadwal === 'Di Luar Jadwal' && (
-                                            <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg">
-                                                <p className="text-red-800 text-xs font-bold mb-1">ALASAN DI LUAR JADWAL:</p>
-                                                <p className="text-red-700 italic">{p.keterangan_luar_jadwal}</p>
-                                            </div>
-                                        )}
-                                        {p.ikut_jadwal_saudara === 'Ya' && (
-                                            <div className="mt-2 p-2 bg-blue-50 text-blue-800 rounded-lg text-xs font-medium">
-                                                {/* LOGIKA MENAMPILKAN NAMA SAUDARA BUKAN ID */}
-                                                {(() => {
-                                                    const saudara = santriList.find(s => s.santri_id === p.saudara_santri_id);
-                                                    return saudara 
-                                                        ? `Ikut jadwal saudara: ${saudara.nama} (${saudara.kelas})` 
-                                                        : `Ikut jadwal saudara (ID: ${p.saudara_santri_id})`;
-                                                })()}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <Button fullWidth onClick={() => setSelectedPermit(p)}>Tindak Lanjut</Button>
-                            </Card>
-                        ))}
-                     </div>
-                    }
-
-                    {/* MODAL APPROVAL/REJECTION */}
-                    <Modal isOpen={!!selectedPermit} onClose={() => setSelectedPermit(null)} title="Tindak Lanjut Izin">
-                        {selectedPermit && (
-                            <div className="space-y-6">
-                                <div className="bg-gray-50 p-4 rounded-lg">
-                                    <p className="text-sm text-gray-500 mb-1">Konfirmasi izin untuk:</p>
-                                    <p className="text-lg font-bold text-gray-900">{selectedPermit.nama_santri} ({selectedPermit.kelas})</p>
-                                </div>
-                                
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Jika Anda MENOLAK, tuliskan alasannya di sini:</label>
-                                    <textarea 
-                                        rows="3" 
-                                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500 outline-none" 
-                                        placeholder="Contoh: Kuota izin bulan ini sudah habis, Alasan kurang jelas..."
-                                        value={rejectReason}
-                                        onChange={(e) => setRejectReason(e.target.value)}
-                                    ></textarea>
-                                </div>
-                                
-                                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                                    <Button variant="danger" disabled={processing} onClick={() => handleAction('REJECT')}>Tolak Izin</Button>
-                                    <Button disabled={processing} onClick={() => handleAction('APPROVE')}>Setujui & Buat QR</Button>
-                                </div>
-                            </div>
-                        )}
-                    </Modal>
-                </div>
-            );
-        };
-
-        const DashboardAdmin = () => (
-            <div className="space-y-6">
-                <div><h2 className="text-2xl font-bold text-gray-800">Dashboard Admin</h2><p className="text-gray-500">Ringkasan perizinan pondok.</p></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><StatCard title="Total Pengajuan" value="-" icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" /><StatCard title="Santri Keluar" value="-" icon={<Icons.Scan />} color="bg-yellow-50 text-yellow-600" /><StatCard title="Santri Kembali" value="-" icon={<Icons.Users />} color="bg-emerald-50 text-emerald-600" /><StatCard title="Terlambat" value="-" icon={<Icons.Settings />} color="bg-red-50 text-red-600" /></div>
-            </div>
-        );
-
-        const LoginPage = () => {
-            const { login } = useContext(AuthContext);
-            const { showToast } = useContext(ToastContext);
-            const [username, setUsername] = useState('');
-            const [password, setPassword] = useState('');
-            const [loading, setLoading] = useState(false);
-
-            const handleSubmit = async (e) => {
-                e.preventDefault(); setLoading(true);
-                try {
-                    const res = await apiService.request('login', { username, password });
-                    if (!res.data || !res.data.role) throw new Error("Login gagal. Periksa kembali backend/role.");
-                    login(res.data);
-                    showToast(`Selamat datang, ${res.data.nama}`, 'success');
-                } catch (err) { showToast(err.message, 'error'); } finally { setLoading(false); }
-            };
-
-            return (
-                <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-                    <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-                        <div className="mx-auto w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center text-white mb-4 shadow-lg shadow-emerald-200"><Icons.FileText /></div>
-                        <h2 className="text-3xl font-extrabold text-gray-900">PPM Al-Islam</h2>
-                        <p className="mt-2 text-sm text-gray-600">Sistem Management Perizinan Keluar Santri</p>
-                    </div>
-                    <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-                        <Card className="py-8 px-4 sm:px-10">
-                            <form className="space-y-6" onSubmit={handleSubmit}>
-                                <Input name="username" label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="Misal: admin, walikelas, sekretaris" />
-                                <Input name="password" label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="123" />
-                                <Button type="submit" fullWidth disabled={loading}>{loading ? 'Memverifikasi...' : 'Masuk ke Sistem'}</Button>
-                            </form>
-                        </Card>
-                    </div>
-                </div>
-            );
-        };
-
-        const MainRouter = ({ currentRoute, setCurrentRoute }) => {
-            const { user } = useContext(AuthContext);
-
-            if (currentRoute === 'dashboard') {
-                if (user.role === ROLES.ADMIN) return <DashboardAdmin />;
-                if (user.role === ROLES.SEKRETARIS_MUDIR) return <DashboardSecretary />;
-                if (user.role === ROLES.WALI_KELAS) return (<div className="space-y-6"><div><h2 className="text-2xl font-bold text-gray-800">Dashboard Wali Kelas</h2></div><Button onClick={() => setCurrentRoute('pengajuan')} icon={<Icons.Plus />}>Buat Pengajuan Baru</Button></div>);
-            }
-            
-            // ADMIN MENU ROUTING
-            if (currentRoute === 'master_santri' && user.role === ROLES.ADMIN) return <MasterSantriPage />;
-            if (currentRoute === 'master_kelas' && user.role === ROLES.ADMIN) return <MasterKelasPage />;
-            if (currentRoute === 'tahun_pelajaran' && user.role === ROLES.ADMIN) return <TahunPelajaranPage />;
-            if (currentRoute === 'kenaikan_kelas' && user.role === ROLES.ADMIN) return <KenaikanKelasPage />;
-            if (currentRoute === 'jadwal_perizinan' && user.role === ROLES.ADMIN) return <JadwalPerizinanPage />;
-            
-            // WALI KELAS MENU ROUTING
-            if (currentRoute === 'pengajuan' && user.role === ROLES.WALI_KELAS) return <AjukanIzinPage setCurrentRoute={setCurrentRoute} />;
-            if (currentRoute === 'histori' && user.role === ROLES.WALI_KELAS) return <HistoriKelasPage />;
-
-            // SEKRETARIS MENU ROUTING
-            if (currentRoute === 'screening' && user.role === ROLES.SEKRETARIS_MUDIR) return <ScreeningIzinPage />;
-            
-            return (
-                <div className="flex flex-col items-center justify-center py-20 text-center">
-                    <Icons.FileText />
-                    <h3 className="mt-4 text-lg font-medium text-gray-900">Modul {currentRoute}</h3>
-                    <p className="mt-1 text-gray-500">Modul ini akan dibangun pada fase pengembangan berikutnya.</p>
-                </div>
-            );
-        };
-
-        function App() {
-            const [user, setUser] = useState(null);
-            const [toast, setToast] = useState(null);
-            const showToast = (message, type = 'success') => setToast({ message, type });
-
-            return (
-                <ToastContext.Provider value={{ showToast }}>
-                    <AuthContext.Provider value={{ user, login: setUser, logout: () => setUser(null) }}>
-                        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-                        {!user ? <LoginPage /> : <Layout><MainRouter /></Layout>}
-                    </AuthContext.Provider>
-                </ToastContext.Provider>
-            );
-        }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+                            const aktif = resTp.data
