@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Perizinan Santri Al-Islam</title>
-    
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
@@ -231,6 +233,99 @@
         };
 
         // --- PHASE 2 COMPONENTS ---
+        const QrCardModal = ({ isOpen, onClose, permit }) => {
+            const qrRef = React.useRef(null);
+            const cardRef = React.useRef(null);
+            const [isDownloading, setIsDownloading] = useState(false);
+
+            useEffect(() => {
+                if (isOpen && permit && qrRef.current) {
+                    qrRef.current.innerHTML = '';
+                    new QRCode(qrRef.current, {
+                        text: permit.qr_token || permit.permit_id, 
+                        width: 128,
+                        height: 128,
+                        colorDark : "#065f46",
+                        colorLight : "#ffffff",
+                        correctLevel : QRCode.CorrectLevel.H
+                    });
+                }
+            }, [isOpen, permit]);
+
+            const handleDownload = async () => {
+                if (!cardRef.current) return;
+                setIsDownloading(true);
+                try {
+                    const canvas = await html2canvas(cardRef.current, { scale: 2, useCORS: true });
+                    const link = document.createElement('a');
+                    link.download = `Izin_${permit.nama_santri.replace(/\s+/g, '_')}_${permit.tanggal_izin}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                } catch (err) {
+                    console.error("Gagal mendownload QR", err);
+                    alert("Gagal mengunduh gambar.");
+                } finally {
+                    setIsDownloading(false);
+                }
+            };
+
+            if (!isOpen || !permit) return null;
+
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in-down">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm flex flex-col overflow-hidden">
+                        <div className="px-4 py-3 border-b flex justify-between items-center bg-gray-50">
+                            <h3 className="font-bold text-gray-800">Kartu Perizinan</h3>
+                            <button onClick={onClose} className="text-gray-400 hover:text-red-500"><Icons.XCircle /></button>
+                        </div>
+                        
+                        {/* Area yang akan di-screenshot HTML2Canvas */}
+                        <div className="p-6 bg-gray-100 flex justify-center">
+                            <div ref={cardRef} className="bg-white p-6 rounded-xl shadow-sm border-2 border-emerald-500 w-full relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-full h-2 bg-emerald-500"></div>
+                                <div className="text-center mb-4 mt-2">
+                                    <h4 className="font-bold text-emerald-800 leading-tight">PONDOK PESANTREN<br/>MODERN AL-ISLAM</h4>
+                                    <p className="text-xs text-gray-500 mt-1 uppercase font-semibold tracking-wider">Perizinan Keluar Santri</p>
+                                </div>
+                                
+                                <div className="border-t border-b border-gray-100 py-3 mb-4 space-y-2">
+                                    <div>
+                                        <p className="text-[10px] text-gray-400 uppercase">Nama Santri</p>
+                                        <p className="font-bold text-gray-800 text-sm leading-tight">{permit.nama_santri}</p>
+                                        <p className="text-xs text-emerald-600 font-medium">{permit.kelas}</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <p className="text-[10px] text-gray-400 uppercase">Tanggal</p>
+                                            <p className="font-semibold text-gray-700 text-xs">{permit.tanggal_izin}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-gray-400 uppercase">Jam Resmi</p>
+                                            <p className="font-bold text-emerald-600 text-xs">08.00 - 16.00</p>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] text-gray-400 uppercase">Wali Safar</p>
+                                        <p className="font-semibold text-gray-700 text-xs">{permit.wali_safar} ({permit.hubungan_wali})</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col items-center justify-center">
+                                    <div ref={qrRef} className="p-2 border rounded-lg bg-white mb-2"></div>
+                                    <p className="text-[10px] text-gray-400 text-center leading-tight">Tunjukkan QR Code ini kepada<br/>Security saat keluar dan kembali.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="p-4 bg-white">
+                            <Button fullWidth onClick={handleDownload} disabled={isDownloading} icon={<Icons.FileText />}>
+                                {isDownloading ? 'Memproses Gambar...' : 'Download PNG'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
         const MasterSantriPage = () => {
             const { showToast } = useContext(ToastContext);
             const [data, setData] = useState([]);
@@ -667,6 +762,7 @@
             const { showToast } = useContext(ToastContext);
             const [permits, setPermits] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [selectedQrPermit, setSelectedQrPermit] = useState(null); // State untuk memanggil modal
 
             useEffect(() => {
                 const fetchPermits = async () => {
@@ -691,12 +787,20 @@
                                     {loading ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Memuat data dari server...</td></tr> : 
                                      permits.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Belum ada histori pengajuan.</td></tr> :
                                      permits.map((p, idx) => (
-                                        <tr key={idx} className="hover:bg-gray-50"><td className="p-4 font-medium text-gray-800">{p.tanggal_izin}</td><td className="p-4"><p className="font-bold text-gray-700">{p.nama_santri}</p><p className="text-xs text-gray-500">{p.kelas}</p></td><td className="p-4"><p className="text-gray-800 truncate w-48">{p.keperluan}</p><p className="text-xs text-gray-500">Tujuan: {p.tujuan}</p></td><td className="p-4 text-gray-600">{p.wali_safar} ({p.hubungan_wali})</td><td className="p-4">{getStatusBadge(p.status_pengajuan)}</td><td className="p-4">{p.status_pengajuan === 'DISETUJUI' ? <button className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-medium hover:bg-emerald-700">QR Code</button> : <span className="text-xs text-gray-400 italic">Menunggu</span>}</td></tr>
+                                        <tr key={idx} className="hover:bg-gray-50"><td className="p-4 font-medium text-gray-800">{p.tanggal_izin}</td><td className="p-4"><p className="font-bold text-gray-700">{p.nama_santri}</p><p className="text-xs text-gray-500">{p.kelas}</p></td><td className="p-4"><p className="text-gray-800 truncate w-48">{p.keperluan}</p><p className="text-xs text-gray-500">Tujuan: {p.tujuan}</p></td><td className="p-4 text-gray-600">{p.wali_safar} ({p.hubungan_wali})</td><td className="p-4">{getStatusBadge(p.status_pengajuan)}</td>
+                                        <td className="p-4">
+                                            {p.status_pengajuan === 'DISETUJUI' ? 
+                                                <button onClick={() => setSelectedQrPermit(p)} className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-medium hover:bg-emerald-700 shadow-sm transition-colors cursor-pointer">Lihat QR</button> 
+                                                : <span className="text-xs text-gray-400 italic">Menunggu</span>
+                                            }
+                                        </td></tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
                     </Card>
+                    {/* Render Modal QR */}
+                    <QrCardModal isOpen={!!selectedQrPermit} onClose={() => setSelectedQrPermit(null)} permit={selectedQrPermit} />
                 </div>
             );
         };
