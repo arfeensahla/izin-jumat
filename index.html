@@ -9,33 +9,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f9fafb;
-        }
-        /* Custom scrollbar untuk tabel */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1; 
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1; 
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8; 
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #f9fafb; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         @keyframes fadeInDown {
             from { opacity: 0; transform: translateY(-10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .animate-fade-in-down {
-            animation: fadeInDown 0.3s ease-out forwards;
-        }
+        .animate-fade-in-down { animation: fadeInDown 0.3s ease-out forwards; }
     </style>
 
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -49,7 +32,7 @@
         const { useState, useEffect, createContext, useContext, useMemo } = React;
 
         const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbyddspvXA3vpGmDpHYjm5-uOlbEdSbDTYygeHsNv192SokqVrEKwBxiZAkYXVscTomM/exec';
-        const USE_MOCK_API = false; // Diubah ke false agar menggunakan GAS asli milik Anda
+        const USE_MOCK_API = false;
 
         const ROLES = {
             ADMIN: 'ADMIN',
@@ -73,7 +56,8 @@
             Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>,
             Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>,
             Calendar: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>,
-            Grid: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            Grid: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>,
+            TrendingUp: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
         };
 
         const AuthContext = createContext(null);
@@ -81,40 +65,19 @@
 
         const apiService = {
             request: async (action, payload) => {
-                if (USE_MOCK_API) {
-                    return new Promise((resolve, reject) => {
-                        setTimeout(() => {
-                            if (action === 'login') {
-                                if (payload.username === 'admin') resolve({ success: true, data: { user_id: 'U1', nama: 'Admin', role: ROLES.ADMIN } });
-                                else reject(new Error("Mock Login Failed"));
-                            } else if (action === 'getSantri') {
-                                resolve({ success: true, data: [
-                                    { santri_id: 'S001', nama: 'Ahmad Fulan', jk: 'Laki-laki', jenjang: 'SMP', kelas: 'VII-A', kota_asal: 'Cirebon', nama_ayah: 'Budi', no_telp: '0812' }
-                                ]});
-                            } else {
-                                resolve({ success: true, data: {} });
-                            }
-                        }, 800);
-                    });
-                }
-
                 try {
                     const response = await fetch(API_BASE_URL, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Wajib text/plain untuk GAS CORS
-                        body: JSON.stringify({ action, ...payload }),
-                        redirect: 'follow'
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action, ...payload })
                     });
-                    
                     const text = await response.text();
                     let data;
                     try {
                         data = JSON.parse(text);
                     } catch (e) {
-                        console.error("Bukan JSON:", text);
-                        throw new Error("Gagal terhubung. Pastikan Google Apps Script sudah di 'New Deployment'.");
+                        throw new Error("Gagal terhubung ke server. Pastikan GAS di-deploy Versi Baru.");
                     }
-
                     if (!data.success) throw new Error(data.message || 'Terjadi kesalahan dari server.');
                     return data;
                 } catch (error) {
@@ -124,11 +87,9 @@
             }
         };
 
-        const Card = ({ children, className = "" }) => (
-            <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 ${className}`}>{children}</div>
-        );
-
-        const Button = ({ children, onClick, variant = 'primary', className = "", disabled, type="button", fullWidth }) => {
+        const Card = ({ children, className = "" }) => <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 ${className}`}>{children}</div>;
+        
+        const Button = ({ children, onClick, variant = 'primary', className = "", disabled, type="button", fullWidth, icon }) => {
             const baseStyle = "px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2";
             const variants = {
                 primary: "bg-emerald-600 hover:bg-emerald-700 text-white focus:ring-emerald-500",
@@ -137,7 +98,7 @@
             };
             return (
                 <button type={type} onClick={onClick} disabled={disabled} className={`${baseStyle} ${variants[variant]} ${fullWidth ? 'w-full' : ''} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
-                    {children}
+                    {icon} {children}
                 </button>
             );
         };
@@ -145,15 +106,7 @@
         const Input = ({ label, type = "text", value, onChange, placeholder, required, name }) => (
             <div className="mb-4">
                 {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
-                <input
-                    name={name}
-                    type={type}
-                    value={value}
-                    onChange={onChange}
-                    placeholder={placeholder}
-                    required={required}
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-                />
+                <input name={name} type={type} value={value} onChange={onChange} placeholder={placeholder} required={required} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" />
             </div>
         );
 
@@ -162,9 +115,7 @@
                 {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
                 <select name={name} value={value} onChange={onChange} required={required} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white">
                     <option value="">-- Pilih --</option>
-                    {options.map((opt, idx) => (
-                        <option key={idx} value={opt}>{opt}</option>
-                    ))}
+                    {options.map((opt, idx) => <option key={idx} value={opt}>{opt}</option>)}
                 </select>
             </div>
         );
@@ -184,7 +135,6 @@
                 const timer = setTimeout(onClose, 4000);
                 return () => clearTimeout(timer);
             }, [onClose]);
-
             return (
                 <div className="fixed top-4 right-4 z-50 animate-fade-in-down">
                     <div className={`flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg text-white ${type === 'error' ? 'bg-red-500' : 'bg-gray-800'}`}>
@@ -196,12 +146,8 @@
         };
 
         const SidebarItem = ({ icon: Icon, label, active, onClick }) => (
-            <button
-                onClick={onClick}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${active ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
-            >
-                <Icon />
-                <span>{label}</span>
+            <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${active ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}>
+                <Icon /> <span>{label}</span>
             </button>
         );
 
@@ -211,8 +157,6 @@
             const [currentRoute, setCurrentRoute] = useState('dashboard');
 
             if (!user) return null;
-
-            // Proteksi aman dari error jika backend memberikan respon role yang salah
             const safeRole = user?.role || 'UNKNOWN';
 
             const menuItems = {
@@ -221,6 +165,7 @@
                     { id: 'master_santri', label: 'Data Santri', icon: Icons.Users },
                     { id: 'master_kelas', label: 'Data Kelas', icon: Icons.Grid },
                     { id: 'tahun_pelajaran', label: 'Tahun Pelajaran', icon: Icons.Calendar },
+                    { id: 'kenaikan_kelas', label: 'Kenaikan Kelas', icon: Icons.TrendingUp },
                     { id: 'perizinan', label: 'Semua Perizinan', icon: Icons.FileText },
                     { id: 'settings', label: 'Pengaturan', icon: Icons.Settings },
                 ],
@@ -245,9 +190,7 @@
                 <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
                     <div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center sticky top-0 z-20">
                         <div className="font-bold text-emerald-700">Al-Islam Permit</div>
-                        <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-600">
-                            <Icons.Menu />
-                        </button>
+                        <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-600"><Icons.Menu /></button>
                     </div>
 
                     <div className={`fixed md:static inset-y-0 left-0 w-64 bg-white border-r transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out z-30 flex flex-col`}>
@@ -261,21 +204,12 @@
                                 <p className="text-xs text-emerald-600 mt-1 uppercase tracking-wider font-bold">{safeRole.replace('_', ' ')}</p>
                             </div>
                             {currentMenu.length > 0 ? currentMenu.map(item => (
-                                <SidebarItem
-                                    key={item.id}
-                                    icon={item.icon}
-                                    label={item.label}
-                                    active={currentRoute === item.id}
-                                    onClick={() => { setCurrentRoute(item.id); setSidebarOpen(false); }}
-                                />
-                            )) : (
-                                <p className="text-red-500 text-sm px-4">Error Role: Menu tidak tersedia.</p>
-                            )}
+                                <SidebarItem key={item.id} icon={item.icon} label={item.label} active={currentRoute === item.id} onClick={() => { setCurrentRoute(item.id); setSidebarOpen(false); }} />
+                            )) : <p className="text-red-500 text-sm px-4">Error Role: Menu tidak tersedia.</p>}
                         </div>
                         <div className="p-4 border-t">
                             <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-red-600 hover:bg-red-50 transition-colors">
-                                <Icons.LogOut />
-                                <span className="font-medium">Keluar</span>
+                                <Icons.LogOut /> <span className="font-medium">Keluar</span>
                             </button>
                         </div>
                     </div>
@@ -302,9 +236,7 @@
             const [formData, setFormData] = useState(initialForm);
             const [saving, setSaving] = useState(false);
 
-            useEffect(() => {
-                fetchSantri();
-            }, []);
+            useEffect(() => { fetchSantri(); }, []);
 
             const fetchSantri = async () => {
                 setLoading(true);
@@ -323,32 +255,22 @@
             }, [santri, search]);
 
             const handleOpenModal = (data = null) => {
-                if (data) {
-                    setEditingData(data);
-                    setFormData(data);
-                } else {
-                    setEditingData(null);
-                    setFormData(initialForm);
-                }
+                if (data) { setEditingData(data); setFormData(data); } 
+                else { setEditingData(null); setFormData(initialForm); }
                 setIsModalOpen(true);
             };
-
-            const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 setSaving(true);
                 try {
-                    // Panggil API saveSantri
                     await apiService.request('saveSantri', formData);
                     showToast('Data santri berhasil disimpan!', 'success');
                     setIsModalOpen(false);
-                    fetchSantri(); // Refresh table
+                    fetchSantri();
                 } catch (err) {
                     showToast(err.message, 'error');
-                } finally {
-                    setSaving(false);
-                }
+                } finally { setSaving(false); }
             };
 
             return (
@@ -358,21 +280,14 @@
                             <h2 className="text-2xl font-bold text-gray-800">Master Data Santri</h2>
                             <p className="text-gray-500">Kelola informasi santri aktif pondok pesantren.</p>
                         </div>
-                        <Button onClick={() => handleOpenModal()} icon={<Icons.Plus />}>
-                            <Icons.Plus /> Tambah Santri
-                        </Button>
+                        <Button onClick={() => handleOpenModal()}>+ Tambah Santri</Button>
                     </div>
 
                     <Card>
                         <div className="flex mb-4 items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200 w-full md:w-1/3">
                             <Icons.Search />
-                            <input 
-                                type="text" placeholder="Cari nama atau kelas..." 
-                                className="bg-transparent border-none outline-none w-full text-sm"
-                                value={search} onChange={(e) => setSearch(e.target.value)}
-                            />
+                            <input type="text" placeholder="Cari nama atau kelas..." className="bg-transparent border-none outline-none w-full text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
                         </div>
-
                         <div className="overflow-x-auto rounded-lg border border-gray-200">
                             <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
                                 <thead>
@@ -386,34 +301,25 @@
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {loading ? (
-                                        <tr><td colSpan="6" className="p-8 text-center text-gray-500">Memuat data dari Google Sheets...</td></tr>
-                                    ) : filteredSantri.length === 0 ? (
-                                        <tr><td colSpan="6" className="p-8 text-center text-gray-500">Tidak ada data ditemukan.</td></tr>
-                                    ) : (
-                                        filteredSantri.map(s => (
-                                            <tr key={s.santri_id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="p-4 font-medium text-gray-800">{s.nama}</td>
-                                                <td className="p-4 text-gray-600">{s.jk === 'Laki-laki' ? 'L' : 'P'}</td>
-                                                <td className="p-4"><span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">{s.jenjang} - {s.kelas}</span></td>
-                                                <td className="p-4 text-gray-600">{s.kota_asal}</td>
-                                                <td className="p-4">
-                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${s.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                                                        {s.status}
-                                                    </span>
-                                                </td>
-                                                <td className="p-4 flex justify-center gap-2">
-                                                    <button onClick={() => handleOpenModal(s)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Icons.Edit /></button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
+                                    {loading ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Memuat data dari Google Sheets...</td></tr>
+                                    : filteredSantri.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Tidak ada data ditemukan.</td></tr>
+                                    : filteredSantri.map(s => (
+                                        <tr key={s.santri_id} className="hover:bg-gray-50">
+                                            <td className="p-4 font-medium text-gray-800">{s.nama}</td>
+                                            <td className="p-4 text-gray-600">{s.jk === 'Laki-laki' ? 'L' : 'P'}</td>
+                                            <td className="p-4"><span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">{s.jenjang} - {s.kelas}</span></td>
+                                            <td className="p-4 text-gray-600">{s.kota_asal}</td>
+                                            <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-medium ${s.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{s.status}</span></td>
+                                            <td className="p-4 flex justify-center gap-2">
+                                                <button onClick={() => handleOpenModal(s)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Icons.Edit /></button>
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
                     </Card>
 
-                    {/* MODAL FORM TAMBAH/EDIT */}
                     {isModalOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
                             <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-fade-in-down">
@@ -423,25 +329,23 @@
                                 </div>
                                 <div className="p-6 overflow-y-auto max-h-[70vh]">
                                     <form id="santriForm" onSubmit={handleSubmit} className="space-y-4">
-                                        <Input name="nama" label="Nama Lengkap Santri" required value={formData.nama} onChange={handleChange} />
+                                        <Input name="nama" label="Nama Lengkap Santri" required value={formData.nama} onChange={(e) => setFormData({...formData, nama: e.target.value})} />
                                         <div className="grid grid-cols-2 gap-4">
-                                            <Select name="jk" label="Jenis Kelamin" required options={['Laki-laki', 'Perempuan']} value={formData.jk} onChange={handleChange} />
-                                            <Select name="jenjang" label="Jenjang" required options={['SMP', 'SMA']} value={formData.jenjang} onChange={handleChange} />
+                                            <Select name="jk" label="Jenis Kelamin" required options={['Laki-laki', 'Perempuan']} value={formData.jk} onChange={(e) => setFormData({...formData, jk: e.target.value})} />
+                                            <Select name="jenjang" label="Jenjang" required options={['SMP', 'SMA']} value={formData.jenjang} onChange={(e) => setFormData({...formData, jenjang: e.target.value})} />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <Input name="kelas" label="Kelas (Contoh: VII-A)" required value={formData.kelas} onChange={handleChange} />
-                                            <Input name="kota_asal" label="Kota Asal" required value={formData.kota_asal} onChange={handleChange} />
+                                            <Input name="kelas" label="Kelas (Contoh: VII-A)" required value={formData.kelas} onChange={(e) => setFormData({...formData, kelas: e.target.value})} />
+                                            <Input name="kota_asal" label="Kota Asal" required value={formData.kota_asal} onChange={(e) => setFormData({...formData, kota_asal: e.target.value})} />
                                         </div>
-                                        <Input name="nama_ayah" label="Nama Ayah" required value={formData.nama_ayah} onChange={handleChange} />
-                                        <Input name="no_telp" label="Nomor Telepon (WA)" required value={formData.no_telp} onChange={handleChange} />
-                                        <Select name="status" label="Status Santri" required options={['Aktif', 'Nonaktif', 'Lulus']} value={formData.status} onChange={handleChange} />
+                                        <Input name="nama_ayah" label="Nama Ayah" required value={formData.nama_ayah} onChange={(e) => setFormData({...formData, nama_ayah: e.target.value})} />
+                                        <Input name="no_telp" label="Nomor Telepon (WA)" required value={formData.no_telp} onChange={(e) => setFormData({...formData, no_telp: e.target.value})} />
+                                        <Select name="status" label="Status Santri" required options={['Aktif', 'Nonaktif', 'Lulus']} value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} />
                                     </form>
                                 </div>
                                 <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
                                     <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Batal</Button>
-                                    <Button type="submit" onClick={(e) => { e.preventDefault(); document.getElementById('santriForm').requestSubmit(); }} disabled={saving}>
-                                        {saving ? 'Menyimpan...' : 'Simpan Data'}
-                                    </Button>
+                                    <Button type="submit" onClick={(e) => { e.preventDefault(); document.getElementById('santriForm').requestSubmit(); }} disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan Data'}</Button>
                                 </div>
                             </div>
                         </div>
@@ -465,9 +369,7 @@
                 try {
                     const res = await apiService.request('getTahunPelajaran');
                     setData(res.data || []);
-                } catch (err) {
-                    showToast(err.message, 'error');
-                } finally { setLoading(false); }
+                } catch (err) { showToast(err.message, 'error'); } finally { setLoading(false); }
             };
 
             const handleSubmit = async (e) => {
@@ -476,11 +378,8 @@
                 try {
                     await apiService.request('saveTahunPelajaran', formData);
                     showToast('Tahun Pelajaran berhasil disimpan!', 'success');
-                    setIsModalOpen(false);
-                    fetchTahunPelajaran();
-                } catch (err) {
-                    showToast(err.message, 'error');
-                } finally { setSaving(false); }
+                    setIsModalOpen(false); fetchTahunPelajaran();
+                } catch (err) { showToast(err.message, 'error'); } finally { setSaving(false); }
             };
 
             return (
@@ -490,43 +389,28 @@
                             <h2 className="text-2xl font-bold text-gray-800">Tahun Pelajaran</h2>
                             <p className="text-gray-500">Kelola periode akademik pondok pesantren.</p>
                         </div>
-                        <Button onClick={() => { setFormData({ tp_id: '', nama_periode: '', status: 'Arsip' }); setIsModalOpen(true); }} icon={<Icons.Plus />}>
-                            <Icons.Plus /> Tambah Periode
-                        </Button>
+                        <Button onClick={() => { setFormData({ tp_id: '', nama_periode: '', status: 'Arsip' }); setIsModalOpen(true); }}>+ Tambah Periode</Button>
                     </div>
                     <Card>
-                        <div className="overflow-x-auto rounded-lg border border-gray-200">
-                            <table className="w-full text-left border-collapse text-sm">
-                                <thead>
-                                    <tr className="bg-gray-100 text-gray-700">
-                                        <th className="p-4 font-semibold">Tahun Pelajaran</th>
-                                        <th className="p-4 font-semibold">Status</th>
-                                        <th className="p-4 font-semibold text-center">Aksi</th>
+                        <table className="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-gray-100 text-gray-700">
+                                    <th className="p-4 font-semibold">Tahun Pelajaran</th>
+                                    <th className="p-4 font-semibold">Status</th>
+                                    <th className="p-4 font-semibold text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {loading ? <tr><td colSpan="3" className="p-8 text-center text-gray-500">Memuat data dari Google Sheets...</td></tr>
+                                : data.map(item => (
+                                    <tr key={item.tp_id} className="hover:bg-gray-50">
+                                        <td className="p-4 font-medium text-gray-800">{item.nama_periode}</td>
+                                        <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-medium ${item.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>{item.status}</span></td>
+                                        <td className="p-4 flex justify-center"><button onClick={() => { setFormData(item); setIsModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Icons.Edit /></button></td>
                                     </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {loading ? (
-                                        <tr><td colSpan="3" className="p-8 text-center text-gray-500">Memuat data dari Google Sheets...</td></tr>
-                                    ) : data.length === 0 ? (
-                                        <tr><td colSpan="3" className="p-8 text-center text-gray-500">Belum ada data.</td></tr>
-                                    ) : (
-                                        data.map(item => (
-                                            <tr key={item.tp_id} className="hover:bg-gray-50">
-                                                <td className="p-4 font-medium text-gray-800">{item.nama_periode}</td>
-                                                <td className="p-4">
-                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${item.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
-                                                        {item.status}
-                                                    </span>
-                                                </td>
-                                                <td className="p-4 flex justify-center">
-                                                    <button onClick={() => { setFormData(item); setIsModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Icons.Edit /></button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                ))}
+                            </tbody>
+                        </table>
                     </Card>
 
                     {isModalOpen && (
@@ -542,9 +426,7 @@
                                 </form>
                                 <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
                                     <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Batal</Button>
-                                    <Button type="submit" onClick={(e) => { e.preventDefault(); document.getElementById('tpForm').requestSubmit(); }} disabled={saving}>
-                                        {saving ? 'Menyimpan...' : 'Simpan Data'}
-                                    </Button>
+                                    <Button type="submit" onClick={(e) => { e.preventDefault(); document.getElementById('tpForm').requestSubmit(); }} disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan Data'}</Button>
                                 </div>
                             </div>
                         </div>
@@ -568,9 +450,7 @@
                 try {
                     const res = await apiService.request('getKelas');
                     setData(res.data || []);
-                } catch (err) {
-                    showToast(err.message, 'error');
-                } finally { setLoading(false); }
+                } catch (err) { showToast(err.message, 'error'); } finally { setLoading(false); }
             };
 
             const handleSubmit = async (e) => {
@@ -579,11 +459,8 @@
                 try {
                     await apiService.request('saveKelas', formData);
                     showToast('Kelas berhasil disimpan!', 'success');
-                    setIsModalOpen(false);
-                    fetchKelas();
-                } catch (err) {
-                    showToast(err.message, 'error');
-                } finally { setSaving(false); }
+                    setIsModalOpen(false); fetchKelas();
+                } catch (err) { showToast(err.message, 'error'); } finally { setSaving(false); }
             };
 
             return (
@@ -591,43 +468,32 @@
                     <div className="flex justify-between items-center">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800">Master Kelas</h2>
-                            <p className="text-gray-500">Kelola data kelas dan rombongan belajar.</p>
+                            <p className="text-gray-500">Daftar kelas dan penetapan wali kelas.</p>
                         </div>
-                        <Button onClick={() => { setFormData({ kelas_id: '', nama_kelas: '', jenjang: 'SMP', wali_kelas: '' }); setIsModalOpen(true); }} icon={<Icons.Plus />}>
-                            <Icons.Plus /> Tambah Kelas
-                        </Button>
+                        <Button onClick={() => { setFormData({ kelas_id: '', nama_kelas: '', jenjang: 'SMP', wali_kelas: '' }); setIsModalOpen(true); }}>+ Tambah Kelas</Button>
                     </div>
                     <Card>
-                        <div className="overflow-x-auto rounded-lg border border-gray-200">
-                            <table className="w-full text-left border-collapse text-sm">
-                                <thead>
-                                    <tr className="bg-gray-100 text-gray-700">
-                                        <th className="p-4 font-semibold">Nama Kelas</th>
-                                        <th className="p-4 font-semibold">Jenjang</th>
-                                        <th className="p-4 font-semibold">Wali Kelas</th>
-                                        <th className="p-4 font-semibold text-center">Aksi</th>
+                        <table className="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-gray-100 text-gray-700">
+                                    <th className="p-4 font-semibold">Nama Kelas</th>
+                                    <th className="p-4 font-semibold">Jenjang</th>
+                                    <th className="p-4 font-semibold">Wali Kelas</th>
+                                    <th className="p-4 font-semibold text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {loading ? <tr><td colSpan="4" className="p-8 text-center text-gray-500">Memuat data dari Google Sheets...</td></tr>
+                                : data.map(item => (
+                                    <tr key={item.kelas_id} className="hover:bg-gray-50">
+                                        <td className="p-4 font-medium text-gray-800">{item.nama_kelas}</td>
+                                        <td className="p-4">{item.jenjang}</td>
+                                        <td className="p-4">{item.wali_kelas}</td>
+                                        <td className="p-4 flex justify-center"><button onClick={() => { setFormData(item); setIsModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Icons.Edit /></button></td>
                                     </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {loading ? (
-                                        <tr><td colSpan="4" className="p-8 text-center text-gray-500">Memuat data dari Google Sheets...</td></tr>
-                                    ) : data.length === 0 ? (
-                                        <tr><td colSpan="4" className="p-8 text-center text-gray-500">Belum ada data.</td></tr>
-                                    ) : (
-                                        data.map(item => (
-                                            <tr key={item.kelas_id} className="hover:bg-gray-50">
-                                                <td className="p-4 font-medium text-gray-800">{item.nama_kelas}</td>
-                                                <td className="p-4"><span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">{item.jenjang}</span></td>
-                                                <td className="p-4 text-gray-600">{item.wali_kelas || '-'}</td>
-                                                <td className="p-4 flex justify-center">
-                                                    <button onClick={() => { setFormData(item); setIsModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Icons.Edit /></button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                ))}
+                            </tbody>
+                        </table>
                     </Card>
 
                     {isModalOpen && (
@@ -637,20 +503,151 @@
                                     <h3 className="text-xl font-bold text-gray-800">{formData.kelas_id ? 'Edit Kelas' : 'Tambah Kelas'}</h3>
                                     <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><Icons.XCircle /></button>
                                 </div>
-                                <form id="kelasForm" onSubmit={handleSubmit} className="p-6 space-y-4">
+                                <form id="klsForm" onSubmit={handleSubmit} className="p-6 space-y-4">
                                     <Input name="nama_kelas" label="Nama Kelas (Contoh: VII-A)" required value={formData.nama_kelas} onChange={(e) => setFormData({...formData, nama_kelas: e.target.value})} />
                                     <Select name="jenjang" label="Jenjang" required options={['SMP', 'SMA']} value={formData.jenjang} onChange={(e) => setFormData({...formData, jenjang: e.target.value})} />
-                                    <Input name="wali_kelas" label="Nama Wali Kelas" value={formData.wali_kelas} onChange={(e) => setFormData({...formData, wali_kelas: e.target.value})} />
+                                    <Input name="wali_kelas" label="Nama Wali Kelas" required value={formData.wali_kelas} onChange={(e) => setFormData({...formData, wali_kelas: e.target.value})} />
                                 </form>
                                 <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
                                     <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Batal</Button>
-                                    <Button type="submit" onClick={(e) => { e.preventDefault(); document.getElementById('kelasForm').requestSubmit(); }} disabled={saving}>
-                                        {saving ? 'Menyimpan...' : 'Simpan Data'}
-                                    </Button>
+                                    <Button type="submit" onClick={(e) => { e.preventDefault(); document.getElementById('klsForm').requestSubmit(); }} disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan Data'}</Button>
                                 </div>
                             </div>
                         </div>
                     )}
+                </div>
+            );
+        };
+
+        const KenaikanKelasPage = () => {
+            const { showToast } = useContext(ToastContext);
+            const [santri, setSantri] = useState([]);
+            const [kelas, setKelas] = useState([]);
+            const [tp, setTp] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [selectedTp, setSelectedTp] = useState('');
+            const [changes, setChanges] = useState({});
+            const [saving, setSaving] = useState(false);
+            const [massFrom, setMassFrom] = useState('');
+            const [massTo, setMassTo] = useState('');
+
+            useEffect(() => { fetchData(); }, []);
+
+            const fetchData = async () => {
+                setLoading(true);
+                try {
+                    const [resSantri, resKelas, resTp] = await Promise.all([ apiService.request('getSantri'), apiService.request('getKelas'), apiService.request('getTahunPelajaran') ]);
+                    setSantri((resSantri.data || []).filter(s => s.status === 'Aktif'));
+                    setKelas(resKelas.data || []);
+                    setTp(resTp.data || []);
+                    const aktifTp = (resTp.data || []).find(t => t.status === 'Aktif');
+                    if (aktifTp) setSelectedTp(aktifTp.tp_id);
+                } catch (err) { showToast(err.message, 'error'); } finally { setLoading(false); }
+            };
+
+            const handleMassUpdate = () => {
+                if (!massFrom || !massTo) return showToast('Pilih kelas asal dan tujuan untuk mass update', 'error');
+                const newChanges = { ...changes };
+                let count = 0;
+                santri.forEach(s => {
+                    if (s.kelas === massFrom) { newChanges[s.santri_id] = { kelas_baru: massTo, status_baru: 'Aktif' }; count++; }
+                });
+                setChanges(newChanges);
+                showToast(`${count} santri ditandai naik ke kelas ${massTo}`, 'success');
+            };
+
+            const handleSimpan = async () => {
+                if (!selectedTp) return showToast('Pilih Tahun Pelajaran target!', 'error');
+                const mutations = Object.keys(changes).map(id => ({ santri_id: id, tp_id: selectedTp, kelas_baru: changes[id].kelas_baru, status_baru: changes[id].status_baru }));
+                if (mutations.length === 0) return showToast('Belum ada perubahan data.', 'error');
+                if (!confirm(`Anda yakin memproses ${mutations.length} data santri ke Spreadsheet?`)) return;
+                
+                setSaving(true);
+                try {
+                    await apiService.request('saveKenaikanKelas', { mutations });
+                    showToast('Proses kenaikan kelas berhasil disimpan permanen!', 'success');
+                    setChanges({}); fetchData();
+                } catch (err) { showToast(err.message, 'error'); } finally { setSaving(false); }
+            };
+
+            return (
+                <div className="space-y-6 animate-fade-in-down">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">Proses Kenaikan Kelas</h2>
+                        <p className="text-gray-500">Pindahkan santri secara massal ke kelas baru tanpa menghapus histori lama.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Card>
+                            <h3 className="font-semibold text-gray-700 mb-4">1. Pilih Tahun Pelajaran Target</h3>
+                            <select className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500" value={selectedTp} onChange={(e) => setSelectedTp(e.target.value)}>
+                                <option value="">-- Pilih Tahun Pelajaran --</option>
+                                {tp.map(t => <option key={t.tp_id} value={t.tp_id}>{t.nama_periode} ({t.status})</option>)}
+                            </select>
+                            <p className="text-xs text-gray-500 mt-2">Data ini digunakan untuk log rekam jejak histori kelas.</p>
+                        </Card>
+                        
+                        <Card>
+                            <h3 className="font-semibold text-gray-700 mb-4">2. Alat Ubah Massal</h3>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                <select className="flex-1 px-3 py-2 border rounded-lg text-sm outline-none" value={massFrom} onChange={e => setMassFrom(e.target.value)}>
+                                    <option value="">-- Dari Kelas --</option>
+                                    {kelas.map(k => <option key={k.kelas_id} value={k.nama_kelas}>{k.nama_kelas}</option>)}
+                                </select>
+                                <select className="flex-1 px-3 py-2 border rounded-lg text-sm outline-none" value={massTo} onChange={e => setMassTo(e.target.value)}>
+                                    <option value="">-- Ke Kelas --</option>
+                                    {kelas.map(k => <option key={k.kelas_id} value={k.nama_kelas}>{k.nama_kelas}</option>)}
+                                </select>
+                                <Button onClick={handleMassUpdate} className="text-sm py-2 px-6">Terapkan</Button>
+                            </div>
+                        </Card>
+                    </div>
+
+                    <Card>
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+                            <h3 className="font-semibold text-gray-700">3. Preview & Koreksi Manual</h3>
+                            <Button onClick={handleSimpan} disabled={saving || Object.keys(changes).length === 0}>{saving ? 'Menyimpan ke Database...' : `Simpan ${Object.keys(changes).length} Perubahan`}</Button>
+                        </div>
+                        
+                        <div className="overflow-x-auto rounded-lg border border-gray-200">
+                            <table className="w-full text-left border-collapse text-sm">
+                                <thead>
+                                    <tr className="bg-gray-100 text-gray-700">
+                                        <th className="p-4 font-semibold">Nama Santri</th>
+                                        <th className="p-4 font-semibold">Kelas Lama</th>
+                                        <th className="p-4 font-semibold">Pindah Ke Kelas</th>
+                                        <th className="p-4 font-semibold">Status Baru</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {loading ? <tr><td colSpan="4" className="p-8 text-center text-gray-500">Memuat data dari Google Sheets...</td></tr>
+                                    : santri.map(s => {
+                                        const isChanged = !!changes[s.santri_id];
+                                        const currentData = changes[s.santri_id] || { kelas_baru: s.kelas, status_baru: s.status };
+                                        return (
+                                            <tr key={s.santri_id} className={isChanged ? 'bg-emerald-50/50' : 'hover:bg-gray-50 transition-colors'}>
+                                                <td className="p-4 font-medium text-gray-800">{s.nama} {isChanged && <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">Diedit</span>}</td>
+                                                <td className="p-4 text-gray-500">{s.kelas}</td>
+                                                <td className="p-4">
+                                                    <select className={`w-full px-2 py-1 border rounded text-sm outline-none ${isChanged ? 'border-emerald-300 bg-white' : 'border-gray-200 bg-gray-50'}`} value={currentData.kelas_baru} onChange={e => setChanges({...changes, [s.santri_id]: {...currentData, kelas_baru: e.target.value}})}>
+                                                        <option value={s.kelas}>{s.kelas} (Tetap)</option>
+                                                        {kelas.map(k => <option key={k.kelas_id} value={k.nama_kelas}>{k.nama_kelas}</option>)}
+                                                    </select>
+                                                </td>
+                                                <td className="p-4">
+                                                    <select className={`w-full px-2 py-1 border rounded text-sm outline-none ${isChanged ? 'border-emerald-300 bg-white' : 'border-gray-200 bg-gray-50'}`} value={currentData.status_baru} onChange={e => setChanges({...changes, [s.santri_id]: {...currentData, status_baru: e.target.value}})}>
+                                                        <option value="Aktif">Aktif</option>
+                                                        <option value="Lulus">Lulus</option>
+                                                        <option value="Nonaktif">Nonaktif</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
                 </div>
             );
         };
@@ -667,10 +664,6 @@
                     <StatCard title="Santri Kembali" value="0" icon={<Icons.Users />} color="bg-emerald-50 text-emerald-600" />
                     <StatCard title="Terlambat" value="0" icon={<Icons.Settings />} color="bg-red-50 text-red-600" />
                 </div>
-                <Card>
-                    <h3 className="font-semibold text-lg mb-4">Integrasi Google Sheets Terhubung</h3>
-                    <p className="text-gray-600 text-sm">Dashboard statistik akan diaktifkan setelah tabel PERIZINAN dan SCAN_LOG selesai dirancang di Phase berikutnya.</p>
-                </Card>
             </div>
         );
 
@@ -682,44 +675,28 @@
             const [loading, setLoading] = useState(false);
 
             const handleSubmit = async (e) => {
-                e.preventDefault();
-                setLoading(true);
+                e.preventDefault(); setLoading(true);
                 try {
                     const res = await apiService.request('login', { username, password });
-                    
-                    // PROTEKSI: Mencegah layar putih jika Backend (GAS) memberikan data kosong
-                    if (!res.data || !res.data.role) {
-                        throw new Error("Login ditolak oleh server. Harap pastikan Code.gs sudah di-Deploy ulang (New deployment) di Google Apps Script.");
-                    }
-
+                    if (!res.data || !res.data.role) throw new Error("Login ditolak. Pastikan GAS di-deploy Versi Baru.");
                     login(res.data);
                     showToast(`Selamat datang, ${res.data.nama}`, 'success');
-                } catch (err) {
-                    showToast(err.message, 'error');
-                } finally {
-                    setLoading(false);
-                }
+                } catch (err) { showToast(err.message, 'error'); } finally { setLoading(false); }
             };
 
             return (
                 <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
                     <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-                        <div className="mx-auto w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center text-white mb-4 shadow-lg shadow-emerald-200">
-                            <Icons.FileText />
-                        </div>
+                        <div className="mx-auto w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center text-white mb-4 shadow-lg shadow-emerald-200"><Icons.FileText /></div>
                         <h2 className="text-3xl font-extrabold text-gray-900">PPM Al-Islam</h2>
                         <p className="mt-2 text-sm text-gray-600">Sistem Management Perizinan Keluar Santri</p>
                     </div>
-
                     <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
                         <Card className="py-8 px-4 sm:px-10">
                             <form className="space-y-6" onSubmit={handleSubmit}>
-                                <Input name="username" label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="Masukkan username" />
-                                <Input name="password" label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" />
-                                
-                                <Button type="submit" fullWidth disabled={loading}>
-                                    {loading ? 'Memverifikasi...' : 'Masuk ke Sistem'}
-                                </Button>
+                                <Input name="username" label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="admin" />
+                                <Input name="password" label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="123" />
+                                <Button type="submit" fullWidth disabled={loading}>{loading ? 'Memverifikasi...' : 'Masuk ke Sistem'}</Button>
                             </form>
                         </Card>
                     </div>
@@ -730,23 +707,11 @@
         const MainRouter = ({ currentRoute }) => {
             const { user } = useContext(AuthContext);
 
-            if (currentRoute === 'dashboard') {
-                switch (user.role) {
-                    case ROLES.ADMIN: return <DashboardAdmin />;
-                    case ROLES.SEKRETARIS_MUDIR: return <div className="p-4">Dashboard Sekretaris Belum Aktif</div>;
-                    default: return <div className="p-4">Dashboard Role Ini Belum Aktif</div>;
-                }
-            }
-
-            if (currentRoute === 'master_santri' && user.role === ROLES.ADMIN) {
-                return <DataSantriPage />;
-            }
-            if (currentRoute === 'master_kelas' && user.role === ROLES.ADMIN) {
-                return <MasterKelasPage />;
-            }
-            if (currentRoute === 'tahun_pelajaran' && user.role === ROLES.ADMIN) {
-                return <TahunPelajaranPage />;
-            }
+            if (currentRoute === 'dashboard') return user.role === ROLES.ADMIN ? <DashboardAdmin /> : <div className="p-4">Dashboard Role Ini Belum Aktif</div>;
+            if (currentRoute === 'master_santri' && user.role === ROLES.ADMIN) return <DataSantriPage />;
+            if (currentRoute === 'master_kelas' && user.role === ROLES.ADMIN) return <MasterKelasPage />;
+            if (currentRoute === 'tahun_pelajaran' && user.role === ROLES.ADMIN) return <TahunPelajaranPage />;
+            if (currentRoute === 'kenaikan_kelas' && user.role === ROLES.ADMIN) return <KenaikanKelasPage />;
             
             return (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -760,27 +725,13 @@
         function App() {
             const [user, setUser] = useState(null);
             const [toast, setToast] = useState(null);
-
             const showToast = (message, type = 'success') => setToast({ message, type });
-
-            const authValue = {
-                user,
-                login: (userData) => setUser(userData),
-                logout: () => setUser(null)
-            };
 
             return (
                 <ToastContext.Provider value={{ showToast }}>
-                    <AuthContext.Provider value={authValue}>
+                    <AuthContext.Provider value={{ user, login: setUser, logout: () => setUser(null) }}>
                         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-                        
-                        {!user ? (
-                            <LoginPage />
-                        ) : (
-                            <Layout>
-                                <MainRouter />
-                            </Layout>
-                        )}
+                        {!user ? <LoginPage /> : <Layout><MainRouter /></Layout>}
                     </AuthContext.Provider>
                 </ToastContext.Provider>
             );
