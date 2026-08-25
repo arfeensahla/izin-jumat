@@ -31,7 +31,10 @@
     <script type="text/babel">
         const { useState, useEffect, createContext, useContext, useMemo } = React;
 
+        // MASUKKAN URL BACKEND ANDA DI SINI (JANGAN DIHAPUS)
         const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbyddspvXA3vpGmDpHYjm5-uOlbEdSbDTYygeHsNv192SokqVrEKwBxiZAkYXVscTomM/exec';
+        
+        // MATIKAN MOCK KARENA BACKEND SUDAH TERSAMBUNG
         const USE_MOCK_API = false;
 
         const ROLES = {
@@ -57,7 +60,8 @@
             Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>,
             Calendar: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>,
             Grid: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>,
-            TrendingUp: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+            TrendingUp: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>,
+            Clock: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
         };
 
         const AuthContext = createContext(null);
@@ -65,6 +69,17 @@
 
         const apiService = {
             request: async (action, payload) => {
+                if (USE_MOCK_API) {
+                    return new Promise((resolve, reject) => {
+                        setTimeout(() => {
+                            if (action === 'login') {
+                                if (payload.username === 'admin' && payload.password === '123') resolve({ success: true, data: { user_id: 'U001', username: 'admin', nama: 'Administrator', role: ROLES.ADMIN } });
+                                else reject(new Error("Username atau password salah"));
+                            } else resolve({ success: true, data: {} });
+                        }, 800);
+                    });
+                }
+                
                 try {
                     const response = await fetch(API_BASE_URL, {
                         method: 'POST',
@@ -76,7 +91,7 @@
                     try {
                         data = JSON.parse(text);
                     } catch (e) {
-                        throw new Error("Gagal terhubung ke server. Pastikan GAS di-deploy Versi Baru.");
+                        throw new Error("Gagal membaca respon server. URL Backend mungkin tidak valid.");
                     }
                     if (!data.success) throw new Error(data.message || 'Terjadi kesalahan dari server.');
                     return data;
@@ -103,10 +118,10 @@
             );
         };
 
-        const Input = ({ label, type = "text", value, onChange, placeholder, required, name }) => (
+        const Input = ({ label, type = "text", value, onChange, placeholder, required, name, readOnly }) => (
             <div className="mb-4">
                 {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
-                <input name={name} type={type} value={value} onChange={onChange} placeholder={placeholder} required={required} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" />
+                <input name={name} type={type} value={value} onChange={onChange} placeholder={placeholder} required={required} readOnly={readOnly} className={`w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors ${readOnly ? 'bg-gray-100' : 'bg-white'}`} />
             </div>
         );
 
@@ -159,6 +174,7 @@
             if (!user) return null;
             const safeRole = user?.role || 'UNKNOWN';
 
+            // Ditambahkan Menu Jadwal Perizinan untuk Admin
             const menuItems = {
                 [ROLES.ADMIN]: [
                     { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
@@ -166,6 +182,7 @@
                     { id: 'master_kelas', label: 'Data Kelas', icon: Icons.Grid },
                     { id: 'tahun_pelajaran', label: 'Tahun Pelajaran', icon: Icons.Calendar },
                     { id: 'kenaikan_kelas', label: 'Kenaikan Kelas', icon: Icons.TrendingUp },
+                    { id: 'jadwal_perizinan', label: 'Jadwal Perizinan', icon: Icons.Clock },
                     { id: 'perizinan', label: 'Semua Perizinan', icon: Icons.FileText },
                     { id: 'settings', label: 'Pengaturan', icon: Icons.Settings },
                 ],
@@ -652,6 +669,114 @@
             );
         };
 
+        const JadwalPerizinanPage = () => {
+            const { showToast } = useContext(ToastContext);
+            const [jadwal, setJadwal] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [formData, setFormData] = useState({ jadwal_id: '', pekan: '', jenjang: '', gender: '', hari: 'Jumat', jam_mulai: '', jam_selesai: '' });
+            const [saving, setSaving] = useState(false);
+
+            useEffect(() => { fetchJadwal(); }, []);
+
+            const fetchJadwal = async () => {
+                setLoading(true);
+                try {
+                    const res = await apiService.request('getJadwal');
+                    // Mengurutkan jadwal berdasarkan pekan (1, 2, 3, 4)
+                    const sortedData = (res.data || []).sort((a, b) => parseInt(a.pekan) - parseInt(b.pekan));
+                    setJadwal(sortedData);
+                } catch (err) { showToast(err.message, 'error'); } finally { setLoading(false); }
+            };
+
+            const handleEdit = (data) => {
+                setFormData(data);
+                setIsModalOpen(true);
+            };
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setSaving(true);
+                try {
+                    await apiService.request('saveJadwal', formData);
+                    showToast('Jadwal berhasil diperbarui!', 'success');
+                    setIsModalOpen(false); 
+                    fetchJadwal();
+                } catch (err) { showToast(err.message, 'error'); } finally { setSaving(false); }
+            };
+
+            return (
+                <div className="space-y-6 animate-fade-in-down">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">Jadwal Perizinan (Jumat)</h2>
+                        <p className="text-gray-500">Sistem akan secara otomatis menentukan tanggal perizinan berdasarkan jadwal yang aktif di bawah ini.</p>
+                    </div>
+
+                    <Card>
+                        <div className="overflow-x-auto rounded-lg border border-gray-200">
+                            <table className="w-full text-left border-collapse text-sm">
+                                <thead>
+                                    <tr className="bg-emerald-50 text-emerald-800">
+                                        <th className="p-4 font-semibold">Pekan Ke-</th>
+                                        <th className="p-4 font-semibold">Jenjang</th>
+                                        <th className="p-4 font-semibold">Gender</th>
+                                        <th className="p-4 font-semibold">Hari</th>
+                                        <th className="p-4 font-semibold">Jam Resmi</th>
+                                        <th className="p-4 font-semibold text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 bg-white">
+                                    {loading ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Memuat data konfigurasi jadwal...</td></tr>
+                                    : jadwal.map(item => (
+                                        <tr key={item.jadwal_id} className="hover:bg-gray-50">
+                                            <td className="p-4 font-bold text-gray-800 text-lg">Pekan {item.pekan}</td>
+                                            <td className="p-4"><span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">{item.jenjang}</span></td>
+                                            <td className="p-4 text-gray-600">{item.gender}</td>
+                                            <td className="p-4 text-gray-600 font-medium">{item.hari}</td>
+                                            <td className="p-4 text-gray-600">{item.jam_mulai} - {item.jam_selesai}</td>
+                                            <td className="p-4 flex justify-center">
+                                                <button onClick={() => handleEdit(item)} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors border border-emerald-100 flex items-center gap-1 text-xs font-medium">
+                                                    <Icons.Edit /> Edit Aturan
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+
+                    {isModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+                            <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in-down">
+                                <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                                    <h3 className="text-xl font-bold text-gray-800">Ubah Aturan Pekan {formData.pekan}</h3>
+                                    <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><Icons.XCircle /></button>
+                                </div>
+                                <form id="jadwalForm" onSubmit={handleSubmit} className="p-6 space-y-4">
+                                    <Input name="pekan" label="Pekan Ke-" readOnly value={formData.pekan} />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <Select name="jenjang" label="Jenjang (Target)" required options={['SMP', 'SMA']} value={formData.jenjang} onChange={(e) => setFormData({...formData, jenjang: e.target.value})} />
+                                        <Select name="gender" label="Gender (Target)" required options={['Laki-laki', 'Perempuan']} value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} />
+                                    </div>
+                                    <Select name="hari" label="Hari Penjengukan" required options={['Jumat', 'Sabtu', 'Minggu']} value={formData.hari} onChange={(e) => setFormData({...formData, hari: e.target.value})} />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <Input type="time" name="jam_mulai" label="Jam Mulai" required value={formData.jam_mulai} onChange={(e) => setFormData({...formData, jam_mulai: e.target.value})} />
+                                        <Input type="time" name="jam_selesai" label="Jam Selesai" required value={formData.jam_selesai} onChange={(e) => setFormData({...formData, jam_selesai: e.target.value})} />
+                                    </div>
+                                    <p className="text-xs text-red-500 mt-2">*Catatan: Waktu toleransi kepulangan (misal 16.30) dikonfigurasi terpisah melalui Menu Pengaturan.</p>
+                                </form>
+                                <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+                                    <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Batal</Button>
+                                    <Button type="submit" onClick={(e) => { e.preventDefault(); document.getElementById('jadwalForm').requestSubmit(); }} disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan Perubahan'}</Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
         const DashboardAdmin = () => (
             <div className="space-y-6">
                 <div>
@@ -712,6 +837,7 @@
             if (currentRoute === 'master_kelas' && user.role === ROLES.ADMIN) return <MasterKelasPage />;
             if (currentRoute === 'tahun_pelajaran' && user.role === ROLES.ADMIN) return <TahunPelajaranPage />;
             if (currentRoute === 'kenaikan_kelas' && user.role === ROLES.ADMIN) return <KenaikanKelasPage />;
+            if (currentRoute === 'jadwal_perizinan' && user.role === ROLES.ADMIN) return <JadwalPerizinanPage />;
             
             return (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
