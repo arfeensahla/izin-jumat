@@ -29,8 +29,7 @@
         const { useState, useEffect, createContext, useContext, useMemo } = React;
 
         const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbyddspvXA3vpGmDpHYjm5-uOlbEdSbDTYygeHsNv192SokqVrEKwBxiZAkYXVscTomM/exec';
-        const USE_MOCK_API = false; // SUDAH MENGGUNAKAN DATABASE ASLI
-
+        
         const ROLES = {
             ADMIN: 'ADMIN',
             WALI_KELAS: 'WALI_KELAS',
@@ -63,18 +62,6 @@
 
         const apiService = {
             request: async (action, payload) => {
-                if (USE_MOCK_API) {
-                    return new Promise((resolve, reject) => {
-                        setTimeout(() => {
-                            if (action === 'login') {
-                                if (payload.username === 'admin' && payload.password === '123') resolve({ success: true, data: { user_id: 'U001', username: 'admin', nama: 'Administrator', role: ROLES.ADMIN } });
-                                else if (payload.username === 'walikelas' && payload.password === '123') resolve({ success: true, data: { user_id: 'U002', username: 'walikelas', nama: 'Ust. Ahmad', role: ROLES.WALI_KELAS, kelas_id: 'VII-A' } });
-                                else reject(new Error("Username atau password salah"));
-                            } else resolve({ success: true, data: {} });
-                        }, 800);
-                    });
-                }
-                
                 try {
                     const response = await fetch(API_BASE_URL, {
                         method: 'POST',
@@ -83,7 +70,7 @@
                     });
                     const text = await response.text();
                     let data;
-                    try { data = JSON.parse(text); } catch (e) { throw new Error("Gagal membaca respon server."); }
+                    try { data = JSON.parse(text); } catch (e) { throw new Error("Gagal membaca respon server. Hubungi Admin."); }
                     if (!data.success) throw new Error(data.message || 'Terjadi kesalahan dari server.');
                     return data;
                 } catch (error) {
@@ -185,8 +172,7 @@
                     { id: 'tahun_pelajaran', label: 'Tahun Pelajaran', icon: Icons.Calendar },
                     { id: 'kenaikan_kelas', label: 'Kenaikan Kelas', icon: Icons.TrendingUp },
                     { id: 'jadwal_perizinan', label: 'Jadwal Perizinan', icon: Icons.Clock },
-                    { id: 'perizinan', label: 'Semua Perizinan', icon: Icons.FileText },
-                    { id: 'settings', label: 'Pengaturan', icon: Icons.Settings },
+                    { id: 'perizinan', label: 'Semua Perizinan', icon: Icons.FileText }
                 ],
                 [ROLES.WALI_KELAS]: [
                     { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
@@ -244,6 +230,7 @@
             );
         };
 
+        // --- PHASE 2 COMPONENTS ---
         const MasterSantriPage = () => {
             const { showToast } = useContext(ToastContext);
             const [data, setData] = useState([]);
@@ -288,7 +275,9 @@
                             <table className="w-full text-left text-sm border-collapse whitespace-nowrap">
                                 <thead><tr className="bg-gray-50 border-b"><th className="p-3">ID</th><th className="p-3">Nama</th><th className="p-3">L/P</th><th className="p-3">Jenjang</th><th className="p-3">Kelas</th><th className="p-3">Aksi</th></tr></thead>
                                 <tbody>
-                                    {loading ? <tr><td colSpan="6" className="p-4 text-center">Memuat data...</td></tr> : filteredData.map((item, idx) => (
+                                    {loading ? <tr><td colSpan="6" className="p-4 text-center text-gray-500">Menghubungkan ke Google Sheets...</td></tr> : 
+                                     filteredData.length === 0 ? <tr><td colSpan="6" className="p-4 text-center text-gray-500">Belum ada data. Silakan import dari Excel ke G-Sheets.</td></tr> :
+                                     filteredData.map((item, idx) => (
                                         <tr key={idx} className="border-b hover:bg-gray-50"><td className="p-3 text-gray-500">{item.santri_id}</td><td className="p-3 font-medium">{item.nama}</td><td className="p-3">{item.jk === 'Laki-laki' ? 'L' : 'P'}</td><td className="p-3">{item.jenjang}</td><td className="p-3 font-bold text-emerald-600">{item.kelas}</td><td className="p-3"><button onClick={() => { setFormData(item); setIsModalOpen(true); }} className="p-1 text-blue-600 hover:bg-blue-50 rounded"><Icons.Edit /></button></td></tr>
                                     ))}
                                 </tbody>
@@ -311,10 +300,7 @@
                                 <Input label="No Telepon" value={formData.no_telp || ''} onChange={(e) => setFormData({...formData, no_telp: e.target.value})} required />
                             </div>
                             <Select label="Status" options={['Aktif', 'Nonaktif', 'Lulus']} value={formData.status || 'Aktif'} onChange={(e) => setFormData({...formData, status: e.target.value})} required />
-                            <div className="pt-4 flex justify-end gap-2 border-t">
-                                <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>Batal</Button>
-                                <Button type="submit">Simpan Data</Button>
-                            </div>
+                            <div className="pt-4 flex justify-end gap-2 border-t"><Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>Batal</Button><Button type="submit">Simpan Data</Button></div>
                         </form>
                     </Modal>
                 </div>
@@ -429,6 +415,7 @@
             );
         };
 
+        // --- PHASE 3 COMPONENTS ---
         const KenaikanKelasPage = () => {
             const { showToast } = useContext(ToastContext);
             const [santriData, setSantriData] = useState([]);
@@ -483,9 +470,7 @@
                 if (!confirm("Apakah Anda yakin memproses kenaikan kelas ini? Proses ini akan mencatat histori di database.")) return;
                 setProcessing(true);
                 try {
-                    const payload = {
-                        mutations: previewData.map(d => ({ santri_id: d.santri_id, tp_id: selectedTp, kelas_baru: d.kelas_baru, status_baru: d.status_baru }))
-                    };
+                    const payload = { mutations: previewData.map(d => ({ santri_id: d.santri_id, tp_id: selectedTp, kelas_baru: d.kelas_baru, status_baru: d.status_baru })) };
                     const res = await apiService.request('saveKenaikanKelas', payload);
                     showToast(res.message, 'success');
                     setPreviewData([]);
@@ -524,6 +509,7 @@
             );
         };
 
+        // --- PHASE 4 COMPONENTS ---
         const JadwalPerizinanPage = () => {
             const { showToast } = useContext(ToastContext);
             const [data, setData] = useState([]);
@@ -556,7 +542,7 @@
                         <div><h2 className="text-2xl font-bold text-gray-800">Jadwal Perizinan</h2><p className="text-gray-500">Konfigurasi otomatis jadwal pekanan (Default: Jumat).</p></div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {loading ? <div className="col-span-2 p-8 text-center">Memuat...</div> : data.map((item, idx) => (
+                        {loading ? <div className="col-span-2 p-8 text-center text-gray-500">Memuat Jadwal...</div> : data.map((item, idx) => (
                             <Card key={idx} className="relative overflow-hidden border-l-4 border-emerald-500">
                                 <div className="flex justify-between items-start">
                                     <div>
@@ -586,25 +572,23 @@
             );
         };
 
+        // --- PHASE 5 COMPONENTS ---
         const helper = {
             getNextFriday: () => {
                 const d = new Date();
-                d.setDate(d.getDate() + ((5 + 7 - d.getDay()) % 7 || 7)); // Cari hari Jumat (5)
+                d.setDate(d.getDate() + ((5 + 7 - d.getDay()) % 7 || 7)); // 5 = Jumat
                 return d;
             },
             getWeekOfMonth: (date) => {
                 const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
                 return Math.ceil((date.getDate() + firstDay) / 7);
             },
-            formatDate: (date) => {
-                return date.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            }
+            formatDate: (date) => date.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
         };
 
         const AjukanIzinPage = ({ setCurrentRoute }) => {
             const { user } = useContext(AuthContext);
             const { showToast } = useContext(ToastContext);
-            
             const [santriData, setSantriData] = useState([]);
             const [jadwalData, setJadwalData] = useState([]);
             const [loading, setLoading] = useState(true);
@@ -613,8 +597,7 @@
             const nextFriday = useMemo(() => helper.getNextFriday(), []);
             const weekNumber = useMemo(() => {
                 let week = helper.getWeekOfMonth(nextFriday);
-                if (week > 4) week = 4; // PRD: Capping ke pekan 4
-                return week.toString();
+                return week > 4 ? '4' : week.toString();
             }, [nextFriday]);
 
             const initialForm = { santri_id: '', keperluan: '', tujuan: '', wali_safar: '', hubungan_wali: '', hubungan_lainnya: '', ikut_jadwal_saudara: false, saudara_santri_id: '', keterangan_luar_jadwal: '' };
@@ -627,8 +610,7 @@
                             apiService.request('getSantri'),
                             apiService.request('getJadwal')
                         ]);
-                        const allSantri = resSantri.data.filter(s => s.status === 'Aktif');
-                        setSantriData(allSantri);
+                        setSantriData(resSantri.data.filter(s => s.status === 'Aktif'));
                         setJadwalData(resJadwal.data);
                     } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
                 };
@@ -643,8 +625,7 @@
                 const targetSantri = (form.ikut_jadwal_saudara && selectedSaudara) ? selectedSaudara : selectedSantri;
                 const rule = jadwalData.find(j => j.pekan === weekNumber);
                 if (!rule) return 'Di Luar Jadwal';
-                const isMatch = (targetSantri.jenjang === rule.jenjang) && (targetSantri.jk === rule.gender);
-                return isMatch ? 'Sesuai Jadwal' : 'Di Luar Jadwal';
+                return (targetSantri.jenjang === rule.jenjang && targetSantri.jk === rule.gender) ? 'Sesuai Jadwal' : 'Di Luar Jadwal';
             }, [selectedSantri, selectedSaudara, form.ikut_jadwal_saudara, jadwalData, weekNumber]);
 
             const handleSubmit = async (e) => {
@@ -663,10 +644,10 @@
                 } catch (e) { showToast(e.message, 'error'); } finally { setSubmitting(false); }
             };
 
-            const santriOptions = santriData.filter(s => user.role !== 'WALI_KELAS' || s.kelas === user.kelas_id || true).map(s => ({ value: s.santri_id, label: `${s.nama} (${s.kelas})` }));
+            const santriOptions = santriData.filter(s => user.role !== ROLES.WALI_KELAS || s.kelas === user.kelas_id || true).map(s => ({ value: s.santri_id, label: `${s.nama} (${s.kelas})` }));
             const hubunganOptions = ['Ayah', 'Ibu', 'Kakak Kandung', 'Adik Kandung', 'Kakek', 'Nenek', 'Paman', 'Bibi', 'Saudara', 'Wali', 'Lainnya'];
 
-            if (loading) return <div className="p-8 text-center text-gray-500 animate-pulse">Menyiapkan Form Pengajuan...</div>;
+            if (loading) return <div className="p-8 text-center text-gray-500 animate-pulse">Menyiapkan Form (Membaca data dari Google Sheets)...</div>;
 
             return (
                 <div className="space-y-6 animate-fade-in-down max-w-4xl">
@@ -694,8 +675,8 @@
             }, []);
 
             const getStatusBadge = (status) => {
-                const styles = { 'MENUNGGU_APPROVAL': 'bg-yellow-100 text-yellow-800 border border-yellow-200', 'DISETUJUI': 'bg-emerald-100 text-emerald-800 border border-emerald-200', 'DITOLAK': 'bg-red-100 text-red-800 border border-red-200' };
-                return <span className={`px-2 py-1 text-xs font-bold rounded-full ${styles[status] || 'bg-gray-100'}`}>{status.replace('_', ' ')}</span>;
+                const styles = { 'MENUNGGU_APPROVAL': 'bg-yellow-100 text-yellow-800 border-yellow-200', 'DISETUJUI': 'bg-emerald-100 text-emerald-800 border-emerald-200', 'DITOLAK': 'bg-red-100 text-red-800 border-red-200' };
+                return <span className={`px-2 py-1 text-xs font-bold rounded-full border ${styles[status] || 'bg-gray-100'}`}>{status.replace('_', ' ')}</span>;
             };
 
             return (
@@ -715,6 +696,163 @@
                             </table>
                         </div>
                     </Card>
+                </div>
+            );
+        };
+
+        // --- PHASE 6 COMPONENTS ---
+        const DashboardSecretary = () => {
+            const { showToast } = useContext(ToastContext);
+            const [stats, setStats] = useState({ total_pekan: 0, disetujui_pekan: 0, ditolak_pekan: 0, menunggu_pekan: 0, sudah_keluar: 0, sudah_kembali: 0, masih_di_luar: 0, terlambat: 0, total_bulan: 0 });
+            const [loading, setLoading] = useState(true);
+            const [lastUpdate, setLastUpdate] = useState(new Date());
+
+            const fetchStats = async () => {
+                try {
+                    const res = await apiService.request('getDashboardStats');
+                    setStats(res.data);
+                    setLastUpdate(new Date());
+                } catch (e) { console.error(e); } finally { setLoading(false); }
+            };
+
+            // Polling every 30 seconds
+            useEffect(() => {
+                fetchStats();
+                const interval = setInterval(fetchStats, 30000);
+                return () => clearInterval(interval);
+            }, []);
+
+            return (
+                <div className="space-y-6 animate-fade-in-down">
+                    <div className="flex justify-between items-end">
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-800">Dashboard Sekretaris</h2>
+                            <p className="text-sm text-gray-500 mt-1">Update terakhir: {lastUpdate.toLocaleTimeString('id-ID')}</p>
+                        </div>
+                        <Button variant="secondary" onClick={() => { setLoading(true); fetchStats(); }} icon={<Icons.Clock />}>{loading ? 'Menyinkronkan...' : 'Refresh Manual'}</Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <StatCard title="Total Izin (Bulan Ini)" value={stats.total_bulan} icon={<Icons.Calendar />} color="bg-blue-50 text-blue-600" />
+                        <StatCard title="Menunggu Approval" value={stats.menunggu_pekan} icon={<Icons.FileText />} color="bg-yellow-50 text-yellow-600" />
+                        <StatCard title="Disetujui (Pekan Ini)" value={stats.disetujui_pekan} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
+                        <StatCard title="Ditolak (Pekan Ini)" value={stats.ditolak_pekan} icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6 border-t pt-6">
+                        <StatCard title="Sudah Keluar" value={stats.sudah_keluar} icon={<Icons.Scan />} color="bg-gray-100 text-gray-600" />
+                        <StatCard title="Sudah Kembali" value={stats.sudah_kembali} icon={<Icons.Home />} color="bg-emerald-100 text-emerald-700" />
+                        <StatCard title="Masih Di Luar" value={stats.masih_di_luar} icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600" />
+                        <StatCard title="Terlambat (Bulan Ini)" value={stats.terlambat} icon={<Icons.Clock />} color="bg-red-100 text-red-700" />
+                    </div>
+                </div>
+            );
+        };
+
+        const ScreeningIzinPage = () => {
+            const { user } = useContext(AuthContext);
+            const { showToast } = useContext(ToastContext);
+            const [permits, setPermits] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [selectedPermit, setSelectedPermit] = useState(null);
+            const [rejectReason, setRejectReason] = useState('');
+            const [processing, setProcessing] = useState(false);
+
+            const fetchPermits = async () => {
+                setLoading(true);
+                try {
+                    const res = await apiService.request('getPermits');
+                    // Filter hanya yang menunggu approval
+                    setPermits(res.data.filter(p => p.status_pengajuan === 'MENUNGGU_APPROVAL'));
+                } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
+            };
+            useEffect(() => { fetchPermits(); }, []);
+
+            const handleAction = async (action) => {
+                if (action === 'REJECT' && !rejectReason) return showToast("Alasan penolakan wajib diisi!", "error");
+                if (action === 'APPROVE' && !confirm("Yakin menyetujui izin ini? QR Code akan otomatis diterbitkan.")) return;
+
+                setProcessing(true);
+                try {
+                    const payload = { permit_id: selectedPermit.permit_id, action, alasan: rejectReason, username: user.nama };
+                    const res = await apiService.request('processApproval', payload);
+                    showToast(res.message, 'success');
+                    setSelectedPermit(null);
+                    setRejectReason('');
+                    fetchPermits();
+                } catch (e) { showToast(e.message, 'error'); } finally { setProcessing(false); }
+            };
+
+            return (
+                <div className="space-y-6 animate-fade-in-down">
+                    <div><h2 className="text-2xl font-bold text-gray-800">Screening Perizinan</h2><p className="text-gray-500">Tinjau dan berikan persetujuan untuk santri yang akan keluar.</p></div>
+                    
+                    {loading ? <div className="p-12 text-center text-gray-500">Membaca antrean izin dari server...</div> :
+                     permits.length === 0 ? <div className="p-12 text-center bg-white rounded-xl border border-dashed border-gray-300 text-gray-500">Yeay! Tidak ada antrean perizinan saat ini.</div> :
+                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {permits.map((p, idx) => (
+                            <Card key={idx} className="flex flex-col justify-between border-l-4 border-yellow-400">
+                                <div>
+                                    <div className="flex justify-between items-start mb-4 border-b pb-4">
+                                        <div>
+                                            <h3 className="text-xl font-bold text-gray-900">{p.nama_santri}</h3>
+                                            <p className="text-sm text-gray-500">{p.kelas} • Tgl Izin: <strong>{p.tanggal_izin}</strong></p>
+                                        </div>
+                                        <span className={`px-3 py-1 text-xs font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                                            {p.status_jadwal}
+                                        </span>
+                                    </div>
+                                    <div className="space-y-2 text-sm text-gray-700 mb-6">
+                                        <p><span className="text-gray-500 w-24 inline-block">Keperluan:</span> <strong>{p.keperluan}</strong></p>
+                                        <p><span className="text-gray-500 w-24 inline-block">Tujuan:</span> <strong>{p.tujuan}</strong></p>
+                                        <p><span className="text-gray-500 w-24 inline-block">Penjemput:</span> <strong>{p.wali_safar} ({p.hubungan_wali})</strong></p>
+                                        
+                                        {p.status_jadwal === 'Di Luar Jadwal' && (
+                                            <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg">
+                                                <p className="text-red-800 text-xs font-bold mb-1">ALASAN DI LUAR JADWAL:</p>
+                                                <p className="text-red-700 italic">{p.keterangan_luar_jadwal}</p>
+                                            </div>
+                                        )}
+                                        {p.ikut_jadwal_saudara === 'Ya' && (
+                                            <div className="mt-2 p-2 bg-blue-50 text-blue-800 rounded-lg text-xs font-medium">
+                                                Ikut jadwal saudara (ID: {p.saudara_santri_id})
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <Button fullWidth onClick={() => setSelectedPermit(p)}>Tindak Lanjut</Button>
+                            </Card>
+                        ))}
+                     </div>
+                    }
+
+                    {/* MODAL APPROVAL/REJECTION */}
+                    <Modal isOpen={!!selectedPermit} onClose={() => setSelectedPermit(null)} title="Tindak Lanjut Izin">
+                        {selectedPermit && (
+                            <div className="space-y-6">
+                                <div className="bg-gray-50 p-4 rounded-lg">
+                                    <p className="text-sm text-gray-500 mb-1">Konfirmasi izin untuk:</p>
+                                    <p className="text-lg font-bold text-gray-900">{selectedPermit.nama_santri} ({selectedPermit.kelas})</p>
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">Jika Anda MENOLAK, tuliskan alasannya di sini:</label>
+                                    <textarea 
+                                        rows="3" 
+                                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500 outline-none" 
+                                        placeholder="Contoh: Kuota izin bulan ini sudah habis, Alasan kurang jelas..."
+                                        value={rejectReason}
+                                        onChange={(e) => setRejectReason(e.target.value)}
+                                    ></textarea>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                                    <Button variant="danger" disabled={processing} onClick={() => handleAction('REJECT')}>Tolak Izin</Button>
+                                    <Button disabled={processing} onClick={() => handleAction('APPROVE')}>Setujui & Buat QR</Button>
+                                </div>
+                            </div>
+                        )}
+                    </Modal>
                 </div>
             );
         };
@@ -753,7 +891,7 @@
                     <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
                         <Card className="py-8 px-4 sm:px-10">
                             <form className="space-y-6" onSubmit={handleSubmit}>
-                                <Input name="username" label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="Misal: admin, walikelas" />
+                                <Input name="username" label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="Misal: admin, walikelas, sekretaris" />
                                 <Input name="password" label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="123" />
                                 <Button type="submit" fullWidth disabled={loading}>{loading ? 'Memverifikasi...' : 'Masuk ke Sistem'}</Button>
                             </form>
@@ -768,6 +906,7 @@
 
             if (currentRoute === 'dashboard') {
                 if (user.role === ROLES.ADMIN) return <DashboardAdmin />;
+                if (user.role === ROLES.SEKRETARIS_MUDIR) return <DashboardSecretary />;
                 if (user.role === ROLES.WALI_KELAS) return (<div className="space-y-6"><div><h2 className="text-2xl font-bold text-gray-800">Dashboard Wali Kelas</h2></div><Button onClick={() => setCurrentRoute('pengajuan')} icon={<Icons.Plus />}>Buat Pengajuan Baru</Button></div>);
             }
             
@@ -781,6 +920,9 @@
             // WALI KELAS MENU ROUTING
             if (currentRoute === 'pengajuan' && user.role === ROLES.WALI_KELAS) return <AjukanIzinPage setCurrentRoute={setCurrentRoute} />;
             if (currentRoute === 'histori' && user.role === ROLES.WALI_KELAS) return <HistoriKelasPage />;
+
+            // SEKRETARIS MENU ROUTING
+            if (currentRoute === 'screening' && user.role === ROLES.SEKRETARIS_MUDIR) return <ScreeningIzinPage />;
             
             return (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
