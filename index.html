@@ -583,7 +583,8 @@
                 const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
                 return Math.ceil((date.getDate() + firstDay) / 7);
             },
-            formatDate: (date) => date.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+            // FORMAT TANGGAL LEBIH SIMPEL: Jum, 28 Ags 2026
+            formatDate: (date) => date.toLocaleDateString('id-ID', { weekday: 'short', year: 'numeric', month: 'short', day: '2-digit' })
         };
 
         const AjukanIzinPage = ({ setCurrentRoute }) => {
@@ -727,7 +728,8 @@
                     <div className="flex justify-between items-end">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800">Dashboard Sekretaris</h2>
-                            <p className="text-sm text-gray-500 mt-1">Update terakhir: {lastUpdate.toLocaleTimeString('id-ID')}</p>
+                            {/* WAKTU DIPERSIMPEL: 11:47 */}
+                            <p className="text-sm text-gray-500 mt-1">Update terakhir: {lastUpdate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
                         </div>
                         <Button variant="secondary" onClick={() => { setLoading(true); fetchStats(); }} icon={<Icons.Clock />}>{loading ? 'Menyinkronkan...' : 'Refresh Manual'}</Button>
                     </div>
@@ -753,6 +755,7 @@
             const { user } = useContext(AuthContext);
             const { showToast } = useContext(ToastContext);
             const [permits, setPermits] = useState([]);
+            const [santriList, setSantriList] = useState([]);
             const [loading, setLoading] = useState(true);
             const [selectedPermit, setSelectedPermit] = useState(null);
             const [rejectReason, setRejectReason] = useState('');
@@ -761,9 +764,14 @@
             const fetchPermits = async () => {
                 setLoading(true);
                 try {
-                    const res = await apiService.request('getPermits');
-                    // Filter hanya yang menunggu approval
-                    setPermits(res.data.filter(p => p.status_pengajuan === 'MENUNGGU_APPROVAL'));
+                    // SEKALIGUS MENGAMBIL DATA SANTRI UNTUK NAMA SAUDARA
+                    const [resPermits, resSantri] = await Promise.all([
+                        apiService.request('getPermits'),
+                        apiService.request('getSantri')
+                    ]);
+                    
+                    setPermits(resPermits.data.filter(p => p.status_pengajuan === 'MENUNGGU_APPROVAL'));
+                    setSantriList(resSantri.data);
                 } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
             };
             useEffect(() => { fetchPermits(); }, []);
@@ -815,7 +823,13 @@
                                         )}
                                         {p.ikut_jadwal_saudara === 'Ya' && (
                                             <div className="mt-2 p-2 bg-blue-50 text-blue-800 rounded-lg text-xs font-medium">
-                                                Ikut jadwal saudara (ID: {p.saudara_santri_id})
+                                                {/* LOGIKA MENAMPILKAN NAMA SAUDARA BUKAN ID */}
+                                                {(() => {
+                                                    const saudara = santriList.find(s => s.santri_id === p.saudara_santri_id);
+                                                    return saudara 
+                                                        ? `Ikut jadwal saudara: ${saudara.nama} (${saudara.kelas})` 
+                                                        : `Ikut jadwal saudara (ID: ${p.saudara_santri_id})`;
+                                                })()}
                                             </div>
                                         )}
                                     </div>
