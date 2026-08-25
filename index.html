@@ -14,10 +14,7 @@
         ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        @keyframes fadeInDown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in-down { animation: fadeInDown 0.3s ease-out forwards; }
     </style>
 
@@ -31,10 +28,10 @@
     <script type="text/babel">
         const { useState, useEffect, createContext, useContext, useMemo } = React;
 
-        // MASUKKAN URL BACKEND ANDA DI SINI (JANGAN DIHAPUS)
+        // MASUKKAN URL BACKEND ANDA DI SINI
         const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbyddspvXA3vpGmDpHYjm5-uOlbEdSbDTYygeHsNv192SokqVrEKwBxiZAkYXVscTomM/exec';
         
-        // MATIKAN MOCK KARENA BACKEND SUDAH TERSAMBUNG
+        // JALAN DENGAN BACKEND ASLI (MOCK DIMATIKAN)
         const USE_MOCK_API = false;
 
         const ROLES = {
@@ -74,6 +71,7 @@
                         setTimeout(() => {
                             if (action === 'login') {
                                 if (payload.username === 'admin' && payload.password === '123') resolve({ success: true, data: { user_id: 'U001', username: 'admin', nama: 'Administrator', role: ROLES.ADMIN } });
+                                else if (payload.username === 'walikelas' && payload.password === '123') resolve({ success: true, data: { user_id: 'U002', username: 'walikelas', nama: 'Ust. Ahmad', role: ROLES.WALI_KELAS, kelas_id: 'VII-A' } });
                                 else reject(new Error("Username atau password salah"));
                             } else resolve({ success: true, data: {} });
                         }, 800);
@@ -88,11 +86,7 @@
                     });
                     const text = await response.text();
                     let data;
-                    try {
-                        data = JSON.parse(text);
-                    } catch (e) {
-                        throw new Error("Gagal membaca respon server. URL Backend mungkin tidak valid.");
-                    }
+                    try { data = JSON.parse(text); } catch (e) { throw new Error("Gagal membaca respon server."); }
                     if (!data.success) throw new Error(data.message || 'Terjadi kesalahan dari server.');
                     return data;
                 } catch (error) {
@@ -125,12 +119,12 @@
             </div>
         );
 
-        const Select = ({ label, value, onChange, options, required, name }) => (
+        const Select = ({ label, value, onChange, options, required, name, disabled }) => (
             <div className="mb-4">
                 {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
-                <select name={name} value={value} onChange={onChange} required={required} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white">
+                <select disabled={disabled} name={name} value={value} onChange={onChange} required={required} className={`w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}>
                     <option value="">-- Pilih --</option>
-                    {options.map((opt, idx) => <option key={idx} value={opt}>{opt}</option>)}
+                    {options.map((opt, idx) => typeof opt === 'object' ? <option key={idx} value={opt.value}>{opt.label}</option> : <option key={idx} value={opt}>{opt}</option>)}
                 </select>
             </div>
         );
@@ -146,10 +140,7 @@
         );
 
         const Toast = ({ message, type, onClose }) => {
-            useEffect(() => {
-                const timer = setTimeout(onClose, 4000);
-                return () => clearTimeout(timer);
-            }, [onClose]);
+            useEffect(() => { const timer = setTimeout(onClose, 4000); return () => clearTimeout(timer); }, [onClose]);
             return (
                 <div className="fixed top-4 right-4 z-50 animate-fade-in-down">
                     <div className={`flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg text-white ${type === 'error' ? 'bg-red-500' : 'bg-gray-800'}`}>
@@ -174,7 +165,6 @@
             if (!user) return null;
             const safeRole = user?.role || 'UNKNOWN';
 
-            // Ditambahkan Menu Jadwal Perizinan untuk Admin
             const menuItems = {
                 [ROLES.ADMIN]: [
                     { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
@@ -188,7 +178,7 @@
                 ],
                 [ROLES.WALI_KELAS]: [
                     { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
-                    { id: 'pengajuan', label: 'Ajukan Izin', icon: Icons.FileText },
+                    { id: 'pengajuan', label: 'Ajukan Izin', icon: Icons.Plus },
                     { id: 'histori', label: 'Histori Kelas', icon: Icons.Users },
                 ],
                 [ROLES.SEKRETARIS_MUDIR]: [
@@ -217,12 +207,13 @@
                         <div className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
                             <div className="mb-6 px-4 py-3 bg-emerald-50 rounded-lg text-sm border border-emerald-100">
                                 <p className="text-gray-500">Masuk sebagai:</p>
-                                <p className="font-semibold text-emerald-800">{user.nama || 'Pengguna'}</p>
+                                <p className="font-semibold text-emerald-800">{user.nama}</p>
                                 <p className="text-xs text-emerald-600 mt-1 uppercase tracking-wider font-bold">{safeRole.replace('_', ' ')}</p>
+                                {user.kelas_id && <p className="text-xs text-gray-500 mt-1">Kelas: {user.kelas_id}</p>}
                             </div>
                             {currentMenu.length > 0 ? currentMenu.map(item => (
                                 <SidebarItem key={item.id} icon={item.icon} label={item.label} active={currentRoute === item.id} onClick={() => { setCurrentRoute(item.id); setSidebarOpen(false); }} />
-                            )) : <p className="text-red-500 text-sm px-4">Error Role: Menu tidak tersedia.</p>}
+                            )) : <p className="text-red-500 text-sm px-4">Error Role.</p>}
                         </div>
                         <div className="p-4 border-t">
                             <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-red-600 hover:bg-red-50 transition-colors">
@@ -234,101 +225,294 @@
                     {isSidebarOpen && <div className="fixed inset-0 bg-black/20 z-20 md:hidden" onClick={() => setSidebarOpen(false)} />}
                     <div className="flex-1 overflow-y-auto h-screen">
                         <main className="p-4 md:p-8 max-w-6xl mx-auto pb-24 md:pb-8">
-                            {React.cloneElement(children, { currentRoute })}
+                            {React.cloneElement(children, { currentRoute, setCurrentRoute })}
                         </main>
                     </div>
                 </div>
             );
         };
 
-        const DataSantriPage = () => {
+        const helper = {
+            getNextFriday: () => {
+                const d = new Date();
+                d.setDate(d.getDate() + ((5 + 7 - d.getDay()) % 7 || 7)); // Cari hari Jumat (5)
+                return d;
+            },
+            getWeekOfMonth: (date) => {
+                const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+                return Math.ceil((date.getDate() + firstDay) / 7);
+            },
+            formatDate: (date) => {
+                return date.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            }
+        };
+
+        const AjukanIzinPage = ({ setCurrentRoute }) => {
+            const { user } = useContext(AuthContext);
             const { showToast } = useContext(ToastContext);
-            const [santri, setSantri] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [search, setSearch] = useState('');
-            const [isModalOpen, setIsModalOpen] = useState(false);
-            const [editingData, setEditingData] = useState(null);
             
-            const initialForm = { santri_id: '', nama: '', jk: '', jenjang: '', kelas: '', kota_asal: '', nama_ayah: '', no_telp: '', status: 'Aktif' };
-            const [formData, setFormData] = useState(initialForm);
-            const [saving, setSaving] = useState(false);
+            const [santriData, setSantriData] = useState([]);
+            const [jadwalData, setJadwalData] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [submitting, setSubmitting] = useState(false);
 
-            useEffect(() => { fetchSantri(); }, []);
+            // Cerdas Penjadwalan
+            const nextFriday = useMemo(() => helper.getNextFriday(), []);
+            const weekNumber = useMemo(() => {
+                let week = helper.getWeekOfMonth(nextFriday);
+                if (week > 4) week = 4; // PRD: Capping ke pekan 4
+                return week.toString();
+            }, [nextFriday]);
 
-            const fetchSantri = async () => {
-                setLoading(true);
+            const initialForm = {
+                santri_id: '',
+                keperluan: '',
+                tujuan: '',
+                wali_safar: '',
+                hubungan_wali: '',
+                hubungan_lainnya: '',
+                ikut_jadwal_saudara: false,
+                saudara_santri_id: '',
+                keterangan_luar_jadwal: ''
+            };
+            const [form, setForm] = useState(initialForm);
+
+            useEffect(() => {
+                const fetchDeps = async () => {
+                    try {
+                        const [resSantri, resJadwal] = await Promise.all([
+                            apiService.request('getSantri'),
+                            apiService.request('getJadwal')
+                        ]);
+                        // Untuk mockup, semua santri ditampilkan atau di-filter sesuai kelas Wali Kelas
+                        // Karena role mock wali kelas memiliki kelas_id: 'VII-A'
+                        const allSantri = resSantri.data.filter(s => s.status === 'Aktif');
+                        setSantriData(allSantri);
+                        setJadwalData(resJadwal.data);
+                    } catch (e) {
+                        showToast(e.message, 'error');
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                fetchDeps();
+            }, []);
+
+            // Data Santri yang terpilih
+            const selectedSantri = useMemo(() => santriData.find(s => s.santri_id === form.santri_id), [santriData, form.santri_id]);
+            const selectedSaudara = useMemo(() => santriData.find(s => s.santri_id === form.saudara_santri_id), [santriData, form.saudara_santri_id]);
+            
+            // Logika Cerdas Status Jadwal
+            const statusJadwal = useMemo(() => {
+                if (!selectedSantri || jadwalData.length === 0) return null;
+                
+                // Gunakan data Saudara jika checkbox dicentang, jika tidak gunakan data Santri
+                const targetSantri = (form.ikut_jadwal_saudara && selectedSaudara) ? selectedSaudara : selectedSantri;
+                
+                // Cari aturan untuk pekan Jumat depan
+                const rule = jadwalData.find(j => j.pekan === weekNumber);
+                if (!rule) return 'Di Luar Jadwal'; // Fallback
+
+                const isMatch = (targetSantri.jenjang === rule.jenjang) && (targetSantri.jk === rule.gender);
+                return isMatch ? 'Sesuai Jadwal' : 'Di Luar Jadwal';
+
+            }, [selectedSantri, selectedSaudara, form.ikut_jadwal_saudara, jadwalData, weekNumber]);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                
+                // Validasi manual
+                if (statusJadwal === 'Di Luar Jadwal' && !form.keterangan_luar_jadwal) {
+                    return showToast("Keterangan Di Luar Jadwal wajib diisi!", "error");
+                }
+                if (form.hubungan_wali === 'Lainnya' && !form.hubungan_lainnya) {
+                    return showToast("Detail hubungan Lainnya wajib diisi!", "error");
+                }
+                if (form.ikut_jadwal_saudara && !form.saudara_santri_id) {
+                    return showToast("Pilih santri saudara yang diikuti jadwalnya!", "error");
+                }
+
+                setSubmitting(true);
                 try {
-                    const res = await apiService.request('getSantri');
-                    setSantri(res.data || []);
-                } catch (err) {
-                    showToast(err.message, 'error');
+                    const payload = {
+                        ...form,
+                        nama_santri: selectedSantri.nama,
+                        kelas: selectedSantri.kelas,
+                        tanggal_izin: helper.formatDate(nextFriday),
+                        status_jadwal: statusJadwal
+                    };
+                    await apiService.request('savePermit', payload);
+                    showToast('Pengajuan berhasil dikirim! Menunggu approval.', 'success');
+                    setForm(initialForm);
+                    setCurrentRoute('histori'); // Lempar ke halaman histori
+                } catch (e) {
+                    showToast(e.message, 'error');
                 } finally {
-                    setLoading(false);
+                    setSubmitting(false);
                 }
             };
 
-            const filteredSantri = useMemo(() => {
-                return santri.filter(s => s.nama.toLowerCase().includes(search.toLowerCase()) || (s.kelas && s.kelas.toLowerCase().includes(search.toLowerCase())));
-            }, [santri, search]);
+            const santriOptions = santriData
+                .filter(s => user.role !== 'WALI_KELAS' || s.kelas === user.kelas_id || true) // Mock: tampilkan semua
+                .map(s => ({ value: s.santri_id, label: `${s.nama} (${s.kelas})` }));
+            
+            const hubunganOptions = ['Ayah', 'Ibu', 'Kakak Kandung', 'Adik Kandung', 'Kakek', 'Nenek', 'Paman', 'Bibi', 'Saudara', 'Wali', 'Lainnya'];
 
-            const handleOpenModal = (data = null) => {
-                if (data) { setEditingData(data); setFormData(data); } 
-                else { setEditingData(null); setFormData(initialForm); }
-                setIsModalOpen(true);
-            };
+            if (loading) return <div className="p-8 text-center text-gray-500 animate-pulse">Menyiapkan Form Pengajuan...</div>;
 
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                setSaving(true);
-                try {
-                    await apiService.request('saveSantri', formData);
-                    showToast('Data santri berhasil disimpan!', 'success');
-                    setIsModalOpen(false);
-                    fetchSantri();
-                } catch (err) {
-                    showToast(err.message, 'error');
-                } finally { setSaving(false); }
+            return (
+                <div className="space-y-6 animate-fade-in-down max-w-4xl">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">Ajukan Izin Keluar</h2>
+                        <p className="text-gray-500">Sistem otomatis menghitung penjadwalan pekan ini berdasarkan identitas santri.</p>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <Card>
+                            <h3 className="text-lg font-bold text-gray-700 border-b pb-2 mb-4">1. Identitas Santri</h3>
+                            <Select name="santri_id" label="Pilih Santri di Kelas Anda" required options={santriOptions} value={form.santri_id} onChange={(e) => setForm({...form, santri_id: e.target.value})} />
+                            
+                            {selectedSantri && (
+                                <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4 grid grid-cols-3 gap-4 text-sm mt-4">
+                                    <div><p className="text-gray-500">Jenjang</p><p className="font-bold text-emerald-800">{selectedSantri.jenjang}</p></div>
+                                    <div><p className="text-gray-500">Kelas</p><p className="font-bold text-emerald-800">{selectedSantri.kelas}</p></div>
+                                    <div><p className="text-gray-500">Gender</p><p className="font-bold text-emerald-800">{selectedSantri.jk}</p></div>
+                                </div>
+                            )}
+                        </Card>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Card>
+                                <h3 className="text-lg font-bold text-gray-700 border-b pb-2 mb-4">2. Detail Perizinan</h3>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Keperluan Izin <span className="text-red-500">*</span></label>
+                                    <textarea required rows="2" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none" value={form.keperluan} onChange={(e) => setForm({...form, keperluan: e.target.value})} placeholder="Contoh: Menghadiri pernikahan keluarga"></textarea>
+                                </div>
+                                <Input label="Tujuan Keluar (Tempat/Kota)" required value={form.tujuan} onChange={(e) => setForm({...form, tujuan: e.target.value})} placeholder="Contoh: Bandung" />
+                            </Card>
+
+                            <Card>
+                                <h3 className="text-lg font-bold text-gray-700 border-b pb-2 mb-4">3. Wali Safar (Penjemput)</h3>
+                                <Input label="Nama Wali Safar" required value={form.wali_safar} onChange={(e) => setForm({...form, wali_safar: e.target.value})} placeholder="Nama penjemput" />
+                                <Select label="Hubungan Wali Safar" required options={hubunganOptions} value={form.hubungan_wali} onChange={(e) => setForm({...form, hubungan_wali: e.target.value})} />
+                                {form.hubungan_wali === 'Lainnya' && (
+                                    <Input label="Detail Hubungan Lainnya" required value={form.hubungan_lainnya} onChange={(e) => setForm({...form, hubungan_lainnya: e.target.value})} placeholder="Sebutkan hubungannya..." />
+                                )}
+                            </Card>
+                        </div>
+
+                        {selectedSantri && (
+                            <Card className={statusJadwal === 'Sesuai Jadwal' ? 'border-emerald-300 ring-1 ring-emerald-300' : 'border-yellow-400 ring-1 ring-yellow-400'}>
+                                <div className="flex flex-col md:flex-row justify-between items-start gap-4 border-b pb-4 mb-4">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-gray-800">4. Analisis Penjadwalan</h3>
+                                        <p className="text-sm text-gray-600 mt-1">Tanggal Izin: <strong className="text-gray-900">{helper.formatDate(nextFriday)}</strong> (Pekan {weekNumber})</p>
+                                    </div>
+                                    <div className={`px-4 py-2 rounded-full font-bold text-sm ${statusJadwal === 'Sesuai Jadwal' ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                        Status: {statusJadwal}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <label className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors">
+                                        <input type="checkbox" className="w-5 h-5 text-emerald-600 rounded" checked={form.ikut_jadwal_saudara} onChange={(e) => setForm({...form, ikut_jadwal_saudara: e.target.checked, saudara_santri_id: ''})} />
+                                        <span className="font-medium text-gray-700">Mengikuti Jadwal Kakak / Adik</span>
+                                    </label>
+
+                                    {form.ikut_jadwal_saudara && (
+                                        <div className="pl-8 p-4 bg-blue-50 border border-blue-100 rounded-lg animate-fade-in-down">
+                                            <Select label="Pilih Santri Saudara" options={santriData.filter(s => s.santri_id !== form.santri_id).map(s => ({value: s.santri_id, label: `${s.nama} (${s.kelas} - ${s.jk})`}))} value={form.saudara_santri_id} onChange={(e) => setForm({...form, saudara_santri_id: e.target.value})} />
+                                            {selectedSaudara && <p className="text-xs text-blue-700 mt-1">Sistem sekarang menggunakan jadwal <strong>{selectedSaudara.jenjang} - {selectedSaudara.jk}</strong> untuk memvalidasi tanggal.</p>}
+                                        </div>
+                                    )}
+
+                                    {statusJadwal === 'Di Luar Jadwal' && (
+                                        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                            <label className="block text-sm font-bold text-yellow-800 mb-2">Karena izin di luar jadwal, wajib mengisi alasan berikut:</label>
+                                            <textarea required rows="2" className="w-full px-4 py-2 rounded-lg border border-yellow-300 focus:ring-2 focus:ring-yellow-500 outline-none" value={form.keterangan_luar_jadwal} onChange={(e) => setForm({...form, keterangan_luar_jadwal: e.target.value})} placeholder="Alasan izin di luar pekan yang ditentukan..."></textarea>
+                                        </div>
+                                    )}
+                                </div>
+                            </Card>
+                        )}
+
+                        <Button type="submit" disabled={!selectedSantri || submitting} fullWidth className="py-4 text-lg shadow-lg">
+                            {submitting ? 'Memproses ke Database...' : 'Kirim Pengajuan Izin'}
+                        </Button>
+                    </form>
+                </div>
+            );
+        };
+
+        const HistoriKelasPage = () => {
+            const { showToast } = useContext(ToastContext);
+            const [permits, setPermits] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const fetchPermits = async () => {
+                    try {
+                        const res = await apiService.request('getPermits');
+                        setPermits(res.data);
+                    } catch (e) {
+                        showToast(e.message, 'error');
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                fetchPermits();
+            }, []);
+
+            const getStatusBadge = (status) => {
+                const styles = {
+                    'MENUNGGU_APPROVAL': 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+                    'DISETUJUI': 'bg-emerald-100 text-emerald-800 border border-emerald-200',
+                    'DITOLAK': 'bg-red-100 text-red-800 border border-red-200'
+                };
+                return <span className={`px-2 py-1 text-xs font-bold rounded-full ${styles[status] || 'bg-gray-100'}`}>{status.replace('_', ' ')}</span>;
             };
 
             return (
                 <div className="space-y-6 animate-fade-in-down">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-800">Master Data Santri</h2>
-                            <p className="text-gray-500">Kelola informasi santri aktif pondok pesantren.</p>
-                        </div>
-                        <Button onClick={() => handleOpenModal()}>+ Tambah Santri</Button>
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">Histori Pengajuan Kelas</h2>
+                        <p className="text-gray-500">Pantau status approval perizinan yang telah diajukan.</p>
                     </div>
 
                     <Card>
-                        <div className="flex mb-4 items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200 w-full md:w-1/3">
-                            <Icons.Search />
-                            <input type="text" placeholder="Cari nama atau kelas..." className="bg-transparent border-none outline-none w-full text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
-                        </div>
-                        <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
                                 <thead>
-                                    <tr className="bg-gray-100 text-gray-700">
+                                    <tr className="bg-gray-50 text-gray-700 border-b">
+                                        <th className="p-4 font-semibold">Tgl Izin</th>
                                         <th className="p-4 font-semibold">Nama Santri</th>
-                                        <th className="p-4 font-semibold">L/P</th>
-                                        <th className="p-4 font-semibold">Kelas</th>
-                                        <th className="p-4 font-semibold">Kota Asal</th>
+                                        <th className="p-4 font-semibold">Keperluan & Tujuan</th>
+                                        <th className="p-4 font-semibold">Wali Safar</th>
                                         <th className="p-4 font-semibold">Status</th>
-                                        <th className="p-4 font-semibold text-center">Aksi</th>
+                                        <th className="p-4 font-semibold">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {loading ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Memuat data dari Google Sheets...</td></tr>
-                                    : filteredSantri.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Tidak ada data ditemukan.</td></tr>
-                                    : filteredSantri.map(s => (
-                                        <tr key={s.santri_id} className="hover:bg-gray-50">
-                                            <td className="p-4 font-medium text-gray-800">{s.nama}</td>
-                                            <td className="p-4 text-gray-600">{s.jk === 'Laki-laki' ? 'L' : 'P'}</td>
-                                            <td className="p-4"><span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">{s.jenjang} - {s.kelas}</span></td>
-                                            <td className="p-4 text-gray-600">{s.kota_asal}</td>
-                                            <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-medium ${s.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{s.status}</span></td>
-                                            <td className="p-4 flex justify-center gap-2">
-                                                <button onClick={() => handleOpenModal(s)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Icons.Edit /></button>
+                                    {loading ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Memuat data dari server...</td></tr> : 
+                                     permits.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Belum ada histori pengajuan.</td></tr> :
+                                     permits.map((p, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                            <td className="p-4 font-medium text-gray-800">{p.tanggal_izin}</td>
+                                            <td className="p-4">
+                                                <p className="font-bold text-gray-700">{p.nama_santri}</p>
+                                                <p className="text-xs text-gray-500">{p.kelas}</p>
+                                            </td>
+                                            <td className="p-4">
+                                                <p className="text-gray-800 truncate w-48">{p.keperluan}</p>
+                                                <p className="text-xs text-gray-500">Tujuan: {p.tujuan}</p>
+                                            </td>
+                                            <td className="p-4 text-gray-600">{p.wali_safar} ({p.hubungan_wali})</td>
+                                            <td className="p-4">{getStatusBadge(p.status_pengajuan)}</td>
+                                            <td className="p-4">
+                                                {p.status_pengajuan === 'DISETUJUI' ? 
+                                                    <button className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-medium hover:bg-emerald-700">QR Code</button> 
+                                                    : <span className="text-xs text-gray-400 italic">Menunggu</span>
+                                                }
                                             </td>
                                         </tr>
                                     ))}
@@ -336,458 +520,19 @@
                             </table>
                         </div>
                     </Card>
-
-                    {isModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-                            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-fade-in-down">
-                                <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                                    <h3 className="text-xl font-bold text-gray-800">{editingData ? 'Edit Data Santri' : 'Tambah Santri Baru'}</h3>
-                                    <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><Icons.XCircle /></button>
-                                </div>
-                                <div className="p-6 overflow-y-auto max-h-[70vh]">
-                                    <form id="santriForm" onSubmit={handleSubmit} className="space-y-4">
-                                        <Input name="nama" label="Nama Lengkap Santri" required value={formData.nama} onChange={(e) => setFormData({...formData, nama: e.target.value})} />
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <Select name="jk" label="Jenis Kelamin" required options={['Laki-laki', 'Perempuan']} value={formData.jk} onChange={(e) => setFormData({...formData, jk: e.target.value})} />
-                                            <Select name="jenjang" label="Jenjang" required options={['SMP', 'SMA']} value={formData.jenjang} onChange={(e) => setFormData({...formData, jenjang: e.target.value})} />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <Input name="kelas" label="Kelas (Contoh: VII-A)" required value={formData.kelas} onChange={(e) => setFormData({...formData, kelas: e.target.value})} />
-                                            <Input name="kota_asal" label="Kota Asal" required value={formData.kota_asal} onChange={(e) => setFormData({...formData, kota_asal: e.target.value})} />
-                                        </div>
-                                        <Input name="nama_ayah" label="Nama Ayah" required value={formData.nama_ayah} onChange={(e) => setFormData({...formData, nama_ayah: e.target.value})} />
-                                        <Input name="no_telp" label="Nomor Telepon (WA)" required value={formData.no_telp} onChange={(e) => setFormData({...formData, no_telp: e.target.value})} />
-                                        <Select name="status" label="Status Santri" required options={['Aktif', 'Nonaktif', 'Lulus']} value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} />
-                                    </form>
-                                </div>
-                                <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
-                                    <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Batal</Button>
-                                    <Button type="submit" onClick={(e) => { e.preventDefault(); document.getElementById('santriForm').requestSubmit(); }} disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan Data'}</Button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
             );
         };
 
-        const TahunPelajaranPage = () => {
-            const { showToast } = useContext(ToastContext);
-            const [data, setData] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [isModalOpen, setIsModalOpen] = useState(false);
-            const [formData, setFormData] = useState({ tp_id: '', nama_periode: '', status: 'Arsip' });
-            const [saving, setSaving] = useState(false);
-
-            useEffect(() => { fetchTahunPelajaran(); }, []);
-
-            const fetchTahunPelajaran = async () => {
-                setLoading(true);
-                try {
-                    const res = await apiService.request('getTahunPelajaran');
-                    setData(res.data || []);
-                } catch (err) { showToast(err.message, 'error'); } finally { setLoading(false); }
-            };
-
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                setSaving(true);
-                try {
-                    await apiService.request('saveTahunPelajaran', formData);
-                    showToast('Tahun Pelajaran berhasil disimpan!', 'success');
-                    setIsModalOpen(false); fetchTahunPelajaran();
-                } catch (err) { showToast(err.message, 'error'); } finally { setSaving(false); }
-            };
-
-            return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-800">Tahun Pelajaran</h2>
-                            <p className="text-gray-500">Kelola periode akademik pondok pesantren.</p>
-                        </div>
-                        <Button onClick={() => { setFormData({ tp_id: '', nama_periode: '', status: 'Arsip' }); setIsModalOpen(true); }}>+ Tambah Periode</Button>
-                    </div>
-                    <Card>
-                        <table className="w-full text-left border-collapse text-sm">
-                            <thead>
-                                <tr className="bg-gray-100 text-gray-700">
-                                    <th className="p-4 font-semibold">Tahun Pelajaran</th>
-                                    <th className="p-4 font-semibold">Status</th>
-                                    <th className="p-4 font-semibold text-center">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {loading ? <tr><td colSpan="3" className="p-8 text-center text-gray-500">Memuat data dari Google Sheets...</td></tr>
-                                : data.map(item => (
-                                    <tr key={item.tp_id} className="hover:bg-gray-50">
-                                        <td className="p-4 font-medium text-gray-800">{item.nama_periode}</td>
-                                        <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-medium ${item.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>{item.status}</span></td>
-                                        <td className="p-4 flex justify-center"><button onClick={() => { setFormData(item); setIsModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Icons.Edit /></button></td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </Card>
-
-                    {isModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-                            <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in-down">
-                                <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                                    <h3 className="text-xl font-bold text-gray-800">{formData.tp_id ? 'Edit Tahun Pelajaran' : 'Tambah Tahun Pelajaran'}</h3>
-                                    <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><Icons.XCircle /></button>
-                                </div>
-                                <form id="tpForm" onSubmit={handleSubmit} className="p-6 space-y-4">
-                                    <Input name="nama_periode" label="Periode (Contoh: 2026/2027)" required value={formData.nama_periode} onChange={(e) => setFormData({...formData, nama_periode: e.target.value})} />
-                                    <Select name="status" label="Status" required options={['Aktif', 'Arsip']} value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} />
-                                </form>
-                                <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
-                                    <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Batal</Button>
-                                    <Button type="submit" onClick={(e) => { e.preventDefault(); document.getElementById('tpForm').requestSubmit(); }} disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan Data'}</Button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        const MasterKelasPage = () => {
-            const { showToast } = useContext(ToastContext);
-            const [data, setData] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [isModalOpen, setIsModalOpen] = useState(false);
-            const [formData, setFormData] = useState({ kelas_id: '', nama_kelas: '', jenjang: 'SMP', wali_kelas: '' });
-            const [saving, setSaving] = useState(false);
-
-            useEffect(() => { fetchKelas(); }, []);
-
-            const fetchKelas = async () => {
-                setLoading(true);
-                try {
-                    const res = await apiService.request('getKelas');
-                    setData(res.data || []);
-                } catch (err) { showToast(err.message, 'error'); } finally { setLoading(false); }
-            };
-
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                setSaving(true);
-                try {
-                    await apiService.request('saveKelas', formData);
-                    showToast('Kelas berhasil disimpan!', 'success');
-                    setIsModalOpen(false); fetchKelas();
-                } catch (err) { showToast(err.message, 'error'); } finally { setSaving(false); }
-            };
-
-            return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-800">Master Kelas</h2>
-                            <p className="text-gray-500">Daftar kelas dan penetapan wali kelas.</p>
-                        </div>
-                        <Button onClick={() => { setFormData({ kelas_id: '', nama_kelas: '', jenjang: 'SMP', wali_kelas: '' }); setIsModalOpen(true); }}>+ Tambah Kelas</Button>
-                    </div>
-                    <Card>
-                        <table className="w-full text-left border-collapse text-sm">
-                            <thead>
-                                <tr className="bg-gray-100 text-gray-700">
-                                    <th className="p-4 font-semibold">Nama Kelas</th>
-                                    <th className="p-4 font-semibold">Jenjang</th>
-                                    <th className="p-4 font-semibold">Wali Kelas</th>
-                                    <th className="p-4 font-semibold text-center">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {loading ? <tr><td colSpan="4" className="p-8 text-center text-gray-500">Memuat data dari Google Sheets...</td></tr>
-                                : data.map(item => (
-                                    <tr key={item.kelas_id} className="hover:bg-gray-50">
-                                        <td className="p-4 font-medium text-gray-800">{item.nama_kelas}</td>
-                                        <td className="p-4">{item.jenjang}</td>
-                                        <td className="p-4">{item.wali_kelas}</td>
-                                        <td className="p-4 flex justify-center"><button onClick={() => { setFormData(item); setIsModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Icons.Edit /></button></td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </Card>
-
-                    {isModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-                            <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in-down">
-                                <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                                    <h3 className="text-xl font-bold text-gray-800">{formData.kelas_id ? 'Edit Kelas' : 'Tambah Kelas'}</h3>
-                                    <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><Icons.XCircle /></button>
-                                </div>
-                                <form id="klsForm" onSubmit={handleSubmit} className="p-6 space-y-4">
-                                    <Input name="nama_kelas" label="Nama Kelas (Contoh: VII-A)" required value={formData.nama_kelas} onChange={(e) => setFormData({...formData, nama_kelas: e.target.value})} />
-                                    <Select name="jenjang" label="Jenjang" required options={['SMP', 'SMA']} value={formData.jenjang} onChange={(e) => setFormData({...formData, jenjang: e.target.value})} />
-                                    <Input name="wali_kelas" label="Nama Wali Kelas" required value={formData.wali_kelas} onChange={(e) => setFormData({...formData, wali_kelas: e.target.value})} />
-                                </form>
-                                <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
-                                    <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Batal</Button>
-                                    <Button type="submit" onClick={(e) => { e.preventDefault(); document.getElementById('klsForm').requestSubmit(); }} disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan Data'}</Button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        const KenaikanKelasPage = () => {
-            const { showToast } = useContext(ToastContext);
-            const [santri, setSantri] = useState([]);
-            const [kelas, setKelas] = useState([]);
-            const [tp, setTp] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [selectedTp, setSelectedTp] = useState('');
-            const [changes, setChanges] = useState({});
-            const [saving, setSaving] = useState(false);
-            const [massFrom, setMassFrom] = useState('');
-            const [massTo, setMassTo] = useState('');
-
-            useEffect(() => { fetchData(); }, []);
-
-            const fetchData = async () => {
-                setLoading(true);
-                try {
-                    const [resSantri, resKelas, resTp] = await Promise.all([ apiService.request('getSantri'), apiService.request('getKelas'), apiService.request('getTahunPelajaran') ]);
-                    setSantri((resSantri.data || []).filter(s => s.status === 'Aktif'));
-                    setKelas(resKelas.data || []);
-                    setTp(resTp.data || []);
-                    const aktifTp = (resTp.data || []).find(t => t.status === 'Aktif');
-                    if (aktifTp) setSelectedTp(aktifTp.tp_id);
-                } catch (err) { showToast(err.message, 'error'); } finally { setLoading(false); }
-            };
-
-            const handleMassUpdate = () => {
-                if (!massFrom || !massTo) return showToast('Pilih kelas asal dan tujuan untuk mass update', 'error');
-                const newChanges = { ...changes };
-                let count = 0;
-                santri.forEach(s => {
-                    if (s.kelas === massFrom) { newChanges[s.santri_id] = { kelas_baru: massTo, status_baru: 'Aktif' }; count++; }
-                });
-                setChanges(newChanges);
-                showToast(`${count} santri ditandai naik ke kelas ${massTo}`, 'success');
-            };
-
-            const handleSimpan = async () => {
-                if (!selectedTp) return showToast('Pilih Tahun Pelajaran target!', 'error');
-                const mutations = Object.keys(changes).map(id => ({ santri_id: id, tp_id: selectedTp, kelas_baru: changes[id].kelas_baru, status_baru: changes[id].status_baru }));
-                if (mutations.length === 0) return showToast('Belum ada perubahan data.', 'error');
-                if (!confirm(`Anda yakin memproses ${mutations.length} data santri ke Spreadsheet?`)) return;
-                
-                setSaving(true);
-                try {
-                    await apiService.request('saveKenaikanKelas', { mutations });
-                    showToast('Proses kenaikan kelas berhasil disimpan permanen!', 'success');
-                    setChanges({}); fetchData();
-                } catch (err) { showToast(err.message, 'error'); } finally { setSaving(false); }
-            };
-
-            return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-800">Proses Kenaikan Kelas</h2>
-                        <p className="text-gray-500">Pindahkan santri secara massal ke kelas baru tanpa menghapus histori lama.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <Card>
-                            <h3 className="font-semibold text-gray-700 mb-4">1. Pilih Tahun Pelajaran Target</h3>
-                            <select className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500" value={selectedTp} onChange={(e) => setSelectedTp(e.target.value)}>
-                                <option value="">-- Pilih Tahun Pelajaran --</option>
-                                {tp.map(t => <option key={t.tp_id} value={t.tp_id}>{t.nama_periode} ({t.status})</option>)}
-                            </select>
-                            <p className="text-xs text-gray-500 mt-2">Data ini digunakan untuk log rekam jejak histori kelas.</p>
-                        </Card>
-                        
-                        <Card>
-                            <h3 className="font-semibold text-gray-700 mb-4">2. Alat Ubah Massal</h3>
-                            <div className="flex flex-col sm:flex-row gap-2">
-                                <select className="flex-1 px-3 py-2 border rounded-lg text-sm outline-none" value={massFrom} onChange={e => setMassFrom(e.target.value)}>
-                                    <option value="">-- Dari Kelas --</option>
-                                    {kelas.map(k => <option key={k.kelas_id} value={k.nama_kelas}>{k.nama_kelas}</option>)}
-                                </select>
-                                <select className="flex-1 px-3 py-2 border rounded-lg text-sm outline-none" value={massTo} onChange={e => setMassTo(e.target.value)}>
-                                    <option value="">-- Ke Kelas --</option>
-                                    {kelas.map(k => <option key={k.kelas_id} value={k.nama_kelas}>{k.nama_kelas}</option>)}
-                                </select>
-                                <Button onClick={handleMassUpdate} className="text-sm py-2 px-6">Terapkan</Button>
-                            </div>
-                        </Card>
-                    </div>
-
-                    <Card>
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-                            <h3 className="font-semibold text-gray-700">3. Preview & Koreksi Manual</h3>
-                            <Button onClick={handleSimpan} disabled={saving || Object.keys(changes).length === 0}>{saving ? 'Menyimpan ke Database...' : `Simpan ${Object.keys(changes).length} Perubahan`}</Button>
-                        </div>
-                        
-                        <div className="overflow-x-auto rounded-lg border border-gray-200">
-                            <table className="w-full text-left border-collapse text-sm">
-                                <thead>
-                                    <tr className="bg-gray-100 text-gray-700">
-                                        <th className="p-4 font-semibold">Nama Santri</th>
-                                        <th className="p-4 font-semibold">Kelas Lama</th>
-                                        <th className="p-4 font-semibold">Pindah Ke Kelas</th>
-                                        <th className="p-4 font-semibold">Status Baru</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {loading ? <tr><td colSpan="4" className="p-8 text-center text-gray-500">Memuat data dari Google Sheets...</td></tr>
-                                    : santri.map(s => {
-                                        const isChanged = !!changes[s.santri_id];
-                                        const currentData = changes[s.santri_id] || { kelas_baru: s.kelas, status_baru: s.status };
-                                        return (
-                                            <tr key={s.santri_id} className={isChanged ? 'bg-emerald-50/50' : 'hover:bg-gray-50 transition-colors'}>
-                                                <td className="p-4 font-medium text-gray-800">{s.nama} {isChanged && <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">Diedit</span>}</td>
-                                                <td className="p-4 text-gray-500">{s.kelas}</td>
-                                                <td className="p-4">
-                                                    <select className={`w-full px-2 py-1 border rounded text-sm outline-none ${isChanged ? 'border-emerald-300 bg-white' : 'border-gray-200 bg-gray-50'}`} value={currentData.kelas_baru} onChange={e => setChanges({...changes, [s.santri_id]: {...currentData, kelas_baru: e.target.value}})}>
-                                                        <option value={s.kelas}>{s.kelas} (Tetap)</option>
-                                                        {kelas.map(k => <option key={k.kelas_id} value={k.nama_kelas}>{k.nama_kelas}</option>)}
-                                                    </select>
-                                                </td>
-                                                <td className="p-4">
-                                                    <select className={`w-full px-2 py-1 border rounded text-sm outline-none ${isChanged ? 'border-emerald-300 bg-white' : 'border-gray-200 bg-gray-50'}`} value={currentData.status_baru} onChange={e => setChanges({...changes, [s.santri_id]: {...currentData, status_baru: e.target.value}})}>
-                                                        <option value="Aktif">Aktif</option>
-                                                        <option value="Lulus">Lulus</option>
-                                                        <option value="Nonaktif">Nonaktif</option>
-                                                    </select>
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Card>
-                </div>
-            );
-        };
-
-        const JadwalPerizinanPage = () => {
-            const { showToast } = useContext(ToastContext);
-            const [jadwal, setJadwal] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [isModalOpen, setIsModalOpen] = useState(false);
-            const [formData, setFormData] = useState({ jadwal_id: '', pekan: '', jenjang: '', gender: '', hari: 'Jumat', jam_mulai: '', jam_selesai: '' });
-            const [saving, setSaving] = useState(false);
-
-            useEffect(() => { fetchJadwal(); }, []);
-
-            const fetchJadwal = async () => {
-                setLoading(true);
-                try {
-                    const res = await apiService.request('getJadwal');
-                    // Mengurutkan jadwal berdasarkan pekan (1, 2, 3, 4)
-                    const sortedData = (res.data || []).sort((a, b) => parseInt(a.pekan) - parseInt(b.pekan));
-                    setJadwal(sortedData);
-                } catch (err) { showToast(err.message, 'error'); } finally { setLoading(false); }
-            };
-
-            const handleEdit = (data) => {
-                setFormData(data);
-                setIsModalOpen(true);
-            };
-
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                setSaving(true);
-                try {
-                    await apiService.request('saveJadwal', formData);
-                    showToast('Jadwal berhasil diperbarui!', 'success');
-                    setIsModalOpen(false); 
-                    fetchJadwal();
-                } catch (err) { showToast(err.message, 'error'); } finally { setSaving(false); }
-            };
-
-            return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-800">Jadwal Perizinan (Jumat)</h2>
-                        <p className="text-gray-500">Sistem akan secara otomatis menentukan tanggal perizinan berdasarkan jadwal yang aktif di bawah ini.</p>
-                    </div>
-
-                    <Card>
-                        <div className="overflow-x-auto rounded-lg border border-gray-200">
-                            <table className="w-full text-left border-collapse text-sm">
-                                <thead>
-                                    <tr className="bg-emerald-50 text-emerald-800">
-                                        <th className="p-4 font-semibold">Pekan Ke-</th>
-                                        <th className="p-4 font-semibold">Jenjang</th>
-                                        <th className="p-4 font-semibold">Gender</th>
-                                        <th className="p-4 font-semibold">Hari</th>
-                                        <th className="p-4 font-semibold">Jam Resmi</th>
-                                        <th className="p-4 font-semibold text-center">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 bg-white">
-                                    {loading ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Memuat data konfigurasi jadwal...</td></tr>
-                                    : jadwal.map(item => (
-                                        <tr key={item.jadwal_id} className="hover:bg-gray-50">
-                                            <td className="p-4 font-bold text-gray-800 text-lg">Pekan {item.pekan}</td>
-                                            <td className="p-4"><span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">{item.jenjang}</span></td>
-                                            <td className="p-4 text-gray-600">{item.gender}</td>
-                                            <td className="p-4 text-gray-600 font-medium">{item.hari}</td>
-                                            <td className="p-4 text-gray-600">{item.jam_mulai} - {item.jam_selesai}</td>
-                                            <td className="p-4 flex justify-center">
-                                                <button onClick={() => handleEdit(item)} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors border border-emerald-100 flex items-center gap-1 text-xs font-medium">
-                                                    <Icons.Edit /> Edit Aturan
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Card>
-
-                    {isModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-                            <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in-down">
-                                <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                                    <h3 className="text-xl font-bold text-gray-800">Ubah Aturan Pekan {formData.pekan}</h3>
-                                    <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><Icons.XCircle /></button>
-                                </div>
-                                <form id="jadwalForm" onSubmit={handleSubmit} className="p-6 space-y-4">
-                                    <Input name="pekan" label="Pekan Ke-" readOnly value={formData.pekan} />
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <Select name="jenjang" label="Jenjang (Target)" required options={['SMP', 'SMA']} value={formData.jenjang} onChange={(e) => setFormData({...formData, jenjang: e.target.value})} />
-                                        <Select name="gender" label="Gender (Target)" required options={['Laki-laki', 'Perempuan']} value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} />
-                                    </div>
-                                    <Select name="hari" label="Hari Penjengukan" required options={['Jumat', 'Sabtu', 'Minggu']} value={formData.hari} onChange={(e) => setFormData({...formData, hari: e.target.value})} />
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <Input type="time" name="jam_mulai" label="Jam Mulai" required value={formData.jam_mulai} onChange={(e) => setFormData({...formData, jam_mulai: e.target.value})} />
-                                        <Input type="time" name="jam_selesai" label="Jam Selesai" required value={formData.jam_selesai} onChange={(e) => setFormData({...formData, jam_selesai: e.target.value})} />
-                                    </div>
-                                    <p className="text-xs text-red-500 mt-2">*Catatan: Waktu toleransi kepulangan (misal 16.30) dikonfigurasi terpisah melalui Menu Pengaturan.</p>
-                                </form>
-                                <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
-                                    <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Batal</Button>
-                                    <Button type="submit" onClick={(e) => { e.preventDefault(); document.getElementById('jadwalForm').requestSubmit(); }} disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan Perubahan'}</Button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
+        // --- DASHBOARD PAGES ---
         const DashboardAdmin = () => (
             <div className="space-y-6">
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Dashboard Admin</h2>
-                    <p className="text-gray-500">Ringkasan perizinan pondok secara keseluruhan.</p>
-                </div>
+                <div><h2 className="text-2xl font-bold text-gray-800">Dashboard Admin</h2><p className="text-gray-500">Ringkasan perizinan pondok.</p></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <StatCard title="Total Pengajuan Hari Ini" value="0" icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
-                    <StatCard title="Santri Keluar" value="0" icon={<Icons.Scan />} color="bg-yellow-50 text-yellow-600" />
-                    <StatCard title="Santri Kembali" value="0" icon={<Icons.Users />} color="bg-emerald-50 text-emerald-600" />
-                    <StatCard title="Terlambat" value="0" icon={<Icons.Settings />} color="bg-red-50 text-red-600" />
+                    <StatCard title="Total Pengajuan" value="-" icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
+                    <StatCard title="Santri Keluar" value="-" icon={<Icons.Scan />} color="bg-yellow-50 text-yellow-600" />
+                    <StatCard title="Santri Kembali" value="-" icon={<Icons.Users />} color="bg-emerald-50 text-emerald-600" />
+                    <StatCard title="Terlambat" value="-" icon={<Icons.Settings />} color="bg-red-50 text-red-600" />
                 </div>
             </div>
         );
@@ -803,7 +548,7 @@
                 e.preventDefault(); setLoading(true);
                 try {
                     const res = await apiService.request('login', { username, password });
-                    if (!res.data || !res.data.role) throw new Error("Login ditolak. Pastikan GAS di-deploy Versi Baru.");
+                    if (!res.data || !res.data.role) throw new Error("Login gagal. Periksa kembali backend/role.");
                     login(res.data);
                     showToast(`Selamat datang, ${res.data.nama}`, 'success');
                 } catch (err) { showToast(err.message, 'error'); } finally { setLoading(false); }
@@ -819,7 +564,7 @@
                     <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
                         <Card className="py-8 px-4 sm:px-10">
                             <form className="space-y-6" onSubmit={handleSubmit}>
-                                <Input name="username" label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="admin" />
+                                <Input name="username" label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="Misal: admin, walikelas" />
                                 <Input name="password" label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="123" />
                                 <Button type="submit" fullWidth disabled={loading}>{loading ? 'Memverifikasi...' : 'Masuk ke Sistem'}</Button>
                             </form>
@@ -829,15 +574,27 @@
             );
         };
 
-        const MainRouter = ({ currentRoute }) => {
+        const MainRouter = ({ currentRoute, setCurrentRoute }) => {
             const { user } = useContext(AuthContext);
 
-            if (currentRoute === 'dashboard') return user.role === ROLES.ADMIN ? <DashboardAdmin /> : <div className="p-4">Dashboard Role Ini Belum Aktif</div>;
-            if (currentRoute === 'master_santri' && user.role === ROLES.ADMIN) return <DataSantriPage />;
-            if (currentRoute === 'master_kelas' && user.role === ROLES.ADMIN) return <MasterKelasPage />;
-            if (currentRoute === 'tahun_pelajaran' && user.role === ROLES.ADMIN) return <TahunPelajaranPage />;
-            if (currentRoute === 'kenaikan_kelas' && user.role === ROLES.ADMIN) return <KenaikanKelasPage />;
-            if (currentRoute === 'jadwal_perizinan' && user.role === ROLES.ADMIN) return <JadwalPerizinanPage />;
+            if (currentRoute === 'dashboard') {
+                if (user.role === ROLES.ADMIN) return <DashboardAdmin />;
+                if (user.role === ROLES.WALI_KELAS) return (
+                    <div className="space-y-6">
+                        <div><h2 className="text-2xl font-bold text-gray-800">Dashboard Wali Kelas</h2></div>
+                        <Button onClick={() => setCurrentRoute('pengajuan')} icon={<Icons.Plus />}>Buat Pengajuan Baru</Button>
+                    </div>
+                );
+            }
+            if (currentRoute === 'master_santri' && user.role === ROLES.ADMIN) return <div className="p-4">Menu Data Santri (Phase 2 Selesai)</div>;
+            if (currentRoute === 'master_kelas' && user.role === ROLES.ADMIN) return <div className="p-4">Menu Master Kelas (Phase 2 Selesai)</div>;
+            if (currentRoute === 'tahun_pelajaran' && user.role === ROLES.ADMIN) return <div className="p-4">Menu Tahun Pelajaran (Phase 2 Selesai)</div>;
+            if (currentRoute === 'kenaikan_kelas' && user.role === ROLES.ADMIN) return <div className="p-4">Menu Kenaikan Kelas (Phase 3 Selesai)</div>;
+            if (currentRoute === 'jadwal_perizinan' && user.role === ROLES.ADMIN) return <div className="p-4">Menu Jadwal (Phase 4 Selesai)</div>;
+            
+            // Phase 5 Routing
+            if (currentRoute === 'pengajuan' && user.role === ROLES.WALI_KELAS) return <AjukanIzinPage setCurrentRoute={setCurrentRoute} />;
+            if (currentRoute === 'histori' && user.role === ROLES.WALI_KELAS) return <HistoriKelasPage />;
             
             return (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
