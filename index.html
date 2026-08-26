@@ -988,18 +988,52 @@
 
         // --- DASHBOARD ADMIN & SEKRETARIS MUDIR ---
         const DashboardManajemen = ({ title, subtitle }) => {
+            const { showToast } = useContext(ToastContext);
+            const [stats, setStats] = useState({ ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0, rekapTepat: 0 });
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const fetchData = async () => {
+                    try {
+                        const [resPermits, resLogs] = await Promise.all([ apiService.request('getPermits'), apiService.request('getScanLogs') ]);
+                        const allPermits = resPermits.data || [];
+                        const allLogs = resLogs.data || [];
+                        
+                        let s = { ajuan: allPermits.length, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0, rekapTepat: 0 };
+                        
+                        allPermits.forEach(p => {
+                            if (p.status_pengajuan === 'DISETUJUI') s.disetujui++;
+                            if (p.status_pengajuan === 'DITOLAK') s.ditolak++;
+                            
+                            const pLogs = allLogs.filter(l => l.permit_id === p.permit_id);
+                            const hasExit = pLogs.some(l => l.tipe_scan === 'EXIT');
+                            const returnLog = pLogs.find(l => l.tipe_scan === 'RETURN');
+                            
+                            if (hasExit && !returnLog) s.diluar++;
+                            if (returnLog) {
+                                s.kembali++;
+                                if (returnLog.keterangan && returnLog.keterangan.includes('TERLAMBAT')) s.terlambat++;
+                                else s.rekapTepat++;
+                            }
+                        });
+                        setStats(s);
+                    } catch (e) { console.error(e); } finally { setLoading(false); }
+                };
+                fetchData();
+            }, []);
+
             return (
                 <div className="space-y-6 animate-fade-in-down">
                     <div><h2 className="text-2xl font-bold text-gray-800">{title}</h2><p className="text-gray-500">{subtitle}</p></div>
                     
                     <h3 className="text-lg font-bold text-emerald-800 border-b pb-2 mt-4">Statistik Pekan Ini</h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                        <StatCard title="Total Ajuan" value="0" icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
-                        <StatCard title="Disetujui" value="0" icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
-                        <StatCard title="Ditolak" value="0" icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
-                        <StatCard title="Masih Di Luar" value="0" icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600" />
-                        <StatCard title="Sudah Kembali" value="0" icon={<Icons.Home />} color="bg-teal-50 text-teal-600" />
-                        <StatCard title="Terlambat" value="0" icon={<Icons.Clock />} color="bg-rose-50 text-rose-600" />
+                        <StatCard title="Total Ajuan" value={loading ? "..." : stats.ajuan} icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
+                        <StatCard title="Disetujui" value={loading ? "..." : stats.disetujui} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
+                        <StatCard title="Ditolak" value={loading ? "..." : stats.ditolak} icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
+                        <StatCard title="Masih Di Luar" value={loading ? "..." : stats.diluar} icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600" />
+                        <StatCard title="Sudah Kembali" value={loading ? "..." : stats.kembali} icon={<Icons.Home />} color="bg-teal-50 text-teal-600" />
+                        <StatCard title="Terlambat" value={loading ? "..." : stats.terlambat} icon={<Icons.Clock />} color="bg-rose-50 text-rose-600" />
                     </div>
 
                     <h3 className="text-lg font-bold text-emerald-800 border-b pb-2 mt-8">Rekapitulasi Histori</h3>
@@ -1014,9 +1048,10 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <RekapRow periode="Bulan Ini" ajuan="0" tepatWaktu="0" terlambat="0" />
-                                <RekapRow periode="Semester Ini" ajuan="0" tepatWaktu="0" terlambat="0" />
-                                <RekapRow periode="Tahun Pelajaran Ini" ajuan="0" tepatWaktu="0" terlambat="0" />
+                                {/* Untuk sementara, data riwayat kita himpun dari total keseluruhan data database */}
+                                <RekapRow periode="Bulan Ini" ajuan={loading ? "..." : stats.ajuan} tepatWaktu={loading ? "..." : stats.rekapTepat} terlambat={loading ? "..." : stats.terlambat} />
+                                <RekapRow periode="Semester Ini" ajuan={loading ? "..." : stats.ajuan} tepatWaktu={loading ? "..." : stats.rekapTepat} terlambat={loading ? "..." : stats.terlambat} />
+                                <RekapRow periode="Tahun Pelajaran Ini" ajuan={loading ? "..." : stats.ajuan} tepatWaktu={loading ? "..." : stats.rekapTepat} terlambat={loading ? "..." : stats.terlambat} />
                             </tbody>
                         </table>
                     </Card>
@@ -1027,6 +1062,38 @@
         // --- DASHBOARD WALI KELAS ---
         const DashboardWaliKelas = ({ setCurrentRoute }) => {
             const { user } = useContext(AuthContext);
+            const { showToast } = useContext(ToastContext);
+            const [stats, setStats] = useState({ ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0 });
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const fetchData = async () => {
+                    try {
+                        const [resPermits, resLogs] = await Promise.all([ apiService.request('getPermits'), apiService.request('getScanLogs') ]);
+                        
+                        const myPermits = (resPermits.data || []).filter(p => p.kelas === user.kelas_id);
+                        let s = { ajuan: myPermits.length, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0 };
+                        
+                        myPermits.forEach(p => {
+                            if (p.status_pengajuan === 'DISETUJUI') s.disetujui++;
+                            if (p.status_pengajuan === 'DITOLAK') s.ditolak++;
+                            
+                            const pLogs = (resLogs.data || []).filter(l => l.permit_id === p.permit_id);
+                            const hasExit = pLogs.some(l => l.tipe_scan === 'EXIT');
+                            const returnLog = pLogs.find(l => l.tipe_scan === 'RETURN');
+                            
+                            if (hasExit && !returnLog) s.diluar++;
+                            if (returnLog) {
+                                s.kembali++;
+                                if (returnLog.keterangan && returnLog.keterangan.includes('TERLAMBAT')) s.terlambat++;
+                            }
+                        });
+                        setStats(s);
+                    } catch (e) { console.error(e); } finally { setLoading(false); }
+                };
+                if (user.kelas_id) fetchData(); else setLoading(false);
+            }, [user.kelas_id]);
+
             return (
                 <div className="space-y-6 animate-fade-in-down">
                     <div className="flex justify-between items-center">
@@ -1038,12 +1105,12 @@
                     </div>
                     
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        <StatCard title="Total Ajuan" value="0" icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
-                        <StatCard title="Disetujui" value="0" icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
-                        <StatCard title="Ditolak" value="0" icon={<Icons.XCircle />} color="bg-gray-100 text-gray-600" />
-                        <StatCard title="Masih Di Luar" value="0" icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600" />
-                        <StatCard title="Sudah Kembali" value="0" icon={<Icons.Home />} color="bg-teal-50 text-teal-600" />
-                        <StatCard title="Terlambat" value="0" icon={<Icons.Clock />} color="bg-red-50 text-red-600" />
+                        <StatCard title="Total Ajuan" value={loading ? "..." : stats.ajuan} icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
+                        <StatCard title="Disetujui" value={loading ? "..." : stats.disetujui} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
+                        <StatCard title="Ditolak" value={loading ? "..." : stats.ditolak} icon={<Icons.XCircle />} color="bg-gray-100 text-gray-600" />
+                        <StatCard title="Masih Di Luar" value={loading ? "..." : stats.diluar} icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600" />
+                        <StatCard title="Sudah Kembali" value={loading ? "..." : stats.kembali} icon={<Icons.Home />} color="bg-teal-50 text-teal-600" />
+                        <StatCard title="Terlambat" value={loading ? "..." : stats.terlambat} icon={<Icons.Clock />} color="bg-red-50 text-red-600" />
                     </div>
                 </div>
             );
@@ -1051,22 +1118,52 @@
 
         // --- DASHBOARD SECURITY ---
         const DashboardSecurity = ({ setCurrentRoute }) => {
+            const { showToast } = useContext(ToastContext);
+            const [stats, setStats] = useState({ disetujui: 0, keluar: 0, diluar: 0, kembali: 0, terlambat: 0 });
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const fetchData = async () => {
+                    try {
+                        const [resPermits, resLogs] = await Promise.all([ apiService.request('getPermits'), apiService.request('getScanLogs') ]);
+                        const allPermits = resPermits.data || [];
+                        const allLogs = resLogs.data || [];
+                        
+                        let s = { disetujui: 0, keluar: 0, diluar: 0, kembali: 0, terlambat: 0 };
+                        
+                        allPermits.forEach(p => {
+                            if (p.status_pengajuan === 'DISETUJUI') s.disetujui++;
+                            
+                            const pLogs = allLogs.filter(l => l.permit_id === p.permit_id);
+                            const hasExit = pLogs.some(l => l.tipe_scan === 'EXIT');
+                            const returnLog = pLogs.find(l => l.tipe_scan === 'RETURN');
+                            
+                            if (hasExit) s.keluar++;
+                            if (hasExit && !returnLog) s.diluar++;
+                            if (returnLog) {
+                                s.kembali++;
+                                if (returnLog.keterangan && returnLog.keterangan.includes('TERLAMBAT')) s.terlambat++;
+                            }
+                        });
+                        setStats(s);
+                    } catch (e) { console.error(e); } finally { setLoading(false); }
+                };
+                fetchData();
+            }, []);
+
             return (
                 <div className="space-y-6 animate-fade-in-down">
                     <div className="flex justify-between items-center border-b pb-4">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-800">Pos Gerbang Utama</h2>
-                            <p className="text-gray-500">Pantauan mobilitas santri pekan ini.</p>
-                        </div>
+                        <div><h2 className="text-2xl font-bold text-gray-800">Pos Gerbang Utama</h2><p className="text-gray-500">Pantauan mobilitas santri pekan ini.</p></div>
                         <Button onClick={() => setCurrentRoute('scanner')} icon={<Icons.Scan />} className="shadow-md">Mulai Scan QR</Button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                        <StatCard title="Target Keluar (Disetujui)" value="0" icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
-                        <StatCard title="Sudah Keluar" value="0" icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600" />
-                        <StatCard title="Masih Di Luar" value="0" icon={<Icons.Clock />} color="bg-yellow-50 text-yellow-600" />
-                        <StatCard title="Sudah Kembali" value="0" icon={<Icons.Home />} color="bg-emerald-50 text-emerald-600" />
-                        <StatCard title="Terlambat" value="0" icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
+                        <StatCard title="Target Keluar" value={loading ? "..." : stats.disetujui} icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
+                        <StatCard title="Sudah Keluar" value={loading ? "..." : stats.keluar} icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600" />
+                        <StatCard title="Masih Di Luar" value={loading ? "..." : stats.diluar} icon={<Icons.Clock />} color="bg-yellow-50 text-yellow-600" />
+                        <StatCard title="Sudah Kembali" value={loading ? "..." : stats.kembali} icon={<Icons.Home />} color="bg-emerald-50 text-emerald-600" />
+                        <StatCard title="Terlambat" value={loading ? "..." : stats.terlambat} icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
                     </div>
                 </div>
             );
