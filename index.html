@@ -1811,11 +1811,11 @@
             }
             
             // ADMIN MENU ROUTING
-            if (currentRoute === 'master-santri' && user.role === ROLES.ADMIN) return <DataSantriPage />;
-            if (currentRoute === 'master-kelas' && user.role === ROLES.ADMIN) return <DataKelasPage />;
-            if (currentRoute === 'master-tp' && user.role === ROLES.ADMIN) return <TahunPelajaranPage />;
+            if (currentRoute === 'master_santri' && user.role === ROLES.ADMIN) return <DataSantriPage />;
+            if (currentRoute === 'master_kelas' && user.role === ROLES.ADMIN) return <DataKelasPage />;
+            if (currentRoute === 'master_tp' && user.role === ROLES.ADMIN) return <TahunPelajaranPage />;
             if (currentRoute === 'kenaikan_kelas' && user.role === ROLES.ADMIN) return <KenaikanKelasPage />;
-            if (currentRoute === 'aturan-jadwal' && user.role === ROLES.ADMIN) return <JadwalPerizinanPage />;
+            if (currentRoute === 'aturan_jadwal' && user.role === ROLES.ADMIN) return <JadwalPerizinanPage />;
             if (currentRoute === 'perizinan' && user.role === ROLES.ADMIN) return <SemuaPerizinanPage />;
             
             // WALI KELAS MENU ROUTING
