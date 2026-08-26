@@ -975,94 +975,98 @@
                 </div>
             );
         };
+             
+        // --- KOMPONEN BANTUAN UNTUK TABEL REKAP (ADMIN & SEKRETARIS) ---
+        const RekapRow = ({ periode, ajuan, tepatWaktu, terlambat }) => (
+            <tr className="border-b hover:bg-gray-50 text-sm">
+                <td className="p-3 font-bold text-gray-800">{periode}</td>
+                <td className="p-3 text-blue-600 font-medium">{ajuan}</td>
+                <td className="p-3 text-emerald-600 font-medium">{tepatWaktu}</td>
+                <td className="p-3 text-red-600 font-medium">{terlambat}</td>
+            </tr>
+        );
 
-        const DashboardWaliKelas = ({ setCurrentRoute }) => {
-            const { user } = useContext(AuthContext);
-            const { showToast } = useContext(ToastContext);
-            const [stats, setStats] = useState({ disetujui: 0, menunggu: 0, ditolak: 0 });
-            const [loading, setLoading] = useState(true);
-
-            useEffect(() => {
-                const fetchPermits = async () => {
-                    try {
-                        const res = await apiService.request('getPermits');
-                        // Filter otomatis khusus untuk kelas yang dipegang wali kelas ini
-                        const myClassPermits = res.data.filter(p => p.kelas === user.kelas_id);
-                        setStats({
-                            menunggu: myClassPermits.filter(p => p.status_pengajuan === 'MENUNGGU_APPROVAL').length,
-                            disetujui: myClassPermits.filter(p => p.status_pengajuan === 'DISETUJUI').length,
-                            ditolak: myClassPermits.filter(p => p.status_pengajuan === 'DITOLAK').length,
-                        });
-                    } catch (e) { console.error(e); } finally { setLoading(false); }
-                };
-                if (user.kelas_id) fetchPermits();
-                else setLoading(false);
-            }, [user.kelas_id]);
-
+        // --- DASHBOARD ADMIN & SEKRETARIS MUDIR ---
+        const DashboardManajemen = ({ title, subtitle }) => {
             return (
                 <div className="space-y-6 animate-fade-in-down">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div><h2 className="text-2xl font-bold text-gray-800">{title}</h2><p className="text-gray-500">{subtitle}</p></div>
+                    
+                    <h3 className="text-lg font-bold text-emerald-800 border-b pb-2 mt-4">Statistik Pekan Ini</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <StatCard title="Total Ajuan" value="0" icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
+                        <StatCard title="Disetujui" value="0" icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
+                        <StatCard title="Ditolak" value="0" icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
+                        <StatCard title="Masih Di Luar" value="0" icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600" />
+                        <StatCard title="Sudah Kembali" value="0" icon={<Icons.Home />} color="bg-teal-50 text-teal-600" />
+                        <StatCard title="Terlambat" value="0" icon={<Icons.Clock />} color="bg-rose-50 text-rose-600" />
+                    </div>
+
+                    <h3 className="text-lg font-bold text-emerald-800 border-b pb-2 mt-8">Rekapitulasi Histori</h3>
+                    <Card className="overflow-x-auto p-0">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-gray-100 text-gray-700 border-b">
+                                    <th className="p-3">Periode Waktu</th>
+                                    <th className="p-3">Total Ajuan Izin</th>
+                                    <th className="p-3">Kembali Tepat Waktu</th>
+                                    <th className="p-3">Total Terlambat</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <RekapRow periode="Bulan Ini" ajuan="0" tepatWaktu="0" terlambat="0" />
+                                <RekapRow periode="Semester Ini" ajuan="0" tepatWaktu="0" terlambat="0" />
+                                <RekapRow periode="Tahun Pelajaran Ini" ajuan="0" tepatWaktu="0" terlambat="0" />
+                            </tbody>
+                        </table>
+                    </Card>
+                </div>
+            );
+        };
+
+        // --- DASHBOARD WALI KELAS ---
+        const DashboardWaliKelas = ({ setCurrentRoute }) => {
+            const { user } = useContext(AuthContext);
+            return (
+                <div className="space-y-6 animate-fade-in-down">
+                    <div className="flex justify-between items-center">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800">Dashboard Wali Kelas</h2>
-                            <p className="text-gray-500">Ringkasan pengajuan izin kelas <strong className="text-emerald-700">{user.kelas_id || 'Belum Diatur'}</strong></p>
+                            <p className="text-gray-500">Statistik Pekan Ini untuk Kelas <strong className="text-emerald-700">{user.kelas_id || 'Belum Diatur'}</strong></p>
                         </div>
                         <Button onClick={() => setCurrentRoute('pengajuan')} icon={<Icons.Plus />}>Ajukan Izin Baru</Button>
                     </div>
                     
-                    {!user.kelas_id && (
-                        <div className="p-4 bg-yellow-50 text-yellow-800 rounded-lg border border-yellow-200 text-sm">
-                            ⚠️ Perhatian: ID Kelas Anda belum diatur di database (Sheet USERS). Statistik kelas tidak dapat ditampilkan.
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <StatCard title="Menunggu Approval" value={loading ? "..." : stats.menunggu} icon={<Icons.FileText />} color="bg-yellow-50 text-yellow-600" />
-                        <StatCard title="Izin Disetujui" value={loading ? "..." : stats.disetujui} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
-                        <StatCard title="Izin Ditolak" value={loading ? "..." : stats.ditolak} icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <StatCard title="Total Ajuan" value="0" icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
+                        <StatCard title="Disetujui" value="0" icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
+                        <StatCard title="Ditolak" value="0" icon={<Icons.XCircle />} color="bg-gray-100 text-gray-600" />
+                        <StatCard title="Masih Di Luar" value="0" icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600" />
+                        <StatCard title="Sudah Kembali" value="0" icon={<Icons.Home />} color="bg-teal-50 text-teal-600" />
+                        <StatCard title="Terlambat" value="0" icon={<Icons.Clock />} color="bg-red-50 text-red-600" />
                     </div>
                 </div>
             );
         };
 
+        // --- DASHBOARD SECURITY ---
         const DashboardSecurity = ({ setCurrentRoute }) => {
             return (
-                <div className="space-y-6 animate-fade-in-down text-center py-12">
-                    <div className="w-24 h-24 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
-                        <Icons.Scan />
-                    </div>
-                    <h2 className="text-3xl font-bold text-gray-800">Siap Bertugas!</h2>
-                    <p className="text-gray-500 max-w-md mx-auto mt-2 mb-8">Gunakan menu Scanner untuk mencatat jam kedatangan dan kepulangan santri di gerbang utama.</p>
-                    <div className="flex flex-col sm:flex-row justify-center gap-4">
-                        <Button onClick={() => setCurrentRoute('scanner')} icon={<Icons.Scan />} className="px-8 py-3 text-lg shadow-md">Buka Kamera Scanner</Button>
-                        <Button variant="secondary" onClick={() => setCurrentRoute('log')} icon={<Icons.FileText />} className="px-8 py-3 text-lg">Lihat Riwayat Hari Ini</Button>
-                    </div>
-                </div>
-            );
-        };
-        
-        const DashboardAdmin = () => {
-            const { showToast } = useContext(ToastContext);
-            const [stats, setStats] = useState({ total_bulan: 0, masih_di_luar: 0, sudah_kembali: 0, terlambat: 0 });
-            const [loading, setLoading] = useState(true);
-
-            useEffect(() => {
-                const fetchStats = async () => {
-                    try {
-                        const res = await apiService.request('getDashboardStats');
-                        setStats(res.data);
-                    } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
-                };
-                fetchStats();
-            }, []);
-
-            return (
                 <div className="space-y-6 animate-fade-in-down">
-                    <div><h2 className="text-2xl font-bold text-gray-800">Dashboard Admin</h2><p className="text-gray-500">Ringkasan perizinan pondok secara keseluruhan.</p></div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <StatCard title="Total Izin (Bulan Ini)" value={loading ? "..." : stats.total_bulan} icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
-                        <StatCard title="Masih Di Luar" value={loading ? "..." : stats.masih_di_luar} icon={<Icons.Scan />} color="bg-orange-50 text-orange-600" />
-                        <StatCard title="Sudah Kembali" value={loading ? "..." : stats.sudah_kembali} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
-                        <StatCard title="Terlambat (Bulan Ini)" value={loading ? "..." : stats.terlambat} icon={<Icons.Clock />} color="bg-red-50 text-red-600" />
+                    <div className="flex justify-between items-center border-b pb-4">
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-800">Pos Gerbang Utama</h2>
+                            <p className="text-gray-500">Pantauan mobilitas santri pekan ini.</p>
+                        </div>
+                        <Button onClick={() => setCurrentRoute('scanner')} icon={<Icons.Scan />} className="shadow-md">Mulai Scan QR</Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <StatCard title="Target Keluar (Disetujui)" value="0" icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
+                        <StatCard title="Sudah Keluar" value="0" icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600" />
+                        <StatCard title="Masih Di Luar" value="0" icon={<Icons.Clock />} color="bg-yellow-50 text-yellow-600" />
+                        <StatCard title="Sudah Kembali" value="0" icon={<Icons.Home />} color="bg-emerald-50 text-emerald-600" />
+                        <StatCard title="Terlambat" value="0" icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
                     </div>
                 </div>
             );
@@ -1318,8 +1322,8 @@
             const { user } = useContext(AuthContext);
 
             if (currentRoute === 'dashboard') {
-                if (user.role === ROLES.ADMIN) return <DashboardAdmin />;
-                if (user.role === ROLES.SEKRETARIS_MUDIR) return <DashboardSecretary />;
+                if (user.role === ROLES.ADMIN) return <DashboardManajemen title="Dashboard Admin" subtitle="Ringkasan perizinan pondok secara keseluruhan." />;
+                if (user.role === ROLES.SEKRETARIS_MUDIR) return <DashboardManajemen title="Dashboard Sekretaris" subtitle="Rekapitulasi perizinan dan approval santri." />;
                 if (user.role === ROLES.WALI_KELAS) return <DashboardWaliKelas setCurrentRoute={setCurrentRoute} />;
                 if (user.role === ROLES.SECURITY) return <DashboardSecurity setCurrentRoute={setCurrentRoute} />;
             }
