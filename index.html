@@ -267,8 +267,8 @@
                     qrRef.current.innerHTML = '';
                     new QRCode(qrRef.current, {
                         text: permit.qr_token || permit.permit_id, 
-                        width: 120,
-                        height: 120,
+                        width: 100, // Diperkecil agar menghemat ruang vertikal
+                        height: 100,
                         colorDark : "#065f46",
                         colorLight : "#ffffff",
                         correctLevel : QRCode.CorrectLevel.H
@@ -296,70 +296,67 @@
             if (!isOpen || !permit) return null;
 
             return (
-                // 1. Pembungkus utama yang bisa di-scroll
-                <div className="fixed inset-0 z-50 overflow-y-auto animate-fade-in-down">
+                // Menggunakan penengah mutlak tanpa padding berlebih
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-sm animate-fade-in-down">
                     
-                    {/* 2. Background hitam blur (dipisah agar tidak ikut ter-scroll) */}
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose}></div>
+                    {/* Klik latar belakang hitam untuk menutup */}
+                    <div className="absolute inset-0" onClick={onClose}></div>
                     
-                    {/* 3. Penengah konten */}
-                    <div className="flex min-h-full items-center justify-center p-4 py-12">
+                    {/* Kotak Modal Utama - Dibatasi max-h-[95vh] agar tidak bablas ke bawah/atas layar */}
+                    <div className="relative w-full max-w-sm flex flex-col bg-white rounded-xl shadow-xl overflow-hidden max-h-[95vh]">
                         
-                        {/* 4. Kotak Modal Utama */}
-                        <div className="relative w-full max-w-sm flex flex-col bg-white rounded-xl shadow-xl">
-                            
-                            {/* Header */}
-                            <div className="px-4 py-3 border-b flex justify-between items-center bg-gray-50 rounded-t-xl shrink-0">
-                                <h3 className="font-bold text-gray-800">Kartu Perizinan</h3>
-                                <button onClick={onClose} className="text-gray-400 hover:text-red-500 transition-colors p-1"><Icons.XCircle /></button>
-                            </div>
-                            
-                            {/* Body (Isi Kartu) */}
-                            <div className="p-4 sm:p-6 bg-gray-100 flex justify-center">
-                                <div ref={cardRef} className="bg-white p-5 rounded-xl shadow-sm border-2 border-emerald-500 w-full relative">
-                                    <div className="absolute top-0 left-0 w-full h-2 bg-emerald-500"></div>
-                                    <div className="text-center mb-4 mt-2">
-                                        <h4 className="font-bold text-emerald-800 leading-tight">PONDOK PESANTREN<br/>MODERN AL-ISLAM</h4>
-                                        <p className="text-[10px] text-gray-500 mt-1 uppercase font-semibold tracking-wider">Perizinan Keluar Santri</p>
+                        {/* Header */}
+                        <div className="px-4 py-3 border-b flex justify-between items-center bg-gray-50 shrink-0">
+                            <h3 className="font-bold text-gray-800 text-sm">Kartu Perizinan</h3>
+                            <button onClick={onClose} className="text-gray-400 hover:text-red-500 transition-colors p-1"><Icons.XCircle /></button>
+                        </div>
+                        
+                        {/* Body (Isi Kartu yang sudah dirapatkan) */}
+                        <div className="p-4 flex justify-center bg-gray-100 overflow-y-auto">
+                            <div ref={cardRef} className="bg-white p-4 rounded-xl shadow-sm border-2 border-emerald-500 w-full relative">
+                                <div className="absolute top-0 left-0 w-full h-2 bg-emerald-500"></div>
+                                
+                                <div className="text-center mb-3 mt-1">
+                                    <h4 className="font-bold text-emerald-800 leading-tight text-sm">PONDOK PESANTREN<br/>MODERN AL-ISLAM</h4>
+                                    <p className="text-[10px] text-gray-500 mt-1 uppercase font-semibold tracking-wider">Perizinan Keluar Santri</p>
+                                </div>
+                                
+                                <div className="border-t border-b border-gray-100 py-2 mb-3 space-y-1.5">
+                                    <div>
+                                        <p className="text-[10px] text-gray-400 uppercase">Nama Santri</p>
+                                        <p className="font-bold text-gray-800 text-sm leading-tight">{permit.nama_santri}</p>
+                                        <p className="text-xs text-emerald-600 font-medium">{permit.kelas}</p>
                                     </div>
-                                    
-                                    <div className="border-t border-b border-gray-100 py-3 mb-4 space-y-2">
+                                    <div className="grid grid-cols-2 gap-2">
                                         <div>
-                                            <p className="text-[10px] text-gray-400 uppercase">Nama Santri</p>
-                                            <p className="font-bold text-gray-800 text-sm leading-tight">{permit.nama_santri}</p>
-                                            <p className="text-xs text-emerald-600 font-medium">{permit.kelas}</p>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div>
-                                                <p className="text-[10px] text-gray-400 uppercase">Tanggal</p>
-                                                <p className="font-semibold text-gray-700 text-xs">{permit.tanggal_izin}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] text-gray-400 uppercase">Jam Resmi</p>
-                                                <p className="font-bold text-emerald-600 text-xs">08.00 - 16.00</p>
-                                            </div>
+                                            <p className="text-[10px] text-gray-400 uppercase">Tanggal</p>
+                                            <p className="font-semibold text-gray-700 text-xs">{permit.tanggal_izin}</p>
                                         </div>
                                         <div>
-                                            <p className="text-[10px] text-gray-400 uppercase">Wali Safar</p>
-                                            <p className="font-semibold text-gray-700 text-xs">{permit.wali_safar} ({permit.hubungan_wali})</p>
+                                            <p className="text-[10px] text-gray-400 uppercase">Jam Resmi</p>
+                                            <p className="font-bold text-emerald-600 text-xs">08.00 - 16.00</p>
                                         </div>
                                     </div>
-
-                                    <div className="flex flex-col items-center justify-center">
-                                        <div ref={qrRef} className="p-2 border rounded-lg bg-white mb-2"></div>
-                                        <p className="text-[10px] text-gray-400 text-center leading-tight">Tunjukkan QR Code ini kepada<br/>Security saat keluar dan kembali.</p>
+                                    <div>
+                                        <p className="text-[10px] text-gray-400 uppercase">Wali Safar</p>
+                                        <p className="font-semibold text-gray-700 text-xs">{permit.wali_safar} ({permit.hubungan_wali})</p>
                                     </div>
                                 </div>
+
+                                <div className="flex flex-col items-center justify-center">
+                                    <div ref={qrRef} className="p-1.5 border rounded-lg bg-white mb-1.5"></div>
+                                    <p className="text-[9px] text-gray-400 text-center leading-tight">Tunjukkan QR Code ini kepada<br/>Security saat keluar dan kembali.</p>
+                                </div>
                             </div>
-                            
-                            {/* Footer */}
-                            <div className="p-4 bg-white border-t rounded-b-xl shrink-0">
-                                <Button fullWidth onClick={handleDownload} disabled={isDownloading} icon={<Icons.FileText />}>
-                                    {isDownloading ? 'Memproses Gambar...' : 'Download PNG'}
-                                </Button>
-                            </div>
-                            
                         </div>
+                        
+                        {/* Footer */}
+                        <div className="p-3 bg-white border-t shrink-0">
+                            <Button fullWidth onClick={handleDownload} disabled={isDownloading} icon={<Icons.FileText />}>
+                                {isDownloading ? 'Memproses...' : 'Download PNG'}
+                            </Button>
+                        </div>
+                        
                     </div>
                 </div>
             );
