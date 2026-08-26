@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Perizinan Santri Al-Islam</title>
 
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -1019,6 +1020,150 @@
             );
         };
 
+        const SecurityScannerPage = () => {
+            const { user } = useContext(AuthContext);
+            const { showToast } = useContext(ToastContext);
+            const [scanning, setScanning] = useState(false);
+            const [scanResult, setScanResult] = useState(null);
+            const [processing, setProcessing] = useState(false);
+            const html5QrCodeRef = React.useRef(null);
+
+            useEffect(() => {
+                return () => {
+                    // Bersihkan kamera saat pindah menu
+                    if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
+                        html5QrCodeRef.current.stop().catch(console.error);
+                    }
+                };
+            }, []);
+
+            const startScanner = async () => {
+                setScanResult(null);
+                setScanning(true);
+                try {
+                    const html5QrCode = new Html5Qrcode("reader");
+                    html5QrCodeRef.current = html5QrCode;
+                    
+                    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+                    await html5QrCode.start(
+                        { facingMode: "environment" }, // Prioritaskan kamera belakang
+                        config,
+                        onScanSuccess
+                    );
+                } catch (err) {
+                    console.error("Gagal membuka kamera:", err);
+                    showToast("Gagal mengakses kamera. Pastikan izin kamera aktif.", "error");
+                    setScanning(false);
+                }
+            };
+
+            const stopScanner = async () => {
+                if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
+                    await html5QrCodeRef.current.stop();
+                }
+                setScanning(false);
+            };
+
+            const onScanSuccess = async (decodedText) => {
+                // Hentikan pemindaian sementara agar tidak double request
+                await stopScanner();
+                
+                // Getar perangkat jika browser mendukung (Haptic Feedback)
+                if (navigator.vibrate) navigator.vibrate(200);
+
+                setProcessing(true);
+                try {
+                    const res = await apiService.request('scanQR', {
+                        qr_token: decodedText,
+                        security_name: user.nama
+                    });
+                    setScanResult({ success: true, data: res.data, message: res.data.pesan });
+                    showToast(res.data.pesan, "success");
+                } catch (err) {
+                    setScanResult({ success: false, message: err.message });
+                    showToast(err.message, "error");
+                } finally {
+                    setProcessing(false);
+                }
+            };
+
+            return (
+                <div className="space-y-6 max-w-lg mx-auto animate-fade-in-down">
+                    <div className="text-center">
+                        <h2 className="text-2xl font-bold text-gray-800">Scanner Pos Security</h2>
+                        <p className="text-sm text-gray-500 mt-1">Arahkan kamera ke QR Code pada kartu izin santri.</p>
+                    </div>
+
+                    <Card className="p-4 flex flex-col items-center">
+                        {/* Area Video Kamera */}
+                        <div id="reader" className={`w-full bg-black rounded-lg overflow-hidden ${scanning ? 'block' : 'hidden'}`} style={{ minHeight: '300px' }}></div>
+
+                        {!scanning && (
+                            <div className="py-12 flex flex-col items-center text-center">
+                                <div className="w-20 h-20 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mb-4">
+                                    <Icons.Scan />
+                                </div>
+                                <p className="text-gray-600 font-medium mb-6">Kamera tidak aktif</p>
+                                <Button onClick={startScanner} className="px-8 py-3 text-lg shadow-md" icon={<Icons.Scan />}>
+                                    Buka Kamera Scan
+                                </Button>
+                            </div>
+                        )}
+
+                        {scanning && (
+                            <div className="w-full mt-4">
+                                <Button variant="secondary" fullWidth onClick={stopScanner}>Tutup Kamera</Button>
+                            </div>
+                        )}
+                    </Card>
+
+                    {processing && (
+                        <div className="p-6 bg-white rounded-xl shadow-sm border text-center animate-pulse">
+                            <p className="text-emerald-700 font-bold">Memverifikasi ke database pusat...</p>
+                        </div>
+                    )}
+
+                    {/* Feedback Visual Hasil Scan */}
+                    {scanResult && (
+                        <Card className={`border-2 ${scanResult.success ? 'border-emerald-500 bg-emerald-50/30' : 'border-red-500 bg-red-50/30'}`}>
+                            <div className="flex items-start gap-4">
+                                <div className="mt-1">
+                                    {scanResult.success ? <Icons.CheckCircle /> : <Icons.XCircle />}
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className={`font-bold text-lg ${scanResult.success ? 'text-emerald-800' : 'text-red-800'}`}>
+                                        {scanResult.success ? `SCAN ${scanResult.data.type} BERHASIL` : 'SCAN GAGAL / DITOLAK'}
+                                    </h3>
+                                    <p className="text-sm text-gray-600 mt-1">{scanResult.message}</p>
+
+                                    {scanResult.success && (
+                                        <div className="mt-4 p-3 bg-white rounded-lg border border-gray-100 text-sm space-y-1">
+                                            <p><span className="text-gray-500">Nama:</span> <strong>{scanResult.data.nama}</strong> ({scanResult.data.kelas})</p>
+                                            <p><span className="text-gray-500">Waktu Scan:</span> <strong>{scanResult.data.waktu} WIB</strong></p>
+                                            {scanResult.data.status_kembali && (
+                                                <p className="mt-2">
+                                                    <span className="text-gray-500">Status Kembali: </span>
+                                                    <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
+                                                        scanResult.data.status_kembali === 'TEPAT WAKTU' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                                                    }`}>
+                                                        {scanResult.data.status_kembali}
+                                                    </span>
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="mt-4">
+                                        <Button fullWidth variant="secondary" onClick={startScanner}>Scan Kartu Lainnya</Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+                    )}
+                </div>
+            );
+        };
+
         const MainRouter = ({ currentRoute, setCurrentRoute }) => {
             const { user } = useContext(AuthContext);
 
@@ -1041,6 +1186,9 @@
 
             // SEKRETARIS MENU ROUTING
             if (currentRoute === 'screening' && user.role === ROLES.SEKRETARIS_MUDIR) return <ScreeningIzinPage />;
+
+            // SECURITY MENU ROUTING
+            if (currentRoute === 'scanner' && user.role === ROLES.SECURITY) return <SecurityScannerPage />;
             
             return (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
