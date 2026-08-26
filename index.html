@@ -267,7 +267,7 @@
                     qrRef.current.innerHTML = '';
                     new QRCode(qrRef.current, {
                         text: permit.qr_token || permit.permit_id, 
-                        width: 100, // Diperkecil agar menghemat ruang vertikal
+                        width: 100,
                         height: 100,
                         colorDark : "#065f46",
                         colorLight : "#ffffff",
@@ -296,32 +296,33 @@
             if (!isOpen || !permit) return null;
 
             return (
-                // Menggunakan penengah mutlak tanpa padding berlebih
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-sm animate-fade-in-down">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-fade-in-down">
                     
                     {/* Klik latar belakang hitam untuk menutup */}
-                    <div className="absolute inset-0" onClick={onClose}></div>
+                    <div className="absolute inset-0 cursor-pointer" onClick={onClose}></div>
                     
-                    {/* Kotak Modal Utama - Dibatasi max-h-[95vh] agar tidak bablas ke bawah/atas layar */}
-                    <div className="relative w-full max-w-sm flex flex-col bg-white rounded-xl shadow-xl overflow-hidden max-h-[95vh]">
+                    {/* Kotak Modal Utama */}
+                    <div className="relative w-full max-w-sm flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden">
                         
-                        {/* Header */}
-                        <div className="px-4 py-3 border-b flex justify-between items-center bg-gray-50 shrink-0">
+                        {/* Header dengan Tombol X SVG Anti-Hilang */}
+                        <div className="px-4 py-3 border-b flex justify-between items-center bg-gray-50 z-10">
                             <h3 className="font-bold text-gray-800 text-sm">Kartu Perizinan</h3>
-                            <button onClick={onClose} className="text-gray-400 hover:text-red-500 transition-colors p-1"><Icons.XCircle /></button>
+                            <button onClick={onClose} className="text-gray-400 hover:text-red-600 transition-colors bg-white rounded-full p-1 shadow-sm border">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
                         </div>
                         
-                        {/* Body (Isi Kartu yang sudah dirapatkan) */}
-                        <div className="p-4 flex justify-center bg-gray-100 overflow-y-auto">
+                        {/* Body (Isi Kartu yang sudah ditambahkan Keperluan) */}
+                        <div className="p-4 flex justify-center bg-gray-100 relative">
                             <div ref={cardRef} className="bg-white p-4 rounded-xl shadow-sm border-2 border-emerald-500 w-full relative">
-                                <div className="absolute top-0 left-0 w-full h-2 bg-emerald-500"></div>
+                                <div className="absolute top-0 left-0 w-full h-2 bg-emerald-500 rounded-t-lg"></div>
                                 
                                 <div className="text-center mb-3 mt-1">
                                     <h4 className="font-bold text-emerald-800 leading-tight text-sm">PONDOK PESANTREN<br/>MODERN AL-ISLAM</h4>
                                     <p className="text-[10px] text-gray-500 mt-1 uppercase font-semibold tracking-wider">Perizinan Keluar Santri</p>
                                 </div>
                                 
-                                <div className="border-t border-b border-gray-100 py-2 mb-3 space-y-1.5">
+                                <div className="border-t border-b border-gray-100 py-2 mb-3 space-y-2">
                                     <div>
                                         <p className="text-[10px] text-gray-400 uppercase">Nama Santri</p>
                                         <p className="font-bold text-gray-800 text-sm leading-tight">{permit.nama_santri}</p>
@@ -337,6 +338,11 @@
                                             <p className="font-bold text-emerald-600 text-xs">08.00 - 16.00</p>
                                         </div>
                                     </div>
+                                    {/* --- TAMBAHAN KEPERLUAN --- */}
+                                    <div>
+                                        <p className="text-[10px] text-gray-400 uppercase">Keperluan</p>
+                                        <p className="font-semibold text-gray-700 text-xs leading-tight">{permit.keperluan || '-'}</p>
+                                    </div>
                                     <div>
                                         <p className="text-[10px] text-gray-400 uppercase">Wali Safar</p>
                                         <p className="font-semibold text-gray-700 text-xs">{permit.wali_safar} ({permit.hubungan_wali})</p>
@@ -350,11 +356,16 @@
                             </div>
                         </div>
                         
-                        {/* Footer */}
-                        <div className="p-3 bg-white border-t shrink-0">
-                            <Button fullWidth onClick={handleDownload} disabled={isDownloading} icon={<Icons.FileText />}>
+                        {/* Footer dengan Desain Tombol Standar */}
+                        <div className="p-3 bg-white border-t z-10">
+                            <button 
+                                onClick={handleDownload} 
+                                disabled={isDownloading} 
+                                className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-lg font-medium transition-colors disabled:opacity-75"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                 {isDownloading ? 'Memproses...' : 'Download PNG'}
-                            </Button>
+                            </button>
                         </div>
                         
                     </div>
