@@ -1320,7 +1320,8 @@
             if (currentRoute === 'dashboard') {
                 if (user.role === ROLES.ADMIN) return <DashboardAdmin />;
                 if (user.role === ROLES.SEKRETARIS_MUDIR) return <DashboardSecretary />;
-                if (user.role === ROLES.WALI_KELAS) return (<div className="space-y-6"><div><h2 className="text-2xl font-bold text-gray-800">Dashboard Wali Kelas</h2></div><Button onClick={() => setCurrentRoute('pengajuan')} icon={<Icons.Plus />}>Buat Pengajuan Baru</Button></div>);
+                if (user.role === ROLES.WALI_KELAS) return <DashboardWaliKelas setCurrentRoute={setCurrentRoute} />;
+                if (user.role === ROLES.SECURITY) return <DashboardSecurity setCurrentRoute={setCurrentRoute} />;
             }
             
             // ADMIN MENU ROUTING
