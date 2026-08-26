@@ -296,16 +296,17 @@
             if (!isOpen || !permit) return null;
 
             return (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-fade-in-down">
+                // 1. Pembungkus utama: Menggunakan overflow-y-auto agar SELALU bisa di-scroll jika kepanjangan
+                <div className="fixed inset-0 z-[9999] flex p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fade-in-down">
                     
-                    {/* Klik latar belakang hitam untuk menutup */}
-                    <div className="absolute inset-0 cursor-pointer" onClick={onClose}></div>
+                    {/* 2. Background hitam untuk menutup (dibuat fixed agar mengcover seluruh layar saat scroll) */}
+                    <div className="fixed inset-0 cursor-pointer" onClick={onClose}></div>
                     
-                    {/* Kotak Modal Utama */}
-                    <div className="relative w-full max-w-sm flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden">
+                    {/* 3. Kotak Modal: Menggunakan m-auto (margin-auto). Ini adalah kunci agar atasnya tidak terpotong! */}
+                    <div className="relative m-auto w-full max-w-sm flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden z-10">
                         
-                        {/* Header dengan Tombol TUTUP Teks (Anti-Hilang) */}
-                        <div className="px-4 py-3 border-b flex justify-between items-center bg-gray-50 z-10">
+                        {/* Header (Pasti Muncul di Paling Atas) */}
+                        <div className="px-4 py-3 border-b flex justify-between items-center bg-gray-50">
                             <h3 className="font-bold text-gray-800 text-sm">Kartu Perizinan</h3>
                             <button 
                                 onClick={onClose} 
@@ -316,7 +317,7 @@
                         </div>
                         
                         {/* Body (Isi Kartu) */}
-                        <div className="p-4 flex justify-center bg-gray-100 relative">
+                        <div className="p-4 flex justify-center bg-gray-100">
                             <div ref={cardRef} className="bg-white p-4 rounded-xl shadow-sm border-2 border-emerald-500 w-full relative">
                                 <div className="absolute top-0 left-0 w-full h-2 bg-emerald-500 rounded-t-lg"></div>
                                 
@@ -358,14 +359,13 @@
                             </div>
                         </div>
                         
-                        {/* Footer Tombol Download */}
-                        <div className="p-3 bg-white border-t z-10">
+                        {/* Footer (Pasti Muncul di Paling Bawah) */}
+                        <div className="p-3 bg-white border-t">
                             <button 
                                 onClick={handleDownload} 
                                 disabled={isDownloading} 
                                 className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-lg font-medium transition-colors disabled:opacity-75"
                             >
-                                {/* Ikon download teks biasa agar sama-sama aman */}
                                 <span className="text-lg leading-none">&#8681;</span>
                                 {isDownloading ? 'Memproses...' : 'Download PNG'}
                             </button>
