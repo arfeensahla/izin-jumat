@@ -1288,13 +1288,31 @@
         };
 
         function App() {
-            const [user, setUser] = useState(null);
+            // 1. Ambil sesi dari localStorage saat pertama kali web dibuka
+            const [user, setUser] = useState(() => {
+                const savedUser = localStorage.getItem('al_islam_session');
+                return savedUser ? JSON.parse(savedUser) : null;
+            });
             const [toast, setToast] = useState(null);
+            
             const showToast = (message, type = 'success') => setToast({ message, type });
+
+            // 2. Fungsi Login: Simpan ke State DAN localStorage
+            const handleLogin = (userData) => {
+                setUser(userData);
+                localStorage.setItem('al_islam_session', JSON.stringify(userData));
+            };
+
+            // 3. Fungsi Logout: Hapus dari State DAN localStorage
+            const handleLogout = () => {
+                setUser(null);
+                localStorage.removeItem('al_islam_session');
+            };
 
             return (
                 <ToastContext.Provider value={{ showToast }}>
-                    <AuthContext.Provider value={{ user, login: setUser, logout: () => setUser(null) }}>
+                    {/* 4. Tautkan fungsi baru ke Context */}
+                    <AuthContext.Provider value={{ user, login: handleLogin, logout: handleLogout }}>
                         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
                         {!user ? <LoginPage /> : <Layout><MainRouter /></Layout>}
                     </AuthContext.Provider>
