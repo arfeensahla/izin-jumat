@@ -267,8 +267,8 @@
                     qrRef.current.innerHTML = '';
                     new QRCode(qrRef.current, {
                         text: permit.qr_token || permit.permit_id, 
-                        width: 128,
-                        height: 128,
+                        width: 120, // Diperkecil sedikit agar lebih pas di layar
+                        height: 120,
                         colorDark : "#065f46",
                         colorLight : "#ffffff",
                         correctLevel : QRCode.CorrectLevel.H
@@ -296,20 +296,23 @@
             if (!isOpen || !permit) return null;
 
             return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in-down">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm flex flex-col overflow-hidden">
-                        <div className="px-4 py-3 border-b flex justify-between items-center bg-gray-50">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-sm animate-fade-in-down">
+                    {/* PERBAIKAN: max-h-[95vh] agar modal tidak akan pernah lebih tinggi dari layar */}
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm flex flex-col max-h-[95vh] overflow-hidden">
+                        
+                        {/* Header: Diberi shrink-0 agar ukurannya tidak mengecil/tertekan */}
+                        <div className="px-4 py-3 border-b flex justify-between items-center bg-gray-50 shrink-0">
                             <h3 className="font-bold text-gray-800">Kartu Perizinan</h3>
-                            <button onClick={onClose} className="text-gray-400 hover:text-red-500"><Icons.XCircle /></button>
+                            <button onClick={onClose} className="text-gray-400 hover:text-red-500 transition-colors p-1"><Icons.XCircle /></button>
                         </div>
                         
-                        {/* Area yang akan di-screenshot HTML2Canvas */}
-                        <div className="p-6 bg-gray-100 flex justify-center">
-                            <div ref={cardRef} className="bg-white p-6 rounded-xl shadow-sm border-2 border-emerald-500 w-full relative overflow-hidden">
+                        {/* Body: Diberi overflow-y-auto agar bisa digeser naik-turun jika layar sempit */}
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-100 flex justify-center">
+                            <div ref={cardRef} className="bg-white p-5 rounded-xl shadow-sm border-2 border-emerald-500 w-full relative flex-shrink-0">
                                 <div className="absolute top-0 left-0 w-full h-2 bg-emerald-500"></div>
                                 <div className="text-center mb-4 mt-2">
                                     <h4 className="font-bold text-emerald-800 leading-tight">PONDOK PESANTREN<br/>MODERN AL-ISLAM</h4>
-                                    <p className="text-xs text-gray-500 mt-1 uppercase font-semibold tracking-wider">Perizinan Keluar Santri</p>
+                                    <p className="text-[10px] text-gray-500 mt-1 uppercase font-semibold tracking-wider">Perizinan Keluar Santri</p>
                                 </div>
                                 
                                 <div className="border-t border-b border-gray-100 py-3 mb-4 space-y-2">
@@ -341,15 +344,18 @@
                             </div>
                         </div>
                         
-                        <div className="p-4 bg-white">
+                        {/* Footer: Sama seperti header, diberi shrink-0 agar tetap paten di bawah */}
+                        <div className="p-4 bg-white border-t shrink-0">
                             <Button fullWidth onClick={handleDownload} disabled={isDownloading} icon={<Icons.FileText />}>
                                 {isDownloading ? 'Memproses Gambar...' : 'Download PNG'}
                             </Button>
                         </div>
+                        
                     </div>
                 </div>
             );
         };
+        
         const MasterSantriPage = () => {
             const { showToast } = useContext(ToastContext);
             const [data, setData] = useState([]);
