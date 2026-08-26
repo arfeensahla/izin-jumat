@@ -887,7 +887,7 @@
 
                 setProcessing(true);
                 try {
-                    const payload = { permit_id: selectedPermit.permit_id, action, alasan: rejectReason, username: user.nama };
+                    const payload = { permit_id: selectedPermit.permit_id, aksi_approval: action, alasan: rejectReason, username: user.nama };
                     const res = await apiService.request('processApproval', payload);
                     showToast(res.message, 'success');
                     setSelectedPermit(null);
