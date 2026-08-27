@@ -986,24 +986,65 @@
                             apiService.request('getTahunPelajaran'),
                             apiService.request('getKelas')
                         ]);
-                        setSantriData(resSantri.data.filter(s => s.status === 'Aktif'));
-                        setTpData(resTp.data.filter(t => t.status === 'Aktif'));
-                        if (resTp.data.length > 0) {
-                            const aktif = resTp.data.find(t => t.status === 'Aktif');
-                            if (aktif) setSelectedTp(aktif.tp_id);
+                        
+                        // 1. Ekstrak Data Santri (Aman dari bungkus ganda)
+                        let finalSantri = [];
+                        if (resSantri && resSantri.data && Array.isArray(resSantri.data.data)) finalSantri = resSantri.data.data;
+                        else if (resSantri && Array.isArray(resSantri.data)) finalSantri = resSantri.data;
+                        else if (Array.isArray(resSantri)) finalSantri = resSantri;
+
+                        // 2. Ekstrak Data Tahun Pelajaran (TP)
+                        let finalTp = [];
+                        if (resTp && resTp.data && Array.isArray(resTp.data.data)) finalTp = resTp.data.data;
+                        else if (resTp && Array.isArray(resTp.data)) finalTp = resTp.data;
+                        else if (Array.isArray(resTp)) finalTp = resTp;
+
+                        // 3. Ekstrak Data Kelas
+                        let finalKelas = [];
+                        if (resKelas && resKelas.data && Array.isArray(resKelas.data.data)) finalKelas = resKelas.data.data;
+                        else if (resKelas && Array.isArray(resKelas.data)) finalKelas = resKelas.data;
+                        else if (Array.isArray(resKelas)) finalKelas = resKelas;
+
+                        // --- PENYARINGAN AMAN ---
+                        // Mencari status aktif tanpa peduli huruf besar/kecil
+                        const aktifSantri = finalSantri.filter(s => String(s.status || s.Status || '').toLowerCase() === 'aktif');
+                        const aktifTp = finalTp.filter(t => String(t.status || t.Status || '').toLowerCase() === 'aktif');
+                        
+                        setSantriData(aktifSantri);
+                        setTpData(aktifTp);
+                        setKelasData(finalKelas);
+
+                        // Set TP default ke yang aktif (Sapu Jagat untuk nama ID)
+                        if (aktifTp.length > 0) {
+                            setSelectedTp(aktifTp[0].tp_id || aktifTp[0].id_tp || aktifTp[0].id || aktifTp[0].tahun_pelajaran);
+                        } else if (finalTp.length > 0) {
+                            setSelectedTp(finalTp[0].tp_id || finalTp[0].id_tp || finalTp[0].id || finalTp[0].tahun_pelajaran);
                         }
-                        setKelasData(resKelas.data);
-                    } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
+
+                    } catch (e) { 
+                        showToast(e.message, 'error'); 
+                    } finally { 
+                        setLoading(false); 
+                    }
                 };
                 fetchDeps();
             }, []);
 
             const handlePreview = () => {
                 if (!selectedTp || !fromKelas || !toKelas) return showToast('Pilih TP, Kelas Asal, dan Kelas Tujuan', 'error');
-                const targetSantri = santriData.filter(s => s.kelas === fromKelas);
+                
+                // Menarik santri sesuai kelas asalnya
+                const targetSantri = santriData.filter(s => (s.kelas || s.Kelas) === fromKelas);
+                
+                // Menyiapkan draft (Dilengkapi Sapu Jagat untuk mengatasi perbedaan nama kolom NIS/Nama)
                 const draft = targetSantri.map(s => ({
-                    santri_id: s.santri_id, nama: s.nama, kelas_lama: s.kelas, kelas_baru: toKelas, status_baru: toKelas === 'LULUS' ? 'Lulus' : 'Aktif'
+                    santri_id: s.santri_id || s.nis || s.NIS || s.id, 
+                    nama: s.nama || s.nama_santri || s.Nama, 
+                    kelas_lama: s.kelas || s.Kelas, 
+                    kelas_baru: toKelas, 
+                    status_baru: toKelas === 'LULUS' ? 'Lulus' : 'Aktif'
                 }));
+                
                 setPreviewData(draft);
                 showToast(`Menemukan ${draft.length} santri untuk diproses.`, 'success');
             };
@@ -1021,32 +1062,86 @@
                 try {
                     const payload = { mutations: previewData.map(d => ({ santri_id: d.santri_id, tp_id: selectedTp, kelas_baru: d.kelas_baru, status_baru: d.status_baru })) };
                     const res = await apiService.request('saveKenaikanKelas', payload);
-                    showToast(res.message, 'success');
+                    showToast(res.message || 'Proses kenaikan kelas berhasil!', 'success');
                     setPreviewData([]);
                     setFromKelas('');
                     setToKelas('');
                 } catch (e) { showToast(e.message, 'error'); } finally { setProcessing(false); }
             };
 
+            // Mengambil daftar nama kelas secara unik & aman
+            const listNamaKelas = [...new Set(kelasData.map(k => k.nama_kelas || k.kelas || k.nama).filter(Boolean))].sort();
+
             return (
                 <div className="space-y-6 animate-fade-in-down">
-                    <div><h2 className="text-2xl font-bold text-gray-800">Proses Kenaikan Kelas</h2><p className="text-gray-500">Pindahkan kelas santri secara massal dengan aman (histori tahun lalu terjaga).</p></div>
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">Proses Kenaikan Kelas</h2>
+                        <p className="text-gray-500">Pindahkan kelas santri secara massal dengan aman (histori tahun lalu terjaga).</p>
+                    </div>
                     <Card>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                            <Select label="Tahun Pelajaran Target" options={tpData.map(t => ({value: t.tp_id, label: t.nama_periode}))} value={selectedTp} onChange={(e) => setSelectedTp(e.target.value)} disabled={loading} />
-                            <Select label="Dari Kelas (Lama)" options={kelasData.map(k => k.nama_kelas)} value={fromKelas} onChange={(e) => setFromKelas(e.target.value)} disabled={loading} />
-                            <Select label="Ke Kelas (Baru)" options={[...kelasData.map(k => k.nama_kelas), 'LULUS', 'TIDAK NAIK']} value={toKelas} onChange={(e) => setToKelas(e.target.value)} disabled={loading} />
-                            <div className="flex items-end"><Button fullWidth onClick={handlePreview} disabled={loading || !selectedTp || !fromKelas || !toKelas}>Tampilkan Preview</Button></div>
+                            <Select 
+                                label="Tahun Pelajaran Target" 
+                                options={tpData.map(t => ({value: t.tp_id || t.id_tp || t.id || t.tahun_pelajaran, label: t.nama_periode || t.tahun_pelajaran || t.nama}))} 
+                                value={selectedTp} 
+                                onChange={(e) => setSelectedTp(e.target.value)} 
+                                disabled={loading} 
+                            />
+                            <Select 
+                                label="Dari Kelas (Lama)" 
+                                options={listNamaKelas} 
+                                value={fromKelas} 
+                                onChange={(e) => setFromKelas(e.target.value)} 
+                                disabled={loading} 
+                            />
+                            <Select 
+                                label="Ke Kelas (Baru)" 
+                                options={[...listNamaKelas, 'LULUS', 'TIDAK NAIK']} 
+                                value={toKelas} 
+                                onChange={(e) => setToKelas(e.target.value)} 
+                                disabled={loading} 
+                            />
+                            <div className="flex items-end">
+                                <Button fullWidth onClick={handlePreview} disabled={loading || !selectedTp || !fromKelas || !toKelas}>Tampilkan Preview</Button>
+                            </div>
                         </div>
+                        
                         {previewData.length > 0 && (
                             <div className="mt-8 border-t pt-4 animate-fade-in-down">
-                                <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-emerald-800">Preview Pemindahan ({previewData.length} Santri)</h3><Button onClick={handleSubmit} disabled={processing}>{processing ? 'Memproses...' : 'Simpan Perubahan Permanen'}</Button></div>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-bold text-emerald-800">Preview Pemindahan ({previewData.length} Santri)</h3>
+                                    <Button onClick={handleSubmit} disabled={processing}>{processing ? 'Memproses...' : 'Simpan Perubahan Permanen'}</Button>
+                                </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left text-sm border-collapse">
-                                        <thead><tr className="bg-gray-50 border-b"><th className="p-3">Nama Santri</th><th className="p-3">Kelas Lama</th><th className="p-3">Ubah Kelas Baru (Koreksi)</th><th className="p-3">Ubah Status</th></tr></thead>
+                                        <thead>
+                                            <tr className="bg-gray-50 border-b">
+                                                <th className="p-3">Nama Santri</th>
+                                                <th className="p-3">Kelas Lama</th>
+                                                <th className="p-3">Ubah Kelas Baru (Koreksi)</th>
+                                                <th className="p-3">Ubah Status</th>
+                                            </tr>
+                                        </thead>
                                         <tbody>
                                             {previewData.map((d, idx) => (
-                                                <tr key={idx} className="border-b bg-emerald-50"><td className="p-3 font-medium">{d.nama}</td><td className="p-3">{d.kelas_lama}</td><td className="p-3"><select className="w-full p-1 border rounded" value={d.kelas_baru} onChange={(e) => handleIndividualChange(idx, 'kelas_baru', e.target.value)}><option value="LULUS">LULUS</option><option value="TIDAK NAIK">TIDAK NAIK</option>{kelasData.map(k => <option key={k.nama_kelas} value={k.nama_kelas}>{k.nama_kelas}</option>)}</select></td><td className="p-3"><select className="w-full p-1 border rounded" value={d.status_baru} onChange={(e) => handleIndividualChange(idx, 'status_baru', e.target.value)}><option value="Aktif">Aktif</option><option value="Lulus">Lulus</option><option value="Nonaktif">Nonaktif</option></select></td></tr>
+                                                <tr key={idx} className="border-b bg-emerald-50 hover:bg-emerald-100 transition-colors">
+                                                    <td className="p-3 font-medium">{d.nama}</td>
+                                                    <td className="p-3">{d.kelas_lama}</td>
+                                                    <td className="p-3">
+                                                        <select className="w-full p-2 border rounded outline-none" value={d.kelas_baru} onChange={(e) => handleIndividualChange(idx, 'kelas_baru', e.target.value)}>
+                                                            <option value="LULUS">LULUS</option>
+                                                            <option value="TIDAK NAIK">TIDAK NAIK</option>
+                                                            {listNamaKelas.map(k => <option key={k} value={k}>{k}</option>)}
+                                                        </select>
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <select className="w-full p-2 border rounded outline-none" value={d.status_baru} onChange={(e) => handleIndividualChange(idx, 'status_baru', e.target.value)}>
+                                                            <option value="Aktif">Aktif</option>
+                                                            <option value="Lulus">Lulus</option>
+                                                            <option value="Nonaktif">Nonaktif</option>
+                                                        </select>
+                                                    </td>
+                                                </tr>
                                             ))}
                                         </tbody>
                                     </table>
