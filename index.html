@@ -229,6 +229,7 @@
                 [ROLES.SEKRETARIS_MUDIR]: [
                     { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
                     { id: 'screening', label: 'Screening Izin', icon: Icons.FileText },
+                    { id: 'histori_global', label: 'Histori Izin', icon: Icons.Users },
                 ],
                 [ROLES.SECURITY]: [
                     { id: 'scanner', label: 'Scan QR Code', icon: Icons.Scan },
@@ -2899,6 +2900,7 @@
 
             // SEKRETARIS MENU ROUTING
             if (currentRoute === 'screening' && user.role === ROLES.SEKRETARIS_MUDIR) return <ScreeningIzinPage />;
+            if (currentRoute === 'histori_global' && user.role === ROLES.SEKRETARIS_MUDIR) return <HistoriSekretarisPage />;
 
             // SECURITY MENU ROUTING
             if (currentRoute === 'scanner' && user.role === ROLES.SECURITY) return <SecurityScannerPage />;
