@@ -1708,61 +1708,48 @@
             const [filterKelas, setFilterKelas] = useState('');
             const [filterStatus, setFilterStatus] = useState('');
 
-            // Fungsi Mesin Pembaca Tanggal (Mengubah format tanggal jadi Nama Bulan & Tahun)
+            // --- STATE UNTUK SORTING (PENGURUTAN) ---
+            const [sortConfig, setSortConfig] = useState({ key: 'tanggal_izin', direction: 'desc' });
+
             const getBulanTahun = (tgl) => {
                 if (!tgl) return '-';
                 const strTgl = String(tgl).trim();
-                
-                // Coba konversi standar
                 const d = new Date(strTgl);
-                if (!isNaN(d.getTime())) {
-                    return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-                }
-                
-                // Jika gagal (biasanya karena format ala Indonesia: DD/MM/YYYY)
+                if (!isNaN(d.getTime())) return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
                 const parts = strTgl.split(/[\/\- ]/);
                 if (parts.length >= 3) {
                     const monthNames = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
                     let m = parseInt(parts[1], 10);
-                    // Cari yang 4 digit untuk tahun
                     let y = parts[2].length === 4 ? parts[2] : (parts[0].length === 4 ? parts[0] : parts[2]); 
                     if (m >= 1 && m <= 12 && String(y).length === 4) return `${monthNames[m]} ${y}`;
                 }
-                
-                return strTgl; // Jika format benar-benar aneh, biarkan seadanya
+                return strTgl; 
             };
 
             useEffect(() => {
                 const fetchPermits = async () => {
                     try { 
                         const res = await apiService.request('getPermits'); 
-                        
                         let finalData = [];
                         if (res && res.data && Array.isArray(res.data.data)) finalData = res.data.data;
                         else if (res && Array.isArray(res.data)) finalData = res.data;
                         else if (Array.isArray(res)) finalData = res;
                         
-                        // Menanamkan properti "Bulan" ke dalam setiap data sebelum disimpan
                         const dataWithBulan = finalData.map(p => ({
                             ...p,
                             _bulan_filter: getBulanTahun(p.tanggal_izin)
                         }));
-                        
                         setPermits(dataWithBulan); 
-                    } catch (e) { 
-                        showToast(e.message, 'error'); 
-                    } finally { 
-                        setLoading(false); 
-                    }
+                    } catch (e) { showToast(e.message, 'error'); } 
+                    finally { setLoading(false); }
                 };
                 fetchPermits();
             }, []);
 
-            // Membaca otomatis pilihan Dropdown dari data (Menghilangkan Duplikat)
             const bulanOptions = [...new Set(permits.map(p => p._bulan_filter).filter(b => b && b !== '-'))];
             const kelasOptions = [...new Set(permits.map(p => p.kelas).filter(Boolean))].sort();
 
-            // --- LOGIKA PENYARINGAN SUPER (4 FILTER SEKALIGUS) ---
+            // 1. FILTERING (Menyaring Data)
             const filteredPermits = permits.filter(p => {
                 const nama = String(p.nama_santri || '').toLowerCase();
                 const kelas = String(p.kelas || '');
@@ -1777,6 +1764,37 @@
                 return matchSearch && matchBulan && matchKelas && matchStatus;
             });
 
+            // 2. SORTING (Mengurutkan Data yang sudah di-filter)
+            const sortedPermits = [...filteredPermits].sort((a, b) => {
+                if (!sortConfig.key) return 0;
+                
+                let aValue = a[sortConfig.key] || '';
+                let bValue = b[sortConfig.key] || '';
+
+                // Paksa jadi huruf kecil semua agar urutannya adil (tidak membedakan A besar dan a kecil)
+                if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+                if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+
+                if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            // Fungsi untuk mengubah arah panah saat header di-klik
+            const handleSort = (key) => {
+                let direction = 'asc';
+                if (sortConfig.key === key && sortConfig.direction === 'asc') {
+                    direction = 'desc'; // Jika sebelumnya naik, ubah jadi turun
+                }
+                setSortConfig({ key, direction });
+            };
+
+            // Komponen kecil untuk menampilkan ikon panah di Header
+            const SortIcon = ({ columnKey }) => {
+                if (sortConfig.key !== columnKey) return <span className="text-gray-300 ml-1">↕</span>;
+                return sortConfig.direction === 'asc' ? <span className="text-emerald-600 ml-1">▲</span> : <span className="text-emerald-600 ml-1">▼</span>;
+            };
+
             return (
                 <div className="space-y-6 animate-fade-in-down">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-4">
@@ -1786,40 +1804,21 @@
                         </div>
                     </div>
 
-                    {/* --- KOTAK ALAT: SEKARANG JADI 4 KOLOM --- */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <input 
-                            type="text" 
-                            placeholder="Cari Nama Santri..." 
+                            type="text" placeholder="Cari Nama Santri..." 
                             className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
                         />
-                        <select 
-                            className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium"
-                            value={filterBulan}
-                            onChange={(e) => setFilterBulan(e.target.value)}
-                        >
+                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterBulan} onChange={(e) => setFilterBulan(e.target.value)}>
                             <option value="">Semua Bulan</option>
-                            {bulanOptions.map((b, idx) => (
-                                <option key={idx} value={b}>{b}</option>
-                            ))}
+                            {bulanOptions.map((b, idx) => <option key={idx} value={b}>{b}</option>)}
                         </select>
-                        <select 
-                            className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium"
-                            value={filterKelas}
-                            onChange={(e) => setFilterKelas(e.target.value)}
-                        >
+                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterKelas} onChange={(e) => setFilterKelas(e.target.value)}>
                             <option value="">Semua Kelas</option>
-                            {kelasOptions.map((k, idx) => (
-                                <option key={idx} value={k}>{k}</option>
-                            ))}
+                            {kelasOptions.map((k, idx) => <option key={idx} value={k}>{k}</option>)}
                         </select>
-                        <select 
-                            className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium"
-                            value={filterStatus}
-                            onChange={(e) => setFilterStatus(e.target.value)}
-                        >
+                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
                             <option value="">Semua Status</option>
                             <option value="MENUNGGU">Menunggu</option>
                             <option value="DISETUJUI">Disetujui</option>
@@ -1828,28 +1827,43 @@
                         </select>
                     </div>
 
-                    {/* --- INFO JUMLAH DATA --- */}
                     <div className="text-sm text-gray-500">
-                        Menampilkan <span className="font-bold text-emerald-600">{filteredPermits.length}</span> dari {permits.length} perizinan
+                        Menampilkan <span className="font-bold text-emerald-600">{sortedPermits.length}</span> dari {permits.length} perizinan
                     </div>
 
                     <Card className="overflow-x-auto p-0">
                         <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
                             <thead>
                                 <tr className="bg-emerald-50 text-emerald-800 border-b">
-                                    <th className="p-4">Tgl Izin</th>
-                                    <th className="p-4">Santri</th>
-                                    <th className="p-4">Kelas</th>
-                                    <th className="p-4">Keperluan</th>
-                                    <th className="p-4">Wali Safar</th>
-                                    <th className="p-4">Status Jadwal</th>
-                                    <th className="p-4">Status Approval</th>
+                                    <th className="p-4 cursor-pointer hover:bg-emerald-100 transition-colors select-none" onClick={() => handleSort('tanggal_izin')}>
+                                        Tgl Izin <SortIcon columnKey="tanggal_izin" />
+                                    </th>
+                                    <th className="p-4 cursor-pointer hover:bg-emerald-100 transition-colors select-none" onClick={() => handleSort('nama_santri')}>
+                                        Santri <SortIcon columnKey="nama_santri" />
+                                    </th>
+                                    <th className="p-4 cursor-pointer hover:bg-emerald-100 transition-colors select-none" onClick={() => handleSort('kelas')}>
+                                        Kelas <SortIcon columnKey="kelas" />
+                                    </th>
+                                    <th className="p-4 cursor-pointer hover:bg-emerald-100 transition-colors select-none" onClick={() => handleSort('keperluan')}>
+                                        Keperluan <SortIcon columnKey="keperluan" />
+                                    </th>
+                                    <th className="p-4 cursor-pointer hover:bg-emerald-100 transition-colors select-none" onClick={() => handleSort('wali_safar')}>
+                                        Wali Safar <SortIcon columnKey="wali_safar" />
+                                    </th>
+                                    <th className="p-4 cursor-pointer hover:bg-emerald-100 transition-colors select-none" onClick={() => handleSort('status_jadwal')}>
+                                        Status Jadwal <SortIcon columnKey="status_jadwal" />
+                                    </th>
+                                    <th className="p-4 cursor-pointer hover:bg-emerald-100 transition-colors select-none" onClick={() => handleSort('status_pengajuan')}>
+                                        Status Approval <SortIcon columnKey="status_pengajuan" />
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Memuat data...</td></tr> : 
-                                 filteredPermits.length === 0 ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Tidak ada data perizinan yang sesuai filter.</td></tr> :
-                                 filteredPermits.map((p, idx) => (
+                                 sortedPermits.length === 0 ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Tidak ada data perizinan.</td></tr> :
+                                 
+                                 // PERHATIKAN: Sekarang kita me-mapping 'sortedPermits', bukan 'filteredPermits' lagi
+                                 sortedPermits.map((p, idx) => (
                                     <tr key={idx} className="hover:bg-gray-50">
                                         <td className="p-4">{p.tanggal_izin}</td>
                                         <td className="p-4 font-bold text-gray-800">{p.nama_santri}</td>
