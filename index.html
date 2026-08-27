@@ -2431,35 +2431,58 @@
                 const fetchData = async () => {
                     try {
                         const [resPermits, resLogs] = await Promise.all([ apiService.request('getPermits'), apiService.request('getScanLogs') ]);
-                        const allPermits = resPermits.data || [];
-                        const allLogs = resLogs.data || [];
+                        
+                        // --- EKSTRAK AMAN PERIZINAN ---
+                        let allPermits = [];
+                        if (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) allPermits = resPermits.data.data;
+                        else if (resPermits && Array.isArray(resPermits.data)) allPermits = resPermits.data;
+                        else if (Array.isArray(resPermits)) allPermits = resPermits;
+
+                        // --- EKSTRAK AMAN SCAN LOGS ---
+                        let allLogs = [];
+                        if (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) allLogs = resLogs.data.data;
+                        else if (resLogs && Array.isArray(resLogs.data)) allLogs = resLogs.data;
+                        else if (Array.isArray(resLogs)) allLogs = resLogs;
                         
                         let s = { disetujui: 0, keluar: 0, diluar: 0, kembali: 0, terlambat: 0 };
                         
                         allPermits.forEach(p => {
-                            if (p.status_pengajuan === 'DISETUJUI') s.disetujui++;
+                            // Ambil ID perizinan dengan toleransi berbagai nama kolom
+                            const pId = p.permit_id || p.id || p.id_perizinan;
+
+                            if (String(p.status_pengajuan || '').toUpperCase() === 'DISETUJUI') s.disetujui++;
                             
-                            const pLogs = allLogs.filter(l => l.permit_id === p.permit_id);
-                            const hasExit = pLogs.some(l => l.tipe_scan === 'EXIT');
-                            const returnLog = pLogs.find(l => l.tipe_scan === 'RETURN');
+                            // Filter log berdasarkan ID yang cocok
+                            const pLogs = allLogs.filter(l => l.permit_id === pId || l.id_perizinan === pId);
+                            const hasExit = pLogs.some(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
+                            const returnLog = pLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'RETURN');
                             
                             if (hasExit) s.keluar++;
                             if (hasExit && !returnLog) s.diluar++;
                             if (returnLog) {
                                 s.kembali++;
-                                if (returnLog.keterangan && returnLog.keterangan.includes('TERLAMBAT')) s.terlambat++;
+                                const ketLog = String(returnLog.keterangan || returnLog.status || '').toUpperCase();
+                                if (ketLog.includes('TERLAMBAT')) s.terlambat++;
                             }
                         });
                         setStats(s);
-                    } catch (e) { console.error(e); } finally { setLoading(false); }
+                    } catch (e) { 
+                        console.error(e); 
+                        showToast("Gagal memuat statistik pos security", "error");
+                    } finally { 
+                        setLoading(false); 
+                    }
                 };
                 fetchData();
             }, []);
 
             return (
                 <div className="space-y-6 animate-fade-in-down">
-                    <div className="flex justify-between items-center border-b pb-4">
-                        <div><h2 className="text-2xl font-bold text-gray-800">Pos Gerbang Utama</h2><p className="text-gray-500">Pantauan mobilitas santri pekan ini.</p></div>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-4">
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-800">Pos Gerbang Utama</h2>
+                            <p className="text-gray-500">Pantauan mobilitas santri secara real-time di gerbang pondok.</p>
+                        </div>
                         <Button onClick={() => setCurrentRoute('scanner')} icon={<Icons.Scan />} className="shadow-md">Mulai Scan QR</Button>
                     </div>
 
