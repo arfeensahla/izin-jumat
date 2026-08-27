@@ -1702,11 +1702,23 @@
             const [permits, setPermits] = useState([]);
             const [loading, setLoading] = useState(true);
 
+            // --- STATE UNTUK PENCARIAN & FILTER ---
+            const [searchTerm, setSearchTerm] = useState('');
+            const [filterKelas, setFilterKelas] = useState('');
+            const [filterStatus, setFilterStatus] = useState('');
+
             useEffect(() => {
                 const fetchPermits = async () => {
                     try { 
                         const res = await apiService.request('getPermits'); 
-                        setPermits(res.data); 
+                        
+                        // Ekstrak data yang aman (mencegah error double array)
+                        let finalData = [];
+                        if (res && res.data && Array.isArray(res.data.data)) finalData = res.data.data;
+                        else if (res && Array.isArray(res.data)) finalData = res.data;
+                        else if (Array.isArray(res)) finalData = res;
+                        
+                        setPermits(finalData); 
                     } catch (e) { 
                         showToast(e.message, 'error'); 
                     } finally { 
@@ -1716,16 +1728,67 @@
                 fetchPermits();
             }, []);
 
+            // Mengambil daftar kelas unik yang ada di data untuk isi Dropdown
+            const kelasOptions = [...new Set(permits.map(p => p.kelas).filter(Boolean))].sort();
+
+            // --- LOGIKA PENYARINGAN DATA (FILTER) ---
+            const filteredPermits = permits.filter(p => {
+                const nama = String(p.nama_santri || '').toLowerCase();
+                const kelas = String(p.kelas || '');
+                const status = String(p.status_pengajuan || '').toUpperCase();
+                
+                const matchSearch = nama.includes(searchTerm.toLowerCase());
+                const matchKelas = filterKelas === '' || kelas === filterKelas;
+                const matchStatus = filterStatus === '' || status.includes(filterStatus);
+                
+                return matchSearch && matchKelas && matchStatus;
+            });
+
             return (
                 <div className="space-y-6 animate-fade-in-down">
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-800">Laporan Semua Perizinan</h2>
-                        <p className="text-gray-500">Data seluruh pengajuan izin santri lintas kelas.</p>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-4">
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-800">Laporan Semua Perizinan</h2>
+                            <p className="text-gray-500">Data seluruh pengajuan izin santri lintas kelas.</p>
+                        </div>
                     </div>
+
+                    {/* --- KOTAK ALAT PENCARIAN & FILTER --- */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <input 
+                            type="text" 
+                            placeholder="Cari Nama Santri..." 
+                            className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        <select 
+                            className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm"
+                            value={filterKelas}
+                            onChange={(e) => setFilterKelas(e.target.value)}
+                        >
+                            <option value="">Semua Kelas</option>
+                            {kelasOptions.map((k, idx) => (
+                                <option key={idx} value={k}>{k}</option>
+                            ))}
+                        </select>
+                        <select 
+                            className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm"
+                            value={filterStatus}
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                        >
+                            <option value="">Semua Status</option>
+                            <option value="MENUNGGU">Menunggu</option>
+                            <option value="DISETUJUI">Disetujui</option>
+                            <option value="DITOLAK">Ditolak</option>
+                            <option value="SELESAI">Selesai</option>
+                        </select>
+                    </div>
+
                     <Card className="overflow-x-auto p-0">
                         <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
                             <thead>
-                                <tr className="bg-gray-100 text-gray-700 border-b">
+                                <tr className="bg-emerald-50 text-emerald-800 border-b">
                                     <th className="p-4">Tgl Izin</th>
                                     <th className="p-4">Santri</th>
                                     <th className="p-4">Kelas</th>
@@ -1737,7 +1800,8 @@
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Memuat data...</td></tr> : 
-                                 permits.map((p, idx) => (
+                                 filteredPermits.length === 0 ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Tidak ada data perizinan yang sesuai filter.</td></tr> :
+                                 filteredPermits.map((p, idx) => (
                                     <tr key={idx} className="hover:bg-gray-50">
                                         <td className="p-4">{p.tanggal_izin}</td>
                                         <td className="p-4 font-bold text-gray-800">{p.nama_santri}</td>
@@ -1755,7 +1819,7 @@
                                                 p.status_pengajuan === 'DITOLAK' ? 'bg-red-100 text-red-800 border-red-200' :
                                                 'bg-yellow-100 text-yellow-800 border-yellow-200'
                                             }`}>
-                                                {p.status_pengajuan.replace('_', ' ')}
+                                                {p.status_pengajuan ? p.status_pengajuan.replace('_', ' ') : '-'}
                                             </span>
                                         </td>
                                     </tr>
