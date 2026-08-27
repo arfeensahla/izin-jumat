@@ -1784,6 +1784,7 @@
         };
 
         // --- PHASE 6 COMPONENTS ---
+        // --- DASHBOARD SEKRETARIS MUDIR ---
         const DashboardSecretary = () => {
             const { showToast } = useContext(ToastContext);
             const [stats, setStats] = useState({ total_pekan: 0, disetujui_pekan: 0, ditolak_pekan: 0, menunggu_pekan: 0, sudah_keluar: 0, sudah_kembali: 0, masih_di_luar: 0, terlambat: 0, total_bulan: 0 });
@@ -1793,7 +1794,9 @@
             const fetchStats = async () => {
                 try {
                     const res = await apiService.request('getDashboardStats');
-                    setStats(res.data);
+                    // Pengaman jika data dibungkus objek res.data.data
+                    const finalData = (res && res.data && res.data.data) ? res.data.data : (res.data || {});
+                    setStats(finalData);
                     setLastUpdate(new Date());
                 } catch (e) { console.error(e); } finally { setLoading(false); }
             };
@@ -1807,32 +1810,32 @@
 
             return (
                 <div className="space-y-6 animate-fade-in-down">
-                    <div className="flex justify-between items-end">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800">Dashboard Sekretaris</h2>
-                            {/* WAKTU DIPERSIMPEL: 11:47 */}
                             <p className="text-sm text-gray-500 mt-1">Update terakhir: {lastUpdate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
                         </div>
                         <Button variant="secondary" onClick={() => { setLoading(true); fetchStats(); }} icon={<Icons.Clock />}>{loading ? 'Menyinkronkan...' : 'Refresh Manual'}</Button>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <StatCard title="Total Izin (Bulan Ini)" value={stats.total_bulan} icon={<Icons.Calendar />} color="bg-blue-50 text-blue-600" />
-                        <StatCard title="Menunggu Approval" value={stats.menunggu_pekan} icon={<Icons.FileText />} color="bg-yellow-50 text-yellow-600" />
-                        <StatCard title="Disetujui (Pekan Ini)" value={stats.disetujui_pekan} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
-                        <StatCard title="Ditolak (Pekan Ini)" value={stats.ditolak_pekan} icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
+                        <StatCard title="Total Izin (Bulan Ini)" value={stats.total_bulan || 0} icon={<Icons.Calendar />} color="bg-blue-50 text-blue-600" />
+                        <StatCard title="Menunggu Approval" value={stats.menunggu_pekan || 0} icon={<Icons.FileText />} color="bg-yellow-50 text-yellow-600" />
+                        <StatCard title="Disetujui (Pekan Ini)" value={stats.disetujui_pekan || 0} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
+                        <StatCard title="Ditolak (Pekan Ini)" value={stats.ditolak_pekan || 0} icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6 border-t pt-6">
-                        <StatCard title="Sudah Keluar" value={stats.sudah_keluar} icon={<Icons.Scan />} color="bg-gray-100 text-gray-600" />
-                        <StatCard title="Sudah Kembali" value={stats.sudah_kembali} icon={<Icons.Home />} color="bg-emerald-100 text-emerald-700" />
-                        <StatCard title="Masih Di Luar" value={stats.masih_di_luar} icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600" />
-                        <StatCard title="Terlambat (Bulan Ini)" value={stats.terlambat} icon={<Icons.Clock />} color="bg-red-100 text-red-700" />
+                        <StatCard title="Sudah Keluar" value={stats.sudah_keluar || 0} icon={<Icons.Scan />} color="bg-gray-100 text-gray-600" />
+                        <StatCard title="Sudah Kembali" value={stats.sudah_kembali || 0} icon={<Icons.Home />} color="bg-emerald-100 text-emerald-700" />
+                        <StatCard title="Masih Di Luar" value={stats.masih_di_luar || 0} icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600" />
+                        <StatCard title="Terlambat (Bulan Ini)" value={stats.terlambat || 0} icon={<Icons.Clock />} color="bg-red-100 text-red-700" />
                     </div>
                 </div>
             );
         };
 
+        // --- SCREENING IZIN ---
         const ScreeningIzinPage = () => {
             const { user } = useContext(AuthContext);
             const { showToast } = useContext(ToastContext);
@@ -1843,17 +1846,35 @@
             const [rejectReason, setRejectReason] = useState('');
             const [processing, setProcessing] = useState(false);
 
+            // State Pencarian dan Filter
+            const [searchTerm, setSearchTerm] = useState('');
+            const [filterKelas, setFilterKelas] = useState('');
+
             const fetchPermits = async () => {
                 setLoading(true);
                 try {
-                    // SEKALIGUS MENGAMBIL DATA SANTRI UNTUK NAMA SAUDARA
                     const [resPermits, resSantri] = await Promise.all([
                         apiService.request('getPermits'),
                         apiService.request('getSantri')
                     ]);
                     
-                    setPermits(resPermits.data.filter(p => p.status_pengajuan === 'MENUNGGU_APPROVAL'));
-                    setSantriList(resSantri.data);
+                    // Ekstrak Aman Perizinan
+                    let finalPermits = [];
+                    if (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) finalPermits = resPermits.data.data;
+                    else if (resPermits && Array.isArray(resPermits.data)) finalPermits = resPermits.data;
+                    else if (Array.isArray(resPermits)) finalPermits = resPermits;
+
+                    // Ekstrak Aman Data Santri
+                    let finalSantri = [];
+                    if (resSantri && resSantri.data && Array.isArray(resSantri.data.data)) finalSantri = resSantri.data.data;
+                    else if (resSantri && Array.isArray(resSantri.data)) finalSantri = resSantri.data;
+                    else if (Array.isArray(resSantri)) finalSantri = resSantri;
+
+                    // Ambil yang masih MENUNGGU atau MENUNGGU_APPROVAL
+                    const pendingPermits = finalPermits.filter(p => p.status_pengajuan === 'MENUNGGU_APPROVAL' || p.status_pengajuan === 'MENUNGGU');
+                    
+                    setPermits(pendingPermits);
+                    setSantriList(finalSantri);
                 } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
             };
             useEffect(() => { fetchPermits(); }, []);
@@ -1864,7 +1885,7 @@
 
                 setProcessing(true);
                 try {
-                    const payload = { permit_id: selectedPermit.permit_id, aksi_approval: action, alasan: rejectReason, username: user.nama };
+                    const payload = { permit_id: selectedPermit.permit_id || selectedPermit.id_perizinan, aksi_approval: action, alasan: rejectReason, username: user.nama };
                     const res = await apiService.request('processApproval', payload);
                     showToast(res.message, 'success');
                     setSelectedPermit(null);
@@ -1873,15 +1894,54 @@
                 } catch (e) { showToast(e.message, 'error'); } finally { setProcessing(false); }
             };
 
+            // Menghasilkan daftar kelas unik dari antrean izin yang ada
+            const kelasOptions = [...new Set(permits.map(p => p.kelas).filter(Boolean))].sort();
+
+            // Logika Penyaringan Tampilan Antrean
+            const filteredPermits = permits.filter(p => {
+                const nama = String(p.nama_santri || '').toLowerCase();
+                const kelas = String(p.kelas || '');
+                const matchSearch = nama.includes(searchTerm.toLowerCase());
+                const matchKelas = filterKelas === '' || kelas === filterKelas;
+                return matchSearch && matchKelas;
+            });
+
             return (
                 <div className="space-y-6 animate-fade-in-down">
-                    <div><h2 className="text-2xl font-bold text-gray-800">Screening Perizinan</h2><p className="text-gray-500">Tinjau dan berikan persetujuan untuk santri yang akan keluar.</p></div>
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">Screening Perizinan</h2>
+                        <p className="text-gray-500">Tinjau dan berikan persetujuan untuk santri yang akan keluar.</p>
+                    </div>
                     
+                    {/* FITUR PENCARIAN & FILTER KELAS */}
+                    {!loading && permits.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <input 
+                                type="text" 
+                                placeholder="Cari Nama Santri di Antrean..." 
+                                className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                            <select 
+                                className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium"
+                                value={filterKelas}
+                                onChange={(e) => setFilterKelas(e.target.value)}
+                            >
+                                <option value="">Semua Kelas</option>
+                                {kelasOptions.map((k, idx) => (
+                                    <option key={idx} value={k}>{k}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
                     {loading ? <div className="p-12 text-center text-gray-500">Membaca antrean izin dari server...</div> :
                      permits.length === 0 ? <div className="p-12 text-center bg-white rounded-xl border border-dashed border-gray-300 text-gray-500">Yeay! Tidak ada antrean perizinan saat ini.</div> :
+                     filteredPermits.length === 0 ? <div className="p-12 text-center bg-white rounded-xl border border-dashed border-gray-300 text-gray-500">Santri yang dicari tidak ditemukan dalam antrean.</div> :
                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {permits.map((p, idx) => (
-                            <Card key={idx} className="flex flex-col justify-between border-l-4 border-yellow-400">
+                        {filteredPermits.map((p, idx) => (
+                            <Card key={idx} className="flex flex-col justify-between border-l-4 border-yellow-400 hover:shadow-md transition-shadow">
                                 <div>
                                     <div className="flex justify-between items-start mb-4 border-b pb-4">
                                         <div>
@@ -1903,13 +1963,14 @@
                                                 <p className="text-red-700 italic">{p.keterangan_luar_jadwal}</p>
                                             </div>
                                         )}
-                                        {p.ikut_jadwal_saudara === 'Ya' && (
+                                        {/* Perbaikan deteksi nilai centang form */}
+                                        {(p.ikut_jadwal_saudara === 'Ya' || p.ikut_jadwal_saudara === true || p.ikut_jadwal_saudara === 'TRUE') && (
                                             <div className="mt-2 p-2 bg-blue-50 text-blue-800 rounded-lg text-xs font-medium">
-                                                {/* LOGIKA MENAMPILKAN NAMA SAUDARA BUKAN ID */}
                                                 {(() => {
-                                                    const saudara = santriList.find(s => s.santri_id === p.saudara_santri_id);
+                                                    // Pencarian saudara dengan aman (Sapu Jagat ID)
+                                                    const saudara = santriList.find(s => (s.santri_id || s.nis || s.id) === p.saudara_santri_id);
                                                     return saudara 
-                                                        ? `Ikut jadwal saudara: ${saudara.nama} (${saudara.kelas})` 
+                                                        ? `Ikut jadwal saudara: ${saudara.nama || saudara.nama_santri} (${saudara.kelas})` 
                                                         : `Ikut jadwal saudara (ID: ${p.saudara_santri_id})`;
                                                 })()}
                                             </div>
@@ -1953,7 +2014,7 @@
             );
         };
              
-        // --- KOMPONEN BANTUAN UNTUK TABEL REKAP (ADMIN & SEKRETARIS) ---
+        // --- KOMPONEN BANTUAN UNTUK TABEL REKAP ---
         const RekapRow = ({ periode, ajuan, tepatWaktu, terlambat }) => (
             <tr className="border-b hover:bg-gray-50 text-sm">
                 <td className="p-3 font-bold text-gray-800">{periode}</td>
@@ -1973,8 +2034,18 @@
                 const fetchData = async () => {
                     try {
                         const [resPermits, resLogs] = await Promise.all([ apiService.request('getPermits'), apiService.request('getScanLogs') ]);
-                        const allPermits = resPermits.data || [];
-                        const allLogs = resLogs.data || [];
+                        
+                        // Ekstrak Aman Array Perizinan
+                        let allPermits = [];
+                        if (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) allPermits = resPermits.data.data;
+                        else if (resPermits && Array.isArray(resPermits.data)) allPermits = resPermits.data;
+                        else if (Array.isArray(resPermits)) allPermits = resPermits;
+
+                        // Ekstrak Aman Array Logs
+                        let allLogs = [];
+                        if (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) allLogs = resLogs.data.data;
+                        else if (resLogs && Array.isArray(resLogs.data)) allLogs = resLogs.data;
+                        else if (Array.isArray(resLogs)) allLogs = resLogs;
                         
                         let s = { ajuan: allPermits.length, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0, rekapTepat: 0 };
                         
@@ -1982,7 +2053,7 @@
                             if (p.status_pengajuan === 'DISETUJUI') s.disetujui++;
                             if (p.status_pengajuan === 'DITOLAK') s.ditolak++;
                             
-                            const pLogs = allLogs.filter(l => l.permit_id === p.permit_id);
+                            const pLogs = allLogs.filter(l => l.permit_id === p.permit_id || l.permit_id === p.id_perizinan);
                             const hasExit = pLogs.some(l => l.tipe_scan === 'EXIT');
                             const returnLog = pLogs.find(l => l.tipe_scan === 'RETURN');
                             
@@ -2003,7 +2074,7 @@
                 <div className="space-y-6 animate-fade-in-down">
                     <div><h2 className="text-2xl font-bold text-gray-800">{title}</h2><p className="text-gray-500">{subtitle}</p></div>
                     
-                    <h3 className="text-lg font-bold text-emerald-800 border-b pb-2 mt-4">Statistik Pekan Ini</h3>
+                    <h3 className="text-lg font-bold text-emerald-800 border-b pb-2 mt-4">Statistik Total</h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                         <StatCard title="Total Ajuan" value={loading ? "..." : stats.ajuan} icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
                         <StatCard title="Disetujui" value={loading ? "..." : stats.disetujui} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
@@ -2025,7 +2096,6 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {/* Untuk sementara, data riwayat kita himpun dari total keseluruhan data database */}
                                 <RekapRow periode="Bulan Ini" ajuan={loading ? "..." : stats.ajuan} tepatWaktu={loading ? "..." : stats.rekapTepat} terlambat={loading ? "..." : stats.terlambat} />
                                 <RekapRow periode="Semester Ini" ajuan={loading ? "..." : stats.ajuan} tepatWaktu={loading ? "..." : stats.rekapTepat} terlambat={loading ? "..." : stats.terlambat} />
                                 <RekapRow periode="Tahun Pelajaran Ini" ajuan={loading ? "..." : stats.ajuan} tepatWaktu={loading ? "..." : stats.rekapTepat} terlambat={loading ? "..." : stats.terlambat} />
@@ -2036,7 +2106,6 @@
             );
         };
 
-        // --- DASHBOARD WALI KELAS ---
         // --- DASHBOARD WALI KELAS ---
         const DashboardWaliKelas = ({ setCurrentRoute }) => {
             const { user } = useContext(AuthContext);
