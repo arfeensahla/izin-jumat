@@ -916,7 +916,8 @@
                 setLoading(true);
                 try { 
                     const res = await apiService.request('getJadwal'); 
-                    setJadwal(res.data || []); 
+                    // Jaring pengaman ekstra: pastikan data selalu berupa array agar map() tidak error
+                    setJadwal(Array.isArray(res.data) ? res.data : []); 
                 } catch (e) { showToast(e.message, 'error'); } 
                 finally { setLoading(false); }
             };
@@ -934,7 +935,6 @@
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 try {
-                    // Membuat ID unik acak untuk jadwal baru
                     const payload = { ...formData, id_jadwal: 'JDW-' + Math.floor(Math.random() * 10000) };
                     await apiService.request('saveData', { sheetName: 'JADWAL', data: payload });
                     showToast('Aturan jadwal baru berhasil ditambahkan!', 'success');
@@ -943,12 +943,19 @@
                 } catch (e) { showToast(e.message, 'error'); }
             };
 
+            // Fungsi PELINDUNG ANTI-CRASH untuk membaca tipe data jam dari Google Sheets
+            const formatJam = (val) => {
+                if (!val) return '-';
+                if (typeof val === 'object' && val instanceof Date) return val.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                return String(val).substring(0, 5); // Ambil 5 karakter pertama saja (misal: "08:00")
+            };
+
             return (
                 <div className="space-y-6 animate-fade-in-down">
                     <div className="flex justify-between items-center border-b pb-4">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800">Aturan Jadwal Perizinan</h2>
-                            <p className="text-gray-500">Kelola jadwal keluar santri secara spesifik (Pekan, Jenjang, Gender).</p>
+                            <p className="text-gray-500">Kelola jadwal keluar santri secara spesifik.</p>
                         </div>
                         <Button onClick={() => setIsModalOpen(true)} icon={<Icons.Plus />}>Tambah Aturan Baru</Button>
                     </div>
@@ -968,18 +975,35 @@
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Memuat aturan jadwal...</td></tr> : 
                                  jadwal.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Belum ada aturan jadwal. Silakan tambah baru.</td></tr> :
-                                 jadwal.map((j, idx) => (
-                                    <tr key={idx} className="hover:bg-gray-50">
-                                        <td className="p-4 font-bold text-gray-800">{j.pekan}</td>
-                                        <td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{j.jenjang}</span></td>
-                                        <td className="p-4"><span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-bold">{j.gender}</span></td>
-                                        <td className="p-4 font-medium">{j.hari}</td>
-                                        <td className="p-4 text-center font-mono text-emerald-600 font-bold">{j.jam_mulai} - {j.jam_selesai}</td>
-                                        <td className="p-4">
-                                            <button onClick={() => handleDelete(j.id_jadwal || j.id)} className="text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md text-xs font-bold transition-colors">Hapus</button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                 jadwal.map((j, idx) => {
+                                     
+                                     // SISTEM SAPU JAGAT: Kebal terhadap perbedaan nama kolom di Google Sheets
+                                     const keys = Object.keys(j);
+                                     
+                                     // Menggunakan String() pada setiap data untuk memastikan React tidak crash
+                                     const id = j[keys[0]] || j.id_jadwal || j.id || `temp-${idx}`;
+                                     const pekan = String(j[keys[1]] || j.pekan || '-');
+                                     const jenjang = String(j[keys[2]] || j.jenjang || '-');
+                                     const gender = String(j[keys[3]] || j.gender || '-');
+                                     const hari = String(j[keys[4]] || j.hari || '-');
+                                     
+                                     // Memproses jam dengan fungsi anti-crash
+                                     const jamMulai = formatJam(j[keys[5]] || j.jam_mulai);
+                                     const jamSelesai = formatJam(j[keys[6]] || j.jam_selesai);
+
+                                     return (
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                            <td className="p-4 font-bold text-gray-800">{pekan}</td>
+                                            <td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{jenjang}</span></td>
+                                            <td className="p-4"><span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-bold">{gender}</span></td>
+                                            <td className="p-4 font-medium">{hari}</td>
+                                            <td className="p-4 text-center font-mono text-emerald-600 font-bold">{jamMulai} - {jamSelesai}</td>
+                                            <td className="p-4">
+                                                <button onClick={() => handleDelete(id)} className="text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md text-xs font-bold transition-colors">Hapus</button>
+                                            </td>
+                                        </tr>
+                                     );
+                                 })}
                             </tbody>
                         </table>
                     </Card>
