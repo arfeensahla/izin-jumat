@@ -919,7 +919,6 @@
                     
                     // --- ALAT SADAP DETEKTIF ---
                     console.log("CEK DATA DARI SERVER:", res); 
-                    // Menangkap data yang terbungkus dua lapis (res.data.data)
                     let finalData = [];
                     if (res && res.data && Array.isArray(res.data.data)) {
                         finalData = res.data.data;
@@ -928,9 +927,7 @@
                     } else if (Array.isArray(res)) {
                         finalData = res;
                     }
-                    
-                    setJadwal(finalData);
-                    
+                                                         
                     // Menangkap jika server diam-diam mengirimkan pesan error
                     if (res && res.status === 'error') {
                         showToast("Error Server: " + res.message, 'error');
