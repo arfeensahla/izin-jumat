@@ -535,19 +535,28 @@
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [loading, setLoading] = useState(true);
             const [formData, setFormData] = useState({ nama_kelas: '', wali_kelas: '' });
+            
+            // State untuk fitur pencarian
+            const [searchTerm, setSearchTerm] = useState('');
 
             const fetchData = async () => {
                 setLoading(true);
                 try { 
                     const res = await apiService.request('getKelas'); 
-                    setData(res.data || []); 
+                    
+                    let finalData = [];
+                    if (res && res.data && Array.isArray(res.data.data)) finalData = res.data.data;
+                    else if (res && Array.isArray(res.data)) finalData = res.data;
+                    else if (Array.isArray(res)) finalData = res;
+                    
+                    setData(finalData); 
                 } catch (e) { showToast(e.message, 'error'); } 
                 finally { setLoading(false); }
             };
             useEffect(() => { fetchData(); }, []);
 
             const handleDelete = async (id) => {
-                if (!window.confirm('Yakin ingin menghapus kelas ini? Menghapus kelas mungkin akan memengaruhi data santri di dalamnya.')) return;
+                if (!window.confirm('Yakin ingin menghapus kelas ini?')) return;
                 try {
                     await apiService.request('deleteData', { sheetName: 'KELAS', rowId: id });
                     showToast('Kelas berhasil dihapus', 'success');
@@ -558,7 +567,11 @@
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 try {
-                    const payload = { id_kelas: 'KLS-' + Date.now(), ...formData };
+                    const payload = { 
+                        id_kelas: 'KLS-' + Date.now(),
+                        nama_kelas: formData.nama_kelas,
+                        wali_kelas: formData.wali_kelas
+                    };
                     await apiService.request('saveData', { sheetName: 'KELAS', data: payload });
                     showToast('Kelas baru berhasil ditambahkan!', 'success');
                     setIsModalOpen(false);
@@ -567,9 +580,18 @@
                 } catch (e) { showToast(e.message, 'error'); }
             };
 
+            // Logika Pencarian Kelas & Wali Kelas
+            const filteredData = data.filter(item => {
+                const renderNama = String(item.nama_kelas || item.nama || item.kelas || '').toLowerCase();
+                const renderWali = String(item.wali_kelas || item.wali || '').toLowerCase();
+                const search = searchTerm.toLowerCase();
+                
+                return renderNama.includes(search) || renderWali.includes(search);
+            });
+
             return (
                 <div className="space-y-6 animate-fade-in-down">
-                    <div className="flex justify-between items-center border-b pb-4">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-4">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800">Data Kelas</h2>
                             <p className="text-gray-500">Kelola daftar kelas dan penetapan wali kelas.</p>
@@ -577,11 +599,21 @@
                         <Button onClick={() => setIsModalOpen(true)} icon={<Icons.Plus />}>Tambah Kelas</Button>
                     </div>
 
+                    {/* KOTAK PENCARIAN KELAS */}
+                    <div className="w-full md:w-1/2">
+                        <input 
+                            type="text" 
+                            placeholder="Cari Nama Kelas atau Wali Kelas..." 
+                            className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+
                     <Card className="overflow-x-auto p-0">
                         <table className="w-full text-left text-sm">
                             <thead className="bg-emerald-50 text-emerald-800 border-b">
                                 <tr>
-                                    {/* Kolom ID Kelas Dihapus */}
                                     <th className="p-4">Nama Kelas</th>
                                     <th className="p-4">Wali Kelas</th>
                                     <th className="p-4">Aksi</th>
@@ -589,8 +621,8 @@
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? <tr><td colSpan="3" className="p-8 text-center text-gray-500">Memuat data kelas...</td></tr> : 
-                                 data.length === 0 ? <tr><td colSpan="3" className="p-8 text-center text-gray-500">Belum ada data kelas.</td></tr> :
-                                 data.map((item, idx) => (
+                                 filteredData.length === 0 ? <tr><td colSpan="3" className="p-8 text-center text-gray-500">Kelas tidak ditemukan.</td></tr> :
+                                 filteredData.map((item, idx) => (
                                     <tr key={idx} className="hover:bg-gray-50">
                                         <td className="p-4 font-bold text-gray-800">{item.nama_kelas || item.nama || item.kelas}</td>
                                         <td className="p-4 font-medium text-emerald-600">{item.wali_kelas || item.wali}</td>
@@ -612,7 +644,6 @@
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Username Wali Kelas</label>
                                 <input type="text" required placeholder="Sesuai dengan username di Sheet USERS" className="w-full p-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-emerald-500 outline-none" value={formData.wali_kelas} onChange={e => setFormData({...formData, wali_kelas: e.target.value})} />
-                                <p className="text-xs text-gray-500 mt-1">Pastikan penulisan sama persis dengan yang ada di database pengguna.</p>
                             </div>
                             <Button fullWidth type="submit" className="mt-6">Simpan Kelas</Button>
                         </form>
@@ -977,35 +1008,25 @@
             const [loading, setLoading] = useState(true);
             const [formData, setFormData] = useState({ pekan: 'Pekan 1', jenjang: 'SEMUA', gender: 'SEMUA', hari: 'Sabtu', jam_mulai: '08:00', jam_selesai: '16:00' });
 
+            // State untuk Filter Dropdown
+            const [filterHari, setFilterHari] = useState('');
+            const [filterJenjang, setFilterJenjang] = useState('');
+            const [filterGender, setFilterGender] = useState('');
+
             const fetchData = async () => {
                 setLoading(true);
                 try { 
                     const res = await apiService.request('getJadwal'); 
-                    console.log("CEK DATA DARI SERVER:", res); 
                     
-                    if (res && res.status === 'error') {
-                        showToast("Error Server: " + res.message, 'error');
-                        return;
-                    }
-
                     let finalData = [];
-                    if (res && res.data && Array.isArray(res.data.data)) {
-                        finalData = res.data.data;
-                    } else if (res && Array.isArray(res.data)) {
-                        finalData = res.data;
-                    } else if (Array.isArray(res)) {
-                        finalData = res;
-                    }
+                    if (res && res.data && Array.isArray(res.data.data)) finalData = res.data.data;
+                    else if (res && Array.isArray(res.data)) finalData = res.data;
+                    else if (Array.isArray(res)) finalData = res;
                     
                     setJadwal(finalData); 
-                } catch (e) { 
-                    console.error("Gagal jaringan:", e);
-                    showToast(e.message, 'error'); 
-                } 
+                } catch (e) { showToast(e.message, 'error'); } 
                 finally { setLoading(false); }
             };
-
-            // Pemicu otomatis saat halaman dibuka
             useEffect(() => { fetchData(); }, []);
 
             const handleSubmit = async (e) => {
@@ -1019,7 +1040,6 @@
                         jam_mulai: "'" + formData.jam_mulai,
                         jam_selesai: "'" + formData.jam_selesai
                     };
-                    
                     await apiService.request('saveData', { sheetName: 'JADWAL', data: payload });
                     showToast('Aturan jadwal baru berhasil ditambahkan!', 'success');
                     setIsModalOpen(false);
@@ -1042,14 +1062,48 @@
                 return String(val).substring(0, 5); 
             };
 
+            // Logika Penyaringan Jadwal (Bisa kombinasi 3 filter sekaligus)
+            const filteredJadwal = jadwal.filter(j => {
+                const keys = Object.keys(j);
+                const jenjang = String(j[keys[2]] || j.jenjang || '-').toUpperCase();
+                const gender = String(j[keys[3]] || j.gender || '-').toLowerCase();
+                const hari = String(j[keys[4]] || j.hari || '-').toLowerCase();
+
+                const matchHari = filterHari === '' || hari.includes(filterHari.toLowerCase());
+                const matchJenjang = filterJenjang === '' || jenjang === filterJenjang.toUpperCase() || jenjang === 'SEMUA';
+                const matchGender = filterGender === '' || gender.includes(filterGender.toLowerCase()) || gender === 'semua';
+
+                return matchHari && matchJenjang && matchGender;
+            });
+
             return (
                 <div className="space-y-6 animate-fade-in-down">
-                    <div className="flex justify-between items-center border-b pb-4">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-4">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800">Aturan Jadwal Perizinan</h2>
                             <p className="text-gray-500">Kelola jadwal keluar santri secara spesifik.</p>
                         </div>
                         <Button onClick={() => setIsModalOpen(true)} icon={<Icons.Plus />}>Tambah Aturan Baru</Button>
+                    </div>
+
+                    {/* KOTAK FILTER JADWAL */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm" value={filterHari} onChange={(e) => setFilterHari(e.target.value)}>
+                            <option value="">Semua Hari</option>
+                            <option value="jumat">Jumat</option>
+                            <option value="sabtu">Sabtu</option>
+                            <option value="ahad">Ahad</option>
+                        </select>
+                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm" value={filterJenjang} onChange={(e) => setFilterJenjang(e.target.value)}>
+                            <option value="">Semua Jenjang</option>
+                            <option value="smp">SMP</option>
+                            <option value="sma">SMA</option>
+                        </select>
+                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm" value={filterGender} onChange={(e) => setFilterGender(e.target.value)}>
+                            <option value="">Semua Gender</option>
+                            <option value="laki">Laki-Laki</option>
+                            <option value="perempuan">Perempuan</option>
+                        </select>
                     </div>
 
                     <Card className="overflow-x-auto p-0">
@@ -1066,8 +1120,8 @@
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Memuat aturan jadwal...</td></tr> : 
-                                 jadwal.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Belum ada aturan jadwal. Silakan tambah baru.</td></tr> :
-                                 jadwal.map((j, idx) => {
+                                 filteredJadwal.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Tidak ada jadwal yang sesuai filter.</td></tr> :
+                                 filteredJadwal.map((j, idx) => {
                                      const keys = Object.keys(j);
                                      const id = j[keys[0]] || j.id_jadwal || j.id || `temp-${idx}`;
                                      const pekan = String(j[keys[1]] || j.pekan || '-');
@@ -1095,6 +1149,7 @@
                     </Card>
 
                     <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Tambah Aturan Jadwal">
+                        {/* Form tidak ada perubahan */}
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
