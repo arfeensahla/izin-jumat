@@ -1704,21 +1704,51 @@
 
             // --- STATE UNTUK PENCARIAN & FILTER ---
             const [searchTerm, setSearchTerm] = useState('');
+            const [filterBulan, setFilterBulan] = useState('');
             const [filterKelas, setFilterKelas] = useState('');
             const [filterStatus, setFilterStatus] = useState('');
+
+            // Fungsi Mesin Pembaca Tanggal (Mengubah format tanggal jadi Nama Bulan & Tahun)
+            const getBulanTahun = (tgl) => {
+                if (!tgl) return '-';
+                const strTgl = String(tgl).trim();
+                
+                // Coba konversi standar
+                const d = new Date(strTgl);
+                if (!isNaN(d.getTime())) {
+                    return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+                }
+                
+                // Jika gagal (biasanya karena format ala Indonesia: DD/MM/YYYY)
+                const parts = strTgl.split(/[\/\- ]/);
+                if (parts.length >= 3) {
+                    const monthNames = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+                    let m = parseInt(parts[1], 10);
+                    // Cari yang 4 digit untuk tahun
+                    let y = parts[2].length === 4 ? parts[2] : (parts[0].length === 4 ? parts[0] : parts[2]); 
+                    if (m >= 1 && m <= 12 && String(y).length === 4) return `${monthNames[m]} ${y}`;
+                }
+                
+                return strTgl; // Jika format benar-benar aneh, biarkan seadanya
+            };
 
             useEffect(() => {
                 const fetchPermits = async () => {
                     try { 
                         const res = await apiService.request('getPermits'); 
                         
-                        // Ekstrak data yang aman (mencegah error double array)
                         let finalData = [];
                         if (res && res.data && Array.isArray(res.data.data)) finalData = res.data.data;
                         else if (res && Array.isArray(res.data)) finalData = res.data;
                         else if (Array.isArray(res)) finalData = res;
                         
-                        setPermits(finalData); 
+                        // Menanamkan properti "Bulan" ke dalam setiap data sebelum disimpan
+                        const dataWithBulan = finalData.map(p => ({
+                            ...p,
+                            _bulan_filter: getBulanTahun(p.tanggal_izin)
+                        }));
+                        
+                        setPermits(dataWithBulan); 
                     } catch (e) { 
                         showToast(e.message, 'error'); 
                     } finally { 
@@ -1728,20 +1758,23 @@
                 fetchPermits();
             }, []);
 
-            // Mengambil daftar kelas unik yang ada di data untuk isi Dropdown
+            // Membaca otomatis pilihan Dropdown dari data (Menghilangkan Duplikat)
+            const bulanOptions = [...new Set(permits.map(p => p._bulan_filter).filter(b => b && b !== '-'))];
             const kelasOptions = [...new Set(permits.map(p => p.kelas).filter(Boolean))].sort();
 
-            // --- LOGIKA PENYARINGAN DATA (FILTER) ---
+            // --- LOGIKA PENYARINGAN SUPER (4 FILTER SEKALIGUS) ---
             const filteredPermits = permits.filter(p => {
                 const nama = String(p.nama_santri || '').toLowerCase();
                 const kelas = String(p.kelas || '');
                 const status = String(p.status_pengajuan || '').toUpperCase();
+                const bulan = String(p._bulan_filter || '');
                 
                 const matchSearch = nama.includes(searchTerm.toLowerCase());
+                const matchBulan = filterBulan === '' || bulan === filterBulan;
                 const matchKelas = filterKelas === '' || kelas === filterKelas;
                 const matchStatus = filterStatus === '' || status.includes(filterStatus);
                 
-                return matchSearch && matchKelas && matchStatus;
+                return matchSearch && matchBulan && matchKelas && matchStatus;
             });
 
             return (
@@ -1753,17 +1786,27 @@
                         </div>
                     </div>
 
-                    {/* --- KOTAK ALAT PENCARIAN & FILTER --- */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* --- KOTAK ALAT: SEKARANG JADI 4 KOLOM --- */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <input 
                             type="text" 
                             placeholder="Cari Nama Santri..." 
-                            className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                            className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                         <select 
-                            className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm"
+                            className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium"
+                            value={filterBulan}
+                            onChange={(e) => setFilterBulan(e.target.value)}
+                        >
+                            <option value="">Semua Bulan</option>
+                            {bulanOptions.map((b, idx) => (
+                                <option key={idx} value={b}>{b}</option>
+                            ))}
+                        </select>
+                        <select 
+                            className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium"
                             value={filterKelas}
                             onChange={(e) => setFilterKelas(e.target.value)}
                         >
@@ -1773,7 +1816,7 @@
                             ))}
                         </select>
                         <select 
-                            className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm"
+                            className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium"
                             value={filterStatus}
                             onChange={(e) => setFilterStatus(e.target.value)}
                         >
@@ -1783,6 +1826,11 @@
                             <option value="DITOLAK">Ditolak</option>
                             <option value="SELESAI">Selesai</option>
                         </select>
+                    </div>
+
+                    {/* --- INFO JUMLAH DATA --- */}
+                    <div className="text-sm text-gray-500">
+                        Menampilkan <span className="font-bold text-emerald-600">{filteredPermits.length}</span> dari {permits.length} perizinan
                     </div>
 
                     <Card className="overflow-x-auto p-0">
@@ -1817,6 +1865,7 @@
                                             <span className={`px-2 py-1 text-xs font-bold rounded-full border ${
                                                 p.status_pengajuan === 'DISETUJUI' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
                                                 p.status_pengajuan === 'DITOLAK' ? 'bg-red-100 text-red-800 border-red-200' :
+                                                p.status_pengajuan === 'SELESAI' ? 'bg-gray-100 text-gray-800 border-gray-200' :
                                                 'bg-yellow-100 text-yellow-800 border-yellow-200'
                                             }`}>
                                                 {p.status_pengajuan ? p.status_pengajuan.replace('_', ' ') : '-'}
