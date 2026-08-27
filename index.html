@@ -1460,14 +1460,32 @@
             const selectedSantri = useMemo(() => santriData.find(s => (s.santri_id || s.nis || s.id) === form.santri_id), [santriData, form.santri_id]);
             const selectedSaudara = useMemo(() => allSantriData.find(s => (s.santri_id || s.nis || s.id) === form.saudara_santri_id), [allSantriData, form.saudara_santri_id]);
             
+            // --- LOGIKA PENJADWALAN YANG SUDAH DIPERBAIKI (TOLERANSI 'SEMUA') ---
             const statusJadwal = useMemo(() => {
                 if (!selectedSantri || jadwalData.length === 0) return null;
                 const targetSantri = (form.ikut_jadwal_saudara && selectedSaudara) ? selectedSaudara : selectedSantri;
-                const rule = jadwalData.find(j => j.pekan === weekNumber);
+                
+                // 1. Cari aturan jadwal yang angkanya cocok dengan pekan ini
+                const currentPekanNum = String(weekNumber).replace(/\D/g, ''); 
+                const rule = jadwalData.find(j => {
+                    const rulePekanNum = String(j.pekan || j.Pekan || '').replace(/\D/g, '');
+                    return rulePekanNum === currentPekanNum;
+                });
+
                 if (!rule) return 'Di Luar Jadwal';
-                const genderTarget = String(targetSantri.gender || targetSantri.jk || '').toLowerCase();
-                const genderRule = String(rule.gender || '').toLowerCase();
-                return (targetSantri.jenjang === rule.jenjang && genderTarget === genderRule) ? 'Sesuai Jadwal' : 'Di Luar Jadwal';
+
+                // 2. Evaluasi Jenjang (Menganggap "SEMUA" sebagai True/Lolos)
+                const targetJenjang = String(targetSantri.jenjang || targetSantri.Jenjang || '').toUpperCase();
+                const ruleJenjang = String(rule.jenjang || rule.Jenjang || '').toUpperCase();
+                const isJenjangMatch = (ruleJenjang === 'SEMUA' || ruleJenjang === targetJenjang);
+
+                // 3. Evaluasi Gender (Menganggap "SEMUA" sebagai True/Lolos)
+                const targetGender = String(targetSantri.gender || targetSantri.jk || '').toUpperCase();
+                const ruleGender = String(rule.gender || rule.Gender || '').toUpperCase();
+                const isGenderMatch = (ruleGender === 'SEMUA' || targetGender.includes(ruleGender) || ruleGender.includes(targetGender));
+
+                // Jika Jenjang DAN Gender lolos kualifikasi, maka Sesuai Jadwal
+                return (isJenjangMatch && isGenderMatch) ? 'Sesuai Jadwal' : 'Di Luar Jadwal';
             }, [selectedSantri, selectedSaudara, form.ikut_jadwal_saudara, jadwalData, weekNumber]);
 
             const handleSubmit = async (e) => {
