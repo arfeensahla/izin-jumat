@@ -2671,31 +2671,74 @@
             );
         };
 
+        // --- RIWAYAT SCAN PAGE ---
         const RiwayatScanPage = () => {
             const { showToast } = useContext(ToastContext);
             const [logs, setLogs] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [searchTerm, setSearchTerm] = useState('');
 
             useEffect(() => {
                 const fetchLogs = async () => {
-                    try { const res = await apiService.request('getScanLogs'); setLogs(res.data); } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
+                    try { 
+                        const res = await apiService.request('getScanLogs'); 
+                        let finalLogs = [];
+                        if (res && res.data && Array.isArray(res.data.data)) finalLogs = res.data.data;
+                        else if (res && Array.isArray(res.data)) finalLogs = res.data;
+                        else if (Array.isArray(res)) finalLogs = res;
+
+                        setLogs(finalLogs); 
+                    } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
                 };
                 fetchLogs();
             }, []);
 
+            const filteredLogs = logs.filter(log => {
+                const idSantri = String(log.santri_id || '').toLowerCase();
+                const ket = String(log.keterangan || '').toLowerCase();
+                const search = searchTerm.toLowerCase();
+                return idSantri.includes(search) || ket.includes(search);
+            });
+
             return (
                 <div className="space-y-6 animate-fade-in-down">
-                    <div><h2 className="text-2xl font-bold text-gray-800">Riwayat Scan Security</h2><p className="text-gray-500">Log aktivitas santri keluar & masuk gerbang.</p></div>
-                    <Card className="overflow-x-auto">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">Riwayat Scan Security</h2>
+                        <p className="text-gray-500">Log aktivitas santri keluar & masuk gerbang pos keamanan.</p>
+                    </div>
+
+                    <div className="w-full md:w-1/3">
+                        <input 
+                            type="text" 
+                            placeholder="Cari ID Santri / Keterangan..." 
+                            className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+
+                    <Card className="overflow-x-auto p-0">
                         <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
-                            <thead><tr className="bg-gray-50 text-gray-700 border-b"><th className="p-4">Waktu</th><th className="p-4">Aksi</th><th className="p-4">ID Santri</th><th className="p-4">Keterangan</th></tr></thead>
+                            <thead>
+                                <tr className="bg-emerald-50 text-emerald-800 border-b">
+                                    <th className="p-4">Waktu</th>
+                                    <th className="p-4">Aksi</th>
+                                    <th className="p-4">ID Santri</th>
+                                    <th className="p-4">Keterangan</th>
+                                </tr>
+                            </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? <tr><td colSpan="4" className="p-8 text-center text-gray-500">Memuat log...</td></tr> : 
-                                 logs.map((log, idx) => (
+                                 filteredLogs.length === 0 ? <tr><td colSpan="4" className="p-8 text-center text-gray-500">Belum ada riwayat scan.</td></tr> :
+                                 filteredLogs.map((log, idx) => (
                                     <tr key={idx} className="hover:bg-gray-50">
                                         <td className="p-4 font-medium text-gray-800">{log.waktu} WIB</td>
-                                        <td className="p-4"><span className={`px-2 py-1 text-xs font-bold rounded-full ${log.tipe_scan === 'EXIT' ? 'bg-orange-100 text-orange-800' : 'bg-emerald-100 text-emerald-800'}`}>{log.tipe_scan}</span></td>
-                                        <td className="p-4">{log.santri_id}</td>
+                                        <td className="p-4">
+                                            <span className={`px-2 py-1 text-xs font-bold rounded-full ${log.tipe_scan === 'EXIT' ? 'bg-orange-100 text-orange-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                                {log.tipe_scan}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 font-mono font-bold">{log.santri_id}</td>
                                         <td className="p-4 text-gray-600">{log.keterangan}</td>
                                     </tr>
                                 ))}
@@ -2743,6 +2786,7 @@
             );
         };
 
+        // --- SECURITY SCANNER PAGE ---
         const SecurityScannerPage = () => {
             const { user } = useContext(AuthContext);
             const { showToast } = useContext(ToastContext);
@@ -2753,7 +2797,6 @@
 
             useEffect(() => {
                 return () => {
-                    // Bersihkan kamera saat pindah menu
                     if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
                         html5QrCodeRef.current.stop().catch(console.error);
                     }
@@ -2769,7 +2812,7 @@
                     
                     const config = { fps: 10, qrbox: { width: 250, height: 250 } };
                     await html5QrCode.start(
-                        { facingMode: "environment" }, // Prioritaskan kamera belakang
+                        { facingMode: "environment" }, 
                         config,
                         onScanSuccess
                     );
@@ -2788,10 +2831,8 @@
             };
 
             const onScanSuccess = async (decodedText) => {
-                // Hentikan pemindaian sementara agar tidak double request
                 await stopScanner();
                 
-                // Getar perangkat jika browser mendukung (Haptic Feedback)
                 if (navigator.vibrate) navigator.vibrate(200);
 
                 setProcessing(true);
@@ -2800,11 +2841,15 @@
                         qr_token: decodedText,
                         security_name: user.nama
                     });
-                    setScanResult({ success: true, data: res.data, message: res.data.pesan });
-                    showToast(res.data.pesan, "success");
+                    
+                    // Ekstrak aman respons server
+                    const resData = (res && res.data && res.data.data) ? res.data.data : (res.data || {});
+                    
+                    setScanResult({ success: true, data: resData, message: resData.pesan || 'Scan berhasil diproses.' });
+                    showToast(resData.pesan || 'Scan berhasil!', "success");
                 } catch (err) {
-                    setScanResult({ success: false, message: err.message });
-                    showToast(err.message, "error");
+                    setScanResult({ success: false, message: err.message || 'QR Code ditolak / Kedaluwarsa.' });
+                    showToast(err.message || 'Scan gagal.', "error");
                 } finally {
                     setProcessing(false);
                 }
@@ -2814,11 +2859,10 @@
                 <div className="space-y-6 max-w-lg mx-auto animate-fade-in-down">
                     <div className="text-center">
                         <h2 className="text-2xl font-bold text-gray-800">Scanner Pos Security</h2>
-                        <p className="text-sm text-gray-500 mt-1">Arahkan kamera ke QR Code pada kartu izin santri.</p>
+                        <p className="text-sm text-gray-500 mt-1">Arahkan kamera ke QR Code pada kartu izin santri (Valid pada Hari-H).</p>
                     </div>
 
                     <Card className="p-4 flex flex-col items-center">
-                        {/* Area Video Kamera */}
                         <div id="reader" className={`w-full bg-black rounded-lg overflow-hidden ${scanning ? 'block' : 'hidden'}`} style={{ minHeight: '300px' }}></div>
 
                         {!scanning && (
@@ -2826,7 +2870,7 @@
                                 <div className="w-20 h-20 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mb-4">
                                     <Icons.Scan />
                                 </div>
-                                <p className="text-gray-600 font-medium mb-6">Kamera tidak aktif</p>
+                                <p className="text-gray-600 font-medium mb-6">Kamera pengawas gerbang siap</p>
                                 <Button onClick={startScanner} className="px-8 py-3 text-lg shadow-md" icon={<Icons.Scan />}>
                                     Buka Kamera Scan
                                 </Button>
@@ -2842,11 +2886,10 @@
 
                     {processing && (
                         <div className="p-6 bg-white rounded-xl shadow-sm border text-center animate-pulse">
-                            <p className="text-emerald-700 font-bold">Memverifikasi ke database pusat...</p>
+                            <p className="text-emerald-700 font-bold">Memverifikasi masa berlaku QR ke database...</p>
                         </div>
                     )}
 
-                    {/* Feedback Visual Hasil Scan */}
                     {scanResult && (
                         <Card className={`border-2 ${scanResult.success ? 'border-emerald-500 bg-emerald-50/30' : 'border-red-500 bg-red-50/30'}`}>
                             <div className="flex items-start gap-4">
@@ -2855,11 +2898,11 @@
                                 </div>
                                 <div className="flex-1">
                                     <h3 className={`font-bold text-lg ${scanResult.success ? 'text-emerald-800' : 'text-red-800'}`}>
-                                        {scanResult.success ? `SCAN ${scanResult.data.type} BERHASIL` : 'SCAN GAGAL / DITOLAK'}
+                                        {scanResult.success ? `SCAN ${scanResult.data.type || 'BERHASIL'} BERHASIL` : 'SCAN DITOLAK / KEDALUWARSA'}
                                     </h3>
                                     <p className="text-sm text-gray-600 mt-1">{scanResult.message}</p>
 
-                                    {scanResult.success && (
+                                    {scanResult.success && scanResult.data.nama && (
                                         <div className="mt-4 p-3 bg-white rounded-lg border border-gray-100 text-sm space-y-1">
                                             <p><span className="text-gray-500">Nama:</span> <strong>{scanResult.data.nama}</strong> ({scanResult.data.kelas})</p>
                                             <p><span className="text-gray-500">Waktu Scan:</span> <strong>{scanResult.data.waktu} WIB</strong></p>
