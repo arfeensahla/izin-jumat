@@ -1412,9 +1412,13 @@
             const { user } = useContext(AuthContext);
             const { showToast } = useContext(ToastContext);
             const [santriData, setSantriData] = useState([]);
+            const [allSantriData, setAllSantriData] = useState([]); // Tambahan: Menyimpan semua santri lintas kelas
             const [jadwalData, setJadwalData] = useState([]);
             const [loading, setLoading] = useState(true);
             const [submitting, setSubmitting] = useState(false);
+            
+            // State untuk fitur pencarian saudara
+            const [searchSaudaraTerm, setSearchSaudaraTerm] = useState('');
 
             const nextFriday = useMemo(() => helper.getNextFriday(), []);
             const weekNumber = useMemo(() => {
@@ -1433,40 +1437,39 @@
                             apiService.request('getJadwal')
                         ]);
                         
-                        // Ekstrak Aman Santri
                         let finalSantri = [];
                         if (resSantri && resSantri.data && Array.isArray(resSantri.data.data)) finalSantri = resSantri.data.data;
                         else if (resSantri && Array.isArray(resSantri.data)) finalSantri = resSantri.data;
                         else if (Array.isArray(resSantri)) finalSantri = resSantri;
 
-                        // Ekstrak Aman Jadwal
                         let finalJadwal = [];
                         if (resJadwal && resJadwal.data && Array.isArray(resJadwal.data.data)) finalJadwal = resJadwal.data.data;
                         else if (resJadwal && Array.isArray(resJadwal.data)) finalJadwal = resJadwal.data;
                         else if (Array.isArray(resJadwal)) finalJadwal = resJadwal;
 
-                        // KUNCI GANDA: Hanya ambil santri Aktif & dari Kelas Wali Kelas (Hapus "|| true")
-                        const mySantri = finalSantri.filter(s => 
-                            String(s.status || s.Status || '').toLowerCase() === 'aktif' && 
-                            s.kelas === user.kelas_id
-                        );
+                        // Ambil semua santri aktif se-pondok
+                        const aktifSantri = finalSantri.filter(s => String(s.status || s.Status || '').toLowerCase() === 'aktif');
+                        setAllSantriData(aktifSantri);
 
+                        // Ambil khusus kelas ini saja
+                        const mySantri = aktifSantri.filter(s => s.kelas === user.kelas_id);
                         setSantriData(mySantri);
                         setJadwalData(finalJadwal);
                     } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
                 };
                 fetchDeps();
-            }, [user.kelas_id]); // Trigger ulang jika kelas user berubah
+            }, [user.kelas_id]);
 
             const selectedSantri = useMemo(() => santriData.find(s => (s.santri_id || s.nis || s.id) === form.santri_id), [santriData, form.santri_id]);
-            const selectedSaudara = useMemo(() => santriData.find(s => (s.santri_id || s.nis || s.id) === form.saudara_santri_id), [santriData, form.saudara_santri_id]);
+            
+            // PERBAIKAN: Cari data saudara dari allSantriData (seluruh pondok)
+            const selectedSaudara = useMemo(() => allSantriData.find(s => (s.santri_id || s.nis || s.id) === form.saudara_santri_id), [allSantriData, form.saudara_santri_id]);
             
             const statusJadwal = useMemo(() => {
                 if (!selectedSantri || jadwalData.length === 0) return null;
                 const targetSantri = (form.ikut_jadwal_saudara && selectedSaudara) ? selectedSaudara : selectedSantri;
                 const rule = jadwalData.find(j => j.pekan === weekNumber);
                 if (!rule) return 'Di Luar Jadwal';
-                // Penyesuaian baca properti gender santri (bisa 'gender', 'jk', dll)
                 const genderTarget = String(targetSantri.gender || targetSantri.jk || '').toLowerCase();
                 const genderRule = String(rule.gender || '').toLowerCase();
                 return (targetSantri.jenjang === rule.jenjang && genderTarget === genderRule) ? 'Sesuai Jadwal' : 'Di Luar Jadwal';
@@ -1490,6 +1493,7 @@
                     await apiService.request('savePermit', payload);
                     showToast('Pengajuan berhasil dikirim! Menunggu approval.', 'success');
                     setForm(initialForm);
+                    setSearchSaudaraTerm(''); // Reset pencarian
                     setCurrentRoute('histori');
                 } catch (e) { showToast(e.message, 'error'); } finally { setSubmitting(false); }
             };
@@ -1505,7 +1509,70 @@
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <Card><h3 className="text-lg font-bold text-gray-700 border-b pb-2 mb-4">1. Identitas Santri</h3><Select name="santri_id" label={`Pilih Santri di Kelas ${user.kelas_id}`} required options={santriOptions} value={form.santri_id} onChange={(e) => setForm({...form, santri_id: e.target.value})} />{selectedSantri && (<div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4 grid grid-cols-3 gap-4 text-sm mt-4"><div><p className="text-gray-500">Jenjang</p><p className="font-bold text-emerald-800">{selectedSantri.jenjang || '-'}</p></div><div><p className="text-gray-500">Kelas</p><p className="font-bold text-emerald-800">{selectedSantri.kelas || '-'}</p></div><div><p className="text-gray-500">Gender</p><p className="font-bold text-emerald-800">{selectedSantri.gender || selectedSantri.jk || '-'}</p></div></div>)}</Card>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6"><Card><h3 className="text-lg font-bold text-gray-700 border-b pb-2 mb-4">2. Detail Perizinan</h3><div className="mb-4"><label className="block text-sm font-medium text-gray-700 mb-1">Keperluan Izin <span className="text-red-500">*</span></label><textarea required rows="2" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none" value={form.keperluan} onChange={(e) => setForm({...form, keperluan: e.target.value})} placeholder="Contoh: Menghadiri pernikahan keluarga"></textarea></div><Input label="Tujuan Keluar (Tempat/Kota)" required value={form.tujuan} onChange={(e) => setForm({...form, tujuan: e.target.value})} placeholder="Contoh: Bandung" /></Card><Card><h3 className="text-lg font-bold text-gray-700 border-b pb-2 mb-4">3. Wali Safar (Penjemput)</h3><Input label="Nama Wali Safar" required value={form.wali_safar} onChange={(e) => setForm({...form, wali_safar: e.target.value})} placeholder="Nama penjemput" /><Select label="Hubungan Wali Safar" required options={hubunganOptions} value={form.hubungan_wali} onChange={(e) => setForm({...form, hubungan_wali: e.target.value})} />{form.hubungan_wali === 'Lainnya' && (<Input label="Detail Hubungan Lainnya" required value={form.hubungan_lainnya} onChange={(e) => setForm({...form, hubungan_lainnya: e.target.value})} placeholder="Sebutkan hubungannya..." />)}</Card></div>
-                        {selectedSantri && (<Card className={statusJadwal === 'Sesuai Jadwal' ? 'border-emerald-300 ring-1 ring-emerald-300' : 'border-yellow-400 ring-1 ring-yellow-400'}><div className="flex flex-col md:flex-row justify-between items-start gap-4 border-b pb-4 mb-4"><div><h3 className="text-lg font-bold text-gray-800">4. Analisis Penjadwalan</h3><p className="text-sm text-gray-600 mt-1">Tanggal Izin: <strong className="text-gray-900">{helper.formatDate(nextFriday)}</strong> (Pekan {weekNumber})</p></div><div className={`px-4 py-2 rounded-full font-bold text-sm ${statusJadwal === 'Sesuai Jadwal' ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'}`}>Status: {statusJadwal}</div></div><div className="space-y-4"><label className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"><input type="checkbox" className="w-5 h-5 text-emerald-600 rounded" checked={form.ikut_jadwal_saudara} onChange={(e) => setForm({...form, ikut_jadwal_saudara: e.target.checked, saudara_santri_id: ''})} /><span className="font-medium text-gray-700">Mengikuti Jadwal Kakak / Adik</span></label>{form.ikut_jadwal_saudara && (<div className="pl-8 p-4 bg-blue-50 border border-blue-100 rounded-lg animate-fade-in-down"><Select label="Pilih Santri Saudara" options={santriData.filter(s => (s.santri_id || s.nis || s.id) !== form.santri_id).map(s => ({value: (s.santri_id || s.nis || s.id), label: `${s.nama || s.nama_santri} (${s.kelas} - ${s.gender || s.jk})`}))} value={form.saudara_santri_id} onChange={(e) => setForm({...form, saudara_santri_id: e.target.value})} />{selectedSaudara && <p className="text-xs text-blue-700 mt-1">Sistem menggunakan jadwal <strong>{selectedSaudara.jenjang} - {selectedSaudara.gender || selectedSaudara.jk}</strong>.</p>}</div>)}{statusJadwal === 'Di Luar Jadwal' && (<div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg"><label className="block text-sm font-bold text-yellow-800 mb-2">Karena izin di luar jadwal, wajib mengisi alasan berikut:</label><textarea required rows="2" className="w-full px-4 py-2 rounded-lg border border-yellow-300 focus:ring-2 focus:ring-yellow-500 outline-none" value={form.keterangan_luar_jadwal} onChange={(e) => setForm({...form, keterangan_luar_jadwal: e.target.value})} placeholder="Alasan izin di luar pekan yang ditentukan..."></textarea></div>)}</div></Card>)}
+                        
+                        {selectedSantri && (
+                        <Card className={statusJadwal === 'Sesuai Jadwal' ? 'border-emerald-300 ring-1 ring-emerald-300' : 'border-yellow-400 ring-1 ring-yellow-400'}>
+                            <div className="flex flex-col md:flex-row justify-between items-start gap-4 border-b pb-4 mb-4">
+                                <div><h3 className="text-lg font-bold text-gray-800">4. Analisis Penjadwalan</h3><p className="text-sm text-gray-600 mt-1">Tanggal Izin: <strong className="text-gray-900">{helper.formatDate(nextFriday)}</strong> (Pekan {weekNumber})</p></div>
+                                <div className={`px-4 py-2 rounded-full font-bold text-sm ${statusJadwal === 'Sesuai Jadwal' ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'}`}>Status: {statusJadwal}</div>
+                            </div>
+                            <div className="space-y-4">
+                                <label className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors">
+                                    <input type="checkbox" className="w-5 h-5 text-emerald-600 rounded" checked={form.ikut_jadwal_saudara} onChange={(e) => { setForm({...form, ikut_jadwal_saudara: e.target.checked, saudara_santri_id: ''}); setSearchSaudaraTerm(''); }} />
+                                    <span className="font-medium text-gray-700">Mengikuti Jadwal Kakak / Adik Lintas Kelas</span>
+                                </label>
+                                
+                                {form.ikut_jadwal_saudara && (
+                                    <div className="pl-8 p-4 bg-blue-50 border border-blue-100 rounded-lg animate-fade-in-down space-y-3">
+                                        <label className="block text-sm font-medium text-blue-900">Cari Nama Saudara <span className="text-red-500">*</span></label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="Ketik nama saudara..." 
+                                            className="w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                            value={searchSaudaraTerm}
+                                            onChange={(e) => {
+                                                setSearchSaudaraTerm(e.target.value);
+                                                setForm({...form, saudara_santri_id: ''}); // Reset ID kalau ngetik ulang
+                                            }}
+                                        />
+                                        {/* Dropdown Pencarian */}
+                                        {searchSaudaraTerm && !form.saudara_santri_id && (
+                                            <div className="max-h-40 overflow-y-auto border border-blue-200 rounded-lg bg-white shadow-sm mt-1">
+                                                {allSantriData
+                                                    .filter(s => (s.santri_id || s.nis || s.id) !== form.santri_id)
+                                                    .filter(s => String(s.nama || s.nama_santri).toLowerCase().includes(searchSaudaraTerm.toLowerCase()))
+                                                    .slice(0, 5) // Batasi 5 hasil pencarian saja
+                                                    .map(s => {
+                                                        const id = s.santri_id || s.nis || s.id;
+                                                        return (
+                                                            <div 
+                                                                key={id} 
+                                                                className="p-3 cursor-pointer hover:bg-blue-50 text-sm border-b last:border-0"
+                                                                onClick={() => {
+                                                                    setForm({...form, saudara_santri_id: id});
+                                                                    setSearchSaudaraTerm(`${s.nama || s.nama_santri} (Kelas: ${s.kelas})`); // Isi otomatis kotak pencarian
+                                                                }}
+                                                            >
+                                                                <span className="font-bold text-gray-800">{s.nama || s.nama_santri}</span> 
+                                                                <span className="text-gray-500 text-xs ml-1">({s.kelas} - {s.gender || s.jk})</span>
+                                                            </div>
+                                                        );
+                                                    })
+                                                }
+                                                {allSantriData.filter(s => String(s.nama || s.nama_santri).toLowerCase().includes(searchSaudaraTerm.toLowerCase())).length === 0 && (
+                                                    <div className="p-3 text-sm text-gray-500 italic">Nama tidak ditemukan...</div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {selectedSaudara && <p className="text-xs text-blue-700 mt-2">Sistem sekarang menggunakan jadwal milik saudara: <strong className="uppercase">{selectedSaudara.jenjang} - {selectedSaudara.gender || selectedSaudara.jk}</strong>.</p>}
+                                    </div>
+                                )}
+                                
+                                {statusJadwal === 'Di Luar Jadwal' && (<div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg"><label className="block text-sm font-bold text-yellow-800 mb-2">Karena izin di luar jadwal, wajib mengisi alasan berikut:</label><textarea required rows="2" className="w-full px-4 py-2 rounded-lg border border-yellow-300 focus:ring-2 focus:ring-yellow-500 outline-none" value={form.keterangan_luar_jadwal} onChange={(e) => setForm({...form, keterangan_luar_jadwal: e.target.value})} placeholder="Alasan izin di luar pekan yang ditentukan..."></textarea></div>)}
+                            </div>
+                        </Card>
+                        )}
                         <Button type="submit" disabled={!selectedSantri || submitting} fullWidth className="py-4 text-lg shadow-lg">{submitting ? 'Memproses ke Database...' : 'Kirim Pengajuan Izin'}</Button>
                     </form>
                 </div>
@@ -1514,42 +1581,95 @@
 
         // --- HISTORI KELAS PAGE ---
         const HistoriKelasPage = () => {
-            // WAJIB: Panggil data user dari AuthContext agar tahu ini Wali Kelas dari kelas mana
             const { user } = useContext(AuthContext); 
             const { showToast } = useContext(ToastContext);
             const [permits, setPermits] = useState([]);
             const [loading, setLoading] = useState(true);
             const [selectedQrPermit, setSelectedQrPermit] = useState(null);
 
+            // --- STATE UNTUK PENCARIAN, FILTER, DAN SORTING ---
+            const [searchTerm, setSearchTerm] = useState('');
+            const [filterBulan, setFilterBulan] = useState('');
+            const [filterStatus, setFilterStatus] = useState('');
+            const [sortConfig, setSortConfig] = useState({ key: 'tanggal_izin', direction: 'desc' });
+
+            const getBulanTahun = (tgl) => {
+                if (!tgl) return '-';
+                const strTgl = String(tgl).trim();
+                const d = new Date(strTgl);
+                if (!isNaN(d.getTime())) return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+                const parts = strTgl.split(/[\/\- ]/);
+                if (parts.length >= 3) {
+                    const monthNames = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+                    let m = parseInt(parts[1], 10);
+                    let y = parts[2].length === 4 ? parts[2] : (parts[0].length === 4 ? parts[0] : parts[2]); 
+                    if (m >= 1 && m <= 12 && String(y).length === 4) return `${monthNames[m]} ${y}`;
+                }
+                return strTgl; 
+            };
+
             useEffect(() => {
                 const fetchPermits = async () => {
                     try { 
                         const res = await apiService.request('getPermits'); 
                         
-                        // Ekstrak Aman Data
                         let finalPermits = [];
                         if (res && res.data && Array.isArray(res.data.data)) finalPermits = res.data.data;
                         else if (res && Array.isArray(res.data)) finalPermits = res.data;
                         else if (Array.isArray(res)) finalPermits = res;
 
-                        // GEMBOK KELAS: Pastikan hanya data untuk user.kelas_id yang masuk
+                        // GEMBOK KELAS
                         let myPermits = finalPermits.filter(p => p.kelas === user.kelas_id);
+                        
+                        // Tambahkan properti bulan untuk filter
+                        const dataWithBulan = myPermits.map(p => ({
+                            ...p,
+                            _bulan_filter: getBulanTahun(p.tanggal_izin)
+                        }));
 
-                        // Urutkan dari yang paling baru
-                        myPermits.sort((a, b) => new Date(b.tanggal_izin) - new Date(a.tanggal_izin));
-
-                        setPermits(myPermits); 
-                    } catch (e) { 
-                        showToast(e.message, 'error'); 
-                    } finally { 
-                        setLoading(false); 
-                    }
+                        setPermits(dataWithBulan); 
+                    } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
                 };
-                
-                // Pastikan user.kelas_id ada sebelum di-fetch
-                if (user.kelas_id) fetchPermits();
-                else setLoading(false);
+                if (user.kelas_id) fetchPermits(); else setLoading(false);
             }, [user.kelas_id]);
+
+            const bulanOptions = [...new Set(permits.map(p => p._bulan_filter).filter(b => b && b !== '-'))];
+
+            // 1. FILTERING
+            const filteredPermits = permits.filter(p => {
+                const nama = String(p.nama_santri || '').toLowerCase();
+                const status = String(p.status_pengajuan || '').toUpperCase();
+                const bulan = String(p._bulan_filter || '');
+                
+                const matchSearch = nama.includes(searchTerm.toLowerCase());
+                const matchBulan = filterBulan === '' || bulan === filterBulan;
+                const matchStatus = filterStatus === '' || status.includes(filterStatus);
+                
+                return matchSearch && matchBulan && matchStatus;
+            });
+
+            // 2. SORTING
+            const sortedPermits = [...filteredPermits].sort((a, b) => {
+                if (!sortConfig.key) return 0;
+                let aValue = a[sortConfig.key] || '';
+                let bValue = b[sortConfig.key] || '';
+                if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+                if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+                if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            const handleSort = (key) => {
+                let direction = 'asc';
+                if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+                setSortConfig({ key, direction });
+            };
+
+            const SortIcon = ({ columnKey }) => {
+                if (sortConfig.key !== columnKey) return <span className="text-gray-300 ml-1">↕</span>;
+                return sortConfig.direction === 'asc' ? <span className="text-emerald-600 ml-1">▲</span> : <span className="text-emerald-600 ml-1">▼</span>;
+            };
 
             const getStatusBadge = (status) => {
                 if (!status) return <span className="bg-gray-100 px-2 py-1 text-xs font-bold rounded-full border">-</span>;
@@ -1564,23 +1684,58 @@
                         <h2 className="text-2xl font-bold text-gray-800">Histori Pengajuan Kelas <span className="text-emerald-700">{user.kelas_id}</span></h2>
                         <p className="text-gray-500">Pantau status approval perizinan yang telah diajukan khusus untuk kelas Anda.</p>
                     </div>
+
+                    {/* KOTAK PENCARIAN & FILTER (TANPA KELAS) */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <input 
+                            type="text" placeholder="Cari Nama Santri..." 
+                            className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium"
+                            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterBulan} onChange={(e) => setFilterBulan(e.target.value)}>
+                            <option value="">Semua Bulan</option>
+                            {bulanOptions.map((b, idx) => <option key={idx} value={b}>{b}</option>)}
+                        </select>
+                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                            <option value="">Semua Status</option>
+                            <option value="MENUNGGU">Menunggu</option>
+                            <option value="DISETUJUI">Disetujui</option>
+                            <option value="DITOLAK">Ditolak</option>
+                            <option value="SELESAI">Selesai</option>
+                        </select>
+                    </div>
+
+                    <div className="text-sm text-gray-500">
+                        Menampilkan <span className="font-bold text-emerald-600">{sortedPermits.length}</span> pengajuan di kelas ini.
+                    </div>
+
                     <Card>
                         <div className="overflow-x-auto p-0">
                             <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
                                 <thead>
                                     <tr className="bg-emerald-50 text-emerald-800 border-b">
-                                        <th className="p-4 font-semibold">Tgl Izin</th>
-                                        <th className="p-4 font-semibold">Nama Santri</th>
-                                        <th className="p-4 font-semibold">Keperluan & Tujuan</th>
-                                        <th className="p-4 font-semibold">Wali Safar</th>
-                                        <th className="p-4 font-semibold">Status</th>
+                                        <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('tanggal_izin')}>
+                                            Tgl Izin <SortIcon columnKey="tanggal_izin"/>
+                                        </th>
+                                        <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('nama_santri')}>
+                                            Nama Santri <SortIcon columnKey="nama_santri"/>
+                                        </th>
+                                        <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('keperluan')}>
+                                            Keperluan & Tujuan <SortIcon columnKey="keperluan"/>
+                                        </th>
+                                        <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('wali_safar')}>
+                                            Wali Safar <SortIcon columnKey="wali_safar"/>
+                                        </th>
+                                        <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_pengajuan')}>
+                                            Status <SortIcon columnKey="status_pengajuan"/>
+                                        </th>
                                         <th className="p-4 font-semibold">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {loading ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Memuat data histori...</td></tr> : 
-                                     permits.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Belum ada histori pengajuan untuk kelas ini.</td></tr> :
-                                     permits.map((p, idx) => (
+                                     sortedPermits.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Tidak ada pengajuan yang sesuai pencarian.</td></tr> :
+                                     sortedPermits.map((p, idx) => (
                                         <tr key={idx} className="hover:bg-gray-50">
                                             <td className="p-4 font-medium text-gray-800">{p.tanggal_izin}</td>
                                             <td className="p-4"><p className="font-bold text-gray-700">{p.nama_santri}</p></td>
