@@ -938,6 +938,7 @@
                 } 
                 finally { setLoading(false); }
             };
+            useEffect(() => { fetchData(); }, []);
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
