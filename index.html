@@ -916,30 +916,37 @@
                 setLoading(true);
                 try { 
                     const res = await apiService.request('getJadwal'); 
-                    // Jaring pengaman ekstra: pastikan data selalu berupa array agar map() tidak error
-                    setJadwal(Array.isArray(res.data) ? res.data : []); 
-                } catch (e) { showToast(e.message, 'error'); } 
-                finally { setLoading(false); }
-            };
-            useEffect(() => { fetchData(); }, []);
+                    
+                    // --- ALAT SADAP DETEKTIF ---
+                    console.log("CEK DATA DARI SERVER:", res); 
+                    
+                    // Menangkap jika server diam-diam mengirimkan pesan error
+                    if (res && res.status === 'error') {
+                        showToast("Error Server: " + res.message, 'error');
+                        return;
+                    }
 
-            const handleDelete = async (id) => {
-                if (!window.confirm('Yakin ingin menghapus aturan jadwal ini?')) return;
-                try {
-                    await apiService.request('deleteData', { sheetName: 'JADWAL', rowId: id });
-                    showToast('Aturan berhasil dihapus', 'success');
-                    fetchData();
-                } catch (e) { showToast(e.message, 'error'); }
+                    // Menangkap data dengan lebih aman
+                    let finalData = [];
+                    if (res && Array.isArray(res.data)) finalData = res.data;
+                    else if (Array.isArray(res)) finalData = res;
+                    
+                    setJadwal(finalData); 
+                } catch (e) { 
+                    console.error("Gagal jaringan:", e);
+                    showToast(e.message, 'error'); 
+                } 
+                finally { setLoading(false); }
             };
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 try {
-                    // TRIK ANTI-ERROR: Menambahkan tanda kutip tunggal (') di depan jam 
-                    // agar Google Sheets otomatis menyimpannya sebagai Plain Text.
+                    const newId = 'JDW-' + Math.floor(Math.random() * 10000);
                     const payload = { 
                         ...formData, 
-                        id_jadwal: 'JDW-' + Math.floor(Math.random() * 10000),
+                        id_jadwal: newId,
+                        jadwal_id: newId, // Sapu jagat agar cocok dengan header di Sheets Anda
                         jam_mulai: "'" + formData.jam_mulai,
                         jam_selesai: "'" + formData.jam_selesai
                     };
@@ -947,6 +954,15 @@
                     await apiService.request('saveData', { sheetName: 'JADWAL', data: payload });
                     showToast('Aturan jadwal baru berhasil ditambahkan!', 'success');
                     setIsModalOpen(false);
+                    fetchData();
+                } catch (e) { showToast(e.message, 'error'); }
+            };
+
+            const handleDelete = async (id) => {
+                if (!window.confirm('Yakin ingin menghapus aturan jadwal ini?')) return;
+                try {
+                    await apiService.request('deleteData', { sheetName: 'JADWAL', rowId: id });
+                    showToast('Aturan berhasil dihapus', 'success');
                     fetchData();
                 } catch (e) { showToast(e.message, 'error'); }
             };
