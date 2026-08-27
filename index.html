@@ -232,6 +232,7 @@
                     { id: 'histori_global', label: 'Histori Izin', icon: Icons.Users },
                 ],
                 [ROLES.SECURITY]: [
+                    { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
                     { id: 'scanner', label: 'Scan QR Code', icon: Icons.Scan },
                     { id: 'log', label: 'Riwayat Scan', icon: Icons.FileText },
                 ]
@@ -2980,6 +2981,7 @@
             if (currentRoute === 'histori_global' && user.role === ROLES.SEKRETARIS_MUDIR) return <HistoriSekretarisPage />;
 
             // SECURITY MENU ROUTING
+            if (currentRoute === 'dashboard' && user.role === ROLES.SECURITY) return <DashboardSecurity setCurrentRoute={setCurrentRoute} />;
             if (currentRoute === 'scanner' && user.role === ROLES.SECURITY) return <SecurityScannerPage />;
             if (currentRoute === 'log' && user.role === ROLES.SECURITY) return <RiwayatScanPage />;            
             
