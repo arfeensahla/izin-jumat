@@ -1460,44 +1460,68 @@
             const selectedSantri = useMemo(() => santriData.find(s => (s.santri_id || s.nis || s.id) === form.santri_id), [santriData, form.santri_id]);
             const selectedSaudara = useMemo(() => allSantriData.find(s => (s.santri_id || s.nis || s.id) === form.saudara_santri_id), [allSantriData, form.saudara_santri_id]);
             
-            // --- LOGIKA PENJADWALAN YANG SUDAH DIPERBAIKI (TOLERANSI 'SEMUA') ---
-            const statusJadwal = useMemo(() => {
+            // --- 1. MENGHITUNG STATUS JADWAL ASLI (MURNI SANTRI ITU SENDIRI) ---
+            const statusJadwalAsli = useMemo(() => {
                 if (!selectedSantri || jadwalData.length === 0) return null;
-                const targetSantri = (form.ikut_jadwal_saudara && selectedSaudara) ? selectedSaudara : selectedSantri;
-                
-                // 1. Cari aturan jadwal yang angkanya cocok dengan pekan ini
                 const currentPekanNum = String(weekNumber).replace(/\D/g, ''); 
-                const rule = jadwalData.find(j => {
-                    const rulePekanNum = String(j.pekan || j.Pekan || '').replace(/\D/g, '');
-                    return rulePekanNum === currentPekanNum;
-                });
-
+                const rule = jadwalData.find(j => String(j.pekan || j.Pekan || '').replace(/\D/g, '') === currentPekanNum);
+                
                 if (!rule) return 'Di Luar Jadwal';
 
-                // 2. Evaluasi Jenjang (Menganggap "SEMUA" sebagai True/Lolos)
-                const targetJenjang = String(targetSantri.jenjang || targetSantri.Jenjang || '').toUpperCase();
+                const targetJenjang = String(selectedSantri.jenjang || selectedSantri.Jenjang || '').toUpperCase();
                 const ruleJenjang = String(rule.jenjang || rule.Jenjang || '').toUpperCase();
                 const isJenjangMatch = (ruleJenjang === 'SEMUA' || ruleJenjang === targetJenjang);
 
-                // 3. Evaluasi Gender (Menganggap "SEMUA" sebagai True/Lolos)
-                const targetGender = String(targetSantri.gender || targetSantri.jk || '').toUpperCase();
+                const targetGender = String(selectedSantri.gender || selectedSantri.jk || '').toUpperCase();
                 const ruleGender = String(rule.gender || rule.Gender || '').toUpperCase();
                 const isGenderMatch = (ruleGender === 'SEMUA' || targetGender.includes(ruleGender) || ruleGender.includes(targetGender));
 
-                // Jika Jenjang DAN Gender lolos kualifikasi, maka Sesuai Jadwal
                 return (isJenjangMatch && isGenderMatch) ? 'Sesuai Jadwal' : 'Di Luar Jadwal';
-            }, [selectedSantri, selectedSaudara, form.ikut_jadwal_saudara, jadwalData, weekNumber]);
+            }, [selectedSantri, jadwalData, weekNumber]);
+
+            // --- 2. MENGHITUNG STATUS JADWAL FINAL (DENGAN EFEK KAKAK/ADIK) ---
+            const statusJadwal = useMemo(() => {
+                // Jika aslinya sudah Sesuai Jadwal, hiraukan apapun inputan kakaknya
+                if (statusJadwalAsli === 'Sesuai Jadwal') return 'Sesuai Jadwal';
+                // Jika tidak menceklis ikut kakak/adik, kembalikan status asli (Di Luar Jadwal)
+                if (!form.ikut_jadwal_saudara) return statusJadwalAsli;
+                
+                // --- Pengecekan Jadwal Kakak/Adik ---
+                if (!selectedSaudara || jadwalData.length === 0) return 'Di Luar Jadwal';
+                
+                const currentPekanNum = String(weekNumber).replace(/\D/g, ''); 
+                const rule = jadwalData.find(j => String(j.pekan || j.Pekan || '').replace(/\D/g, '') === currentPekanNum);
+                
+                if (!rule) return 'Di Luar Jadwal';
+
+                const targetJenjang = String(selectedSaudara.jenjang || selectedSaudara.Jenjang || '').toUpperCase();
+                const ruleJenjang = String(rule.jenjang || rule.Jenjang || '').toUpperCase();
+                const isJenjangMatch = (ruleJenjang === 'SEMUA' || ruleJenjang === targetJenjang);
+
+                const targetGender = String(selectedSaudara.gender || selectedSaudara.jk || '').toUpperCase();
+                const ruleGender = String(rule.gender || rule.Gender || '').toUpperCase();
+                const isGenderMatch = (ruleGender === 'SEMUA' || targetGender.includes(ruleGender) || ruleGender.includes(targetGender));
+
+                return (isJenjangMatch && isGenderMatch) ? 'Sesuai Jadwal' : 'Di Luar Jadwal';
+            }, [statusJadwalAsli, selectedSaudara, form.ikut_jadwal_saudara, jadwalData, weekNumber]);
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 if (statusJadwal === 'Di Luar Jadwal' && !form.keterangan_luar_jadwal) return showToast("Keterangan Di Luar Jadwal wajib diisi!", "error");
                 if (form.hubungan_wali === 'Lainnya' && !form.hubungan_lainnya) return showToast("Detail hubungan Lainnya wajib diisi!", "error");
-                if (form.ikut_jadwal_saudara && !form.saudara_santri_id) return showToast("Pilih santri saudara yang diikuti jadwalnya!", "error");
+                
+                // Cegah error jika checkbox tidak sengaja kecentang tapi status asli sudah sesuai
+                if (statusJadwalAsli === 'Di Luar Jadwal' && form.ikut_jadwal_saudara && !form.saudara_santri_id) {
+                    return showToast("Pilih santri saudara yang diikuti jadwalnya!", "error");
+                }
 
                 setSubmitting(true);
                 try {
                     const payload = { 
                         ...form, 
+                        // Bersihkan data sampah saudara jika ternyata dia lolos secara mandiri
+                        ikut_jadwal_saudara: statusJadwalAsli === 'Sesuai Jadwal' ? false : form.ikut_jadwal_saudara,
+                        saudara_santri_id: statusJadwalAsli === 'Sesuai Jadwal' ? '' : form.saudara_santri_id,
                         nama_santri: selectedSantri.nama || selectedSantri.nama_santri, 
                         kelas: selectedSantri.kelas, 
                         tanggal_izin: helper.formatDate(nextFriday), 
@@ -1550,51 +1574,57 @@
                                 <div className={`px-4 py-2 rounded-full font-bold text-sm ${statusJadwal === 'Sesuai Jadwal' ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'}`}>Status: {statusJadwal}</div>
                             </div>
                             <div className="space-y-4">
-                                <label className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors">
-                                    <input type="checkbox" className="w-5 h-5 text-emerald-600 rounded" checked={form.ikut_jadwal_saudara} onChange={(e) => { setForm({...form, ikut_jadwal_saudara: e.target.checked, saudara_santri_id: ''}); setSearchSaudaraTerm(''); }} />
-                                    <span className="font-medium text-gray-700">Mengikuti Jadwal Kakak / Adik Lintas Kelas</span>
-                                </label>
                                 
-                                {form.ikut_jadwal_saudara && (
-                                    <div className="pl-8 p-4 bg-blue-50 border border-blue-100 rounded-lg animate-fade-in-down space-y-3">
-                                        <label className="block text-sm font-medium text-blue-900">Cari Nama Saudara <span className="text-red-500">*</span></label>
-                                        <input 
-                                            type="text" 
-                                            placeholder="Ketik nama saudara..." 
-                                            className="w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                            value={searchSaudaraTerm}
-                                            onChange={(e) => {
-                                                setSearchSaudaraTerm(e.target.value);
-                                                setForm({...form, saudara_santri_id: ''}); 
-                                            }}
-                                        />
-                                        {searchSaudaraTerm && !form.saudara_santri_id && (
-                                            <div className="max-h-40 overflow-y-auto border border-blue-200 rounded-lg bg-white shadow-sm mt-1">
-                                                {allSantriData
-                                                    .filter(s => (s.santri_id || s.nis || s.id) !== form.santri_id)
-                                                    .filter(s => String(s.nama || s.nama_santri).toLowerCase().includes(searchSaudaraTerm.toLowerCase()))
-                                                    .slice(0, 5) 
-                                                    .map(s => {
-                                                        const id = s.santri_id || s.nis || s.id;
-                                                        return (
-                                                            <div 
-                                                                key={id} 
-                                                                className="p-3 cursor-pointer hover:bg-blue-50 text-sm border-b last:border-0"
-                                                                onClick={() => {
-                                                                    setForm({...form, saudara_santri_id: id});
-                                                                    setSearchSaudaraTerm(`${s.nama || s.nama_santri} (Kelas: ${s.kelas})`); 
-                                                                }}
-                                                            >
-                                                                <span className="font-bold text-gray-800">{s.nama || s.nama_santri}</span> 
-                                                                <span className="text-gray-500 text-xs ml-1">({s.kelas} - {s.gender || s.jk})</span>
-                                                            </div>
-                                                        );
-                                                    })
-                                                }
+                                {/* CEK STATUS ASLI: Jika Sesuai Jadwal, Sembunyikan Checkbox Kakak/Adik! */}
+                                {statusJadwalAsli === 'Di Luar Jadwal' && (
+                                    <>
+                                        <label className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors">
+                                            <input type="checkbox" className="w-5 h-5 text-emerald-600 rounded" checked={form.ikut_jadwal_saudara} onChange={(e) => { setForm({...form, ikut_jadwal_saudara: e.target.checked, saudara_santri_id: ''}); setSearchSaudaraTerm(''); }} />
+                                            <span className="font-medium text-gray-700">Mengikuti Jadwal Kakak / Adik Lintas Kelas</span>
+                                        </label>
+                                        
+                                        {form.ikut_jadwal_saudara && (
+                                            <div className="pl-8 p-4 bg-blue-50 border border-blue-100 rounded-lg animate-fade-in-down space-y-3">
+                                                <label className="block text-sm font-medium text-blue-900">Cari Nama Saudara <span className="text-red-500">*</span></label>
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Ketik nama saudara..." 
+                                                    className="w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                                    value={searchSaudaraTerm}
+                                                    onChange={(e) => {
+                                                        setSearchSaudaraTerm(e.target.value);
+                                                        setForm({...form, saudara_santri_id: ''}); 
+                                                    }}
+                                                />
+                                                {searchSaudaraTerm && !form.saudara_santri_id && (
+                                                    <div className="max-h-40 overflow-y-auto border border-blue-200 rounded-lg bg-white shadow-sm mt-1">
+                                                        {allSantriData
+                                                            .filter(s => (s.santri_id || s.nis || s.id) !== form.santri_id)
+                                                            .filter(s => String(s.nama || s.nama_santri).toLowerCase().includes(searchSaudaraTerm.toLowerCase()))
+                                                            .slice(0, 5) 
+                                                            .map(s => {
+                                                                const id = s.santri_id || s.nis || s.id;
+                                                                return (
+                                                                    <div 
+                                                                        key={id} 
+                                                                        className="p-3 cursor-pointer hover:bg-blue-50 text-sm border-b last:border-0"
+                                                                        onClick={() => {
+                                                                            setForm({...form, saudara_santri_id: id});
+                                                                            setSearchSaudaraTerm(`${s.nama || s.nama_santri} (Kelas: ${s.kelas})`); 
+                                                                        }}
+                                                                    >
+                                                                        <span className="font-bold text-gray-800">{s.nama || s.nama_santri}</span> 
+                                                                        <span className="text-gray-500 text-xs ml-1">({s.kelas} - {s.gender || s.jk})</span>
+                                                                    </div>
+                                                                );
+                                                            })
+                                                        }
+                                                    </div>
+                                                )}
+                                                {selectedSaudara && <p className="text-xs text-blue-700 mt-2">Sistem sekarang menggunakan jadwal milik saudara: <strong className="uppercase">{selectedSaudara.jenjang} - {selectedSaudara.gender || selectedSaudara.jk}</strong>.</p>}
                                             </div>
                                         )}
-                                        {selectedSaudara && <p className="text-xs text-blue-700 mt-2">Sistem sekarang menggunakan jadwal milik saudara: <strong className="uppercase">{selectedSaudara.jenjang} - {selectedSaudara.gender || selectedSaudara.jk}</strong>.</p>}
-                                    </div>
+                                    </>
                                 )}
                                 
                                 {statusJadwal === 'Di Luar Jadwal' && (
