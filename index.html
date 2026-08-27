@@ -916,7 +916,6 @@
                 setLoading(true);
                 try { 
                     const res = await apiService.request('getJadwal'); 
-                    
                     console.log("CEK DATA DARI SERVER:", res); 
                     
                     if (res && res.status === 'error') {
@@ -924,7 +923,6 @@
                         return;
                     }
 
-                    // Deklarasi finalData CUKUP SATU KALI di sini
                     let finalData = [];
                     if (res && res.data && Array.isArray(res.data.data)) {
                         finalData = res.data.data;
@@ -940,7 +938,143 @@
                     showToast(e.message, 'error'); 
                 } 
                 finally { setLoading(false); }
-            };};
+            };
+
+            // Pemicu otomatis saat halaman dibuka
+            useEffect(() => { fetchData(); }, []);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                try {
+                    const newId = 'JDW-' + Math.floor(Math.random() * 10000);
+                    const payload = { 
+                        ...formData, 
+                        id_jadwal: newId,
+                        jadwal_id: newId, 
+                        jam_mulai: "'" + formData.jam_mulai,
+                        jam_selesai: "'" + formData.jam_selesai
+                    };
+                    
+                    await apiService.request('saveData', { sheetName: 'JADWAL', data: payload });
+                    showToast('Aturan jadwal baru berhasil ditambahkan!', 'success');
+                    setIsModalOpen(false);
+                    fetchData();
+                } catch (e) { showToast(e.message, 'error'); }
+            };
+
+            const handleDelete = async (id) => {
+                if (!window.confirm('Yakin ingin menghapus aturan jadwal ini?')) return;
+                try {
+                    await apiService.request('deleteData', { sheetName: 'JADWAL', rowId: id });
+                    showToast('Aturan berhasil dihapus', 'success');
+                    fetchData();
+                } catch (e) { showToast(e.message, 'error'); }
+            };
+
+            const formatJam = (val) => {
+                if (!val) return '-';
+                if (typeof val === 'object' && val instanceof Date) return val.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                return String(val).substring(0, 5); 
+            };
+
+            return (
+                <div className="space-y-6 animate-fade-in-down">
+                    <div className="flex justify-between items-center border-b pb-4">
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-800">Aturan Jadwal Perizinan</h2>
+                            <p className="text-gray-500">Kelola jadwal keluar santri secara spesifik.</p>
+                        </div>
+                        <Button onClick={() => setIsModalOpen(true)} icon={<Icons.Plus />}>Tambah Aturan Baru</Button>
+                    </div>
+
+                    <Card className="overflow-x-auto p-0">
+                        <table className="w-full text-left text-sm whitespace-nowrap">
+                            <thead className="bg-emerald-50 text-emerald-800 border-b">
+                                <tr>
+                                    <th className="p-4">Pekan</th>
+                                    <th className="p-4">Jenjang</th>
+                                    <th className="p-4">Gender</th>
+                                    <th className="p-4">Hari</th>
+                                    <th className="p-4 text-center">Jam Berlaku</th>
+                                    <th className="p-4">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {loading ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Memuat aturan jadwal...</td></tr> : 
+                                 jadwal.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Belum ada aturan jadwal. Silakan tambah baru.</td></tr> :
+                                 jadwal.map((j, idx) => {
+                                     const keys = Object.keys(j);
+                                     const id = j[keys[0]] || j.id_jadwal || j.id || `temp-${idx}`;
+                                     const pekan = String(j[keys[1]] || j.pekan || '-');
+                                     const jenjang = String(j[keys[2]] || j.jenjang || '-');
+                                     const gender = String(j[keys[3]] || j.gender || '-');
+                                     const hari = String(j[keys[4]] || j.hari || '-');
+                                     const jamMulai = formatJam(j[keys[5]] || j.jam_mulai);
+                                     const jamSelesai = formatJam(j[keys[6]] || j.jam_selesai);
+
+                                     return (
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                            <td className="p-4 font-bold text-gray-800">{pekan}</td>
+                                            <td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{jenjang}</span></td>
+                                            <td className="p-4"><span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-bold">{gender}</span></td>
+                                            <td className="p-4 font-medium">{hari}</td>
+                                            <td className="p-4 text-center font-mono text-emerald-600 font-bold">{jamMulai} - {jamSelesai}</td>
+                                            <td className="p-4">
+                                                <button onClick={() => handleDelete(id)} className="text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md text-xs font-bold transition-colors">Hapus</button>
+                                            </td>
+                                        </tr>
+                                     );
+                                 })}
+                            </tbody>
+                        </table>
+                    </Card>
+
+                    <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Tambah Aturan Jadwal">
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Pekan Ke-</label>
+                                    <select className="w-full p-2 border rounded-lg bg-gray-50" value={formData.pekan} onChange={e => setFormData({...formData, pekan: e.target.value})}>
+                                        <option>Pekan 1</option><option>Pekan 2</option><option>Pekan 3</option><option>Pekan 4</option><option>Pekan 5</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Hari</label>
+                                    <select className="w-full p-2 border rounded-lg bg-gray-50" value={formData.hari} onChange={e => setFormData({...formData, hari: e.target.value})}>
+                                        <option>Jumat</option><option>Sabtu</option><option>Ahad</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Target Jenjang</label>
+                                    <select className="w-full p-2 border rounded-lg bg-gray-50" value={formData.jenjang} onChange={e => setFormData({...formData, jenjang: e.target.value})}>
+                                        <option>SEMUA</option><option>SMP</option><option>SMA</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Target Gender</label>
+                                    <select className="w-full p-2 border rounded-lg bg-gray-50" value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})}>
+                                        <option>SEMUA</option><option>Laki-Laki</option><option>Perempuan</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Jam Mulai (Misal: 08:00)</label>
+                                    <input type="time" required className="w-full p-2 border rounded-lg bg-gray-50" value={formData.jam_mulai} onChange={e => setFormData({...formData, jam_mulai: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Jam Selesai (Misal: 16:00)</label>
+                                    <input type="time" required className="w-full p-2 border rounded-lg bg-gray-50" value={formData.jam_selesai} onChange={e => setFormData({...formData, jam_selesai: e.target.value})} />
+                                </div>
+                            </div>
+                            <Button fullWidth type="submit" className="mt-6">Simpan Aturan</Button>
+                        </form>
+                    </Modal>
+                </div>
+            );
+        };
 
         // --- PHASE 5 COMPONENTS ---
         const helper = {
