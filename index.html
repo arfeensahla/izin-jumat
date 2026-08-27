@@ -940,7 +940,7 @@
                     showToast(e.message, 'error'); 
                 } 
                 finally { setLoading(false); }
-            };
+            };};
 
         // --- PHASE 5 COMPONENTS ---
         const helper = {
@@ -955,7 +955,6 @@
             },
             // FORMAT TANGGAL LEBIH SIMPEL: Jum, 28 Ags 2026
             formatDate: (date) => date.toLocaleDateString('id-ID', { weekday: 'short', year: 'numeric', month: 'short', day: '2-digit' })
-        };
         };
 
         const AjukanIzinPage = ({ setCurrentRoute }) => {
