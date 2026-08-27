@@ -636,8 +636,20 @@
                         apiService.request('getSantri'),
                         apiService.request('getKelas')
                     ]);
-                    setSantri(resSantri.data || []);
-                    setKelasOptions(resKelas.data || []);
+                    
+                    // Ekstrak data santri dengan aman (berkaca dari kasus Jadwal)
+                    let finalSantri = [];
+                    if (resSantri && resSantri.data && Array.isArray(resSantri.data.data)) finalSantri = resSantri.data.data;
+                    else if (resSantri && Array.isArray(resSantri.data)) finalSantri = resSantri.data;
+                    else if (Array.isArray(resSantri)) finalSantri = resSantri;
+                    setSantri(finalSantri);
+
+                    // Ekstrak data kelas untuk pilihan dropdown
+                    let finalKelas = [];
+                    if (resKelas && resKelas.data && Array.isArray(resKelas.data.data)) finalKelas = resKelas.data.data;
+                    else if (resKelas && Array.isArray(resKelas.data)) finalKelas = resKelas.data;
+                    else if (Array.isArray(resKelas)) finalKelas = resKelas;
+                    setKelasOptions(finalKelas);
                 } catch (e) { showToast(e.message, 'error'); } 
                 finally { setLoading(false); }
             };
@@ -657,7 +669,15 @@
                 if (!formData.kelas) return showToast('Pilih kelas terlebih dahulu!', 'error');
                 
                 try {
-                    await apiService.request('saveData', { sheetName: 'SANTRI', data: formData });
+                    // Membuat cadangan nama kolom besar & kecil agar pasti nyangkut saat disimpan
+                    const payload = { 
+                        ...formData,
+                        NIS: formData.nis,
+                        Nama: formData.nama_santri,
+                        Kelas: formData.kelas,
+                        Gender: formData.gender
+                    };
+                    await apiService.request('saveData', { sheetName: 'SANTRI', data: payload });
                     showToast('Data santri berhasil ditambahkan!', 'success');
                     setIsModalOpen(false);
                     setFormData({ nis: '', nama_santri: '', kelas: '', gender: 'Laki-Laki' });
@@ -690,12 +710,18 @@
                                 {loading ? <tr><td colSpan="5" className="p-8 text-center text-gray-500">Memuat data santri...</td></tr> : 
                                  santri.length === 0 ? <tr><td colSpan="5" className="p-8 text-center text-gray-500">Belum ada data santri.</td></tr> :
                                  santri.map((item, idx) => {
-                                     // SISTEM SAPU JAGAT: Deteksi data berdasarkan urutan kolom, bukan namanya!
                                      const keys = Object.keys(item);
-                                     const renderNis = item[keys[0]] || '-';     // Kolom A = NIS
-                                     const renderNama = item[keys[1]] || '-';    // Kolom B = Nama
-                                     const renderKelas = item[keys[2]] || '-';   // Kolom C = Kelas
-                                     const renderGender = String(item[keys[3]] || '-'); // Kolom D = Gender
+                                     
+                                     // SISTEM DETEKTIF: Mencari berdasarkan kata pada nama kolom, jadi bebas diacak
+                                     const nisKey = keys.find(k => k.toLowerCase().includes('nis') || k.toLowerCase().includes('id')) || keys[0];
+                                     const namaKey = keys.find(k => k.toLowerCase().includes('nama')) || keys[1];
+                                     const kelasKey = keys.find(k => k.toLowerCase().includes('kelas')) || keys[2];
+                                     const genderKey = keys.find(k => k.toLowerCase().includes('gender') || k.toLowerCase().includes('jk') || k.toLowerCase().includes('kelamin')) || keys[3];
+                                     
+                                     const renderNis = item[nisKey] || '-';
+                                     const renderNama = item[namaKey] || '-';
+                                     const renderKelas = item[kelasKey] || '-';
+                                     const renderGender = String(item[genderKey] || '-');
                                      
                                      return (
                                         <tr key={idx} className="hover:bg-gray-50">
@@ -718,7 +744,6 @@
                     </Card>
 
                     <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Tambah Data Santri">
-                        {/* Form tambah santri tetap sama */}
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Induk Santri (NIS)</label>
@@ -735,8 +760,7 @@
                                         <option value="">-- Pilih Kelas --</option>
                                         {kelasOptions.map((k, i) => {
                                             const kKeys = Object.keys(k);
-                                            // Asumsi Kolom B adalah Nama Kelas
-                                            const namaKelas = k[kKeys[1]] || k.nama_kelas;
+                                            const namaKelas = k[kKeys.find(key => key.toLowerCase().includes('nama')) || kKeys[1]] || k.nama_kelas;
                                             return <option key={i} value={namaKelas}>{namaKelas}</option>;
                                         })}
                                     </select>
