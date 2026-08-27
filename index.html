@@ -2064,6 +2064,7 @@
         };
 
         // --- HISTORI GLOBAL SEKRETARIS ---
+        // --- HISTORI GLOBAL SEKRETARIS ---
         const HistoriSekretarisPage = () => {
             const { showToast } = useContext(ToastContext);
             const [permits, setPermits] = useState([]);
@@ -2198,50 +2199,60 @@
                         Menampilkan <span className="font-bold text-emerald-600">{sortedPermits.length}</span> data riwayat perizinan.
                     </div>
 
-                    <Card>
-                        <div className="overflow-x-auto p-0">
-                            <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
-                                <thead>
-                                    <tr className="bg-emerald-50 text-emerald-800 border-b">
-                                        <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('tanggal_izin')}>
-                                            Tgl Izin <SortIcon columnKey="tanggal_izin"/>
-                                        </th>
-                                        <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('nama_santri')}>
-                                            Nama Santri <SortIcon columnKey="nama_santri"/>
-                                        </th>
-                                        <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('kelas')}>
-                                            Kelas <SortIcon columnKey="kelas"/>
-                                        </th>
-                                        <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('keperluan')}>
-                                            Keperluan <SortIcon columnKey="keperluan"/>
-                                        </th>
-                                        <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_pengajuan')}>
-                                            Status <SortIcon columnKey="status_pengajuan"/>
-                                        </th>
-                                        <th className="p-4 font-semibold">Aksi</th>
+                    <Card className="overflow-x-auto p-0">
+                        <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+                            <thead>
+                                <tr className="bg-emerald-50 text-emerald-800 border-b">
+                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('tanggal_izin')}>
+                                        Tgl Izin <SortIcon columnKey="tanggal_izin"/>
+                                    </th>
+                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('nama_santri')}>
+                                        Santri <SortIcon columnKey="nama_santri"/>
+                                    </th>
+                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('kelas')}>
+                                        Kelas <SortIcon columnKey="kelas"/>
+                                    </th>
+                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('keperluan')}>
+                                        Keperluan <SortIcon columnKey="keperluan"/>
+                                    </th>
+                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('wali_safar')}>
+                                        Wali Safar <SortIcon columnKey="wali_safar"/>
+                                    </th>
+                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_jadwal')}>
+                                        Status Jadwal <SortIcon columnKey="status_jadwal"/>
+                                    </th>
+                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_pengajuan')}>
+                                        Status Approval <SortIcon columnKey="status_pengajuan"/>
+                                    </th>
+                                    <th className="p-4 font-semibold">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {loading ? <tr><td colSpan="8" className="p-8 text-center text-gray-500">Memuat data arsip...</td></tr> : 
+                                 sortedPermits.length === 0 ? <tr><td colSpan="8" className="p-8 text-center text-gray-500">Tidak ada data yang sesuai pencarian.</td></tr> :
+                                 sortedPermits.map((p, idx) => (
+                                    <tr key={idx} className="hover:bg-gray-50">
+                                        <td className="p-4 font-medium text-gray-800">{p.tanggal_izin}</td>
+                                        <td className="p-4 font-bold text-gray-700">{p.nama_santri}</td>
+                                        <td className="p-4 text-emerald-600 font-medium">{p.kelas}</td>
+                                        <td className="p-4"><p className="text-gray-800 truncate max-w-[150px]" title={p.keperluan}>{p.keperluan}</p></td>
+                                        <td className="p-4">{p.wali_safar} <span className="text-xs text-gray-500">({p.hubungan_wali})</span></td>
+                                        <td className="p-4">
+                                            <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
+                                                {p.status_jadwal ? p.status_jadwal.toUpperCase() : 'TIDAK DIKETAHUI'}
+                                            </span>
+                                        </td>
+                                        <td className="p-4">{getStatusBadge(p.status_pengajuan)}</td>
+                                        <td className="p-4">
+                                            {p.status_pengajuan === 'DISETUJUI' ? 
+                                                <button onClick={() => setSelectedQrPermit(p)} className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 shadow-sm transition-colors cursor-pointer">Lihat QR</button> 
+                                                : <span className="text-xs text-gray-400">-</span>
+                                            }
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {loading ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Memuat data arsip...</td></tr> : 
-                                     sortedPermits.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Tidak ada data yang sesuai pencarian.</td></tr> :
-                                     sortedPermits.map((p, idx) => (
-                                        <tr key={idx} className="hover:bg-gray-50">
-                                            <td className="p-4 font-medium text-gray-800">{p.tanggal_izin}</td>
-                                            <td className="p-4 font-bold text-gray-700">{p.nama_santri}</td>
-                                            <td className="p-4 text-emerald-600 font-medium">{p.kelas}</td>
-                                            <td className="p-4"><p className="text-gray-800 truncate max-w-[150px]" title={p.keperluan}>{p.keperluan}</p></td>
-                                            <td className="p-4">{getStatusBadge(p.status_pengajuan)}</td>
-                                            <td className="p-4">
-                                                {p.status_pengajuan === 'DISETUJUI' ? 
-                                                    <button onClick={() => setSelectedQrPermit(p)} className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 shadow-sm transition-colors cursor-pointer">Lihat QR</button> 
-                                                    : <span className="text-xs text-gray-400">-</span>
-                                                }
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                ))}
+                            </tbody>
+                        </table>
                     </Card>
                     <QrCardModal isOpen={!!selectedQrPermit} onClose={() => setSelectedQrPermit(null)} permit={selectedQrPermit} />
                 </div>
