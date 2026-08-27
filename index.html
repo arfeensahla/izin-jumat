@@ -1831,7 +1831,7 @@
             // ADMIN MENU ROUTING
             if (currentRoute === 'master_santri' && user.role === ROLES.ADMIN) return <DataSantriPage />;
             if (currentRoute === 'master_kelas' && user.role === ROLES.ADMIN) return <DataKelasPage />;
-            if ((currentRoute === 'master_tp' || currentRoute === 'tahun_pelajaran' || currentRoute === 'tp') && user.role === ROLES.ADMIN) return <TahunPelajaranPage />;
+            if (currentRoute === 'tahun_pelajaran' && user.role === ROLES.ADMIN) return <TahunPelajaranPage />;
             if (currentRoute === 'kenaikan_kelas' && user.role === ROLES.ADMIN) return <KenaikanKelasPage />;
             if (currentRoute === 'aturan_jadwal' && user.role === ROLES.ADMIN) return <JadwalPerizinanPage />;
             if (currentRoute === 'perizinan' && user.role === ROLES.ADMIN) return <SemuaPerizinanPage />;
