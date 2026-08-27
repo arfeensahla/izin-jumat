@@ -935,7 +935,15 @@
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 try {
-                    const payload = { ...formData, id_jadwal: 'JDW-' + Math.floor(Math.random() * 10000) };
+                    // TRIK ANTI-ERROR: Menambahkan tanda kutip tunggal (') di depan jam 
+                    // agar Google Sheets otomatis menyimpannya sebagai Plain Text.
+                    const payload = { 
+                        ...formData, 
+                        id_jadwal: 'JDW-' + Math.floor(Math.random() * 10000),
+                        jam_mulai: "'" + formData.jam_mulai,
+                        jam_selesai: "'" + formData.jam_selesai
+                    };
+                    
                     await apiService.request('saveData', { sheetName: 'JADWAL', data: payload });
                     showToast('Aturan jadwal baru berhasil ditambahkan!', 'success');
                     setIsModalOpen(false);
