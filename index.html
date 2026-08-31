@@ -1521,6 +1521,7 @@
                 try {
                     const payload = { 
                         ...form, 
+                        hubungan_wali: form.hubungan_wali === 'Lainnya' ? form.hubungan_lainnya : form.hubungan_wali,
                         // Bersihkan data sampah saudara jika ternyata dia lolos secara mandiri
                         ikut_jadwal_saudara: statusJadwalAsli === 'Sesuai Jadwal' ? false : form.ikut_jadwal_saudara,
                         saudara_santri_id: statusJadwalAsli === 'Sesuai Jadwal' ? '' : form.saudara_santri_id,
@@ -1538,7 +1539,7 @@
             };
 
             const santriOptions = santriData.map(s => ({ value: (s.santri_id || s.nis || s.id), label: `${s.nama || s.nama_santri} (${s.kelas})` }));
-            const hubunganOptions = ['Ayah', 'Ibu', 'Kakak Kandung', 'Adik Kandung', 'Kakek', 'Nenek', 'Paman', 'Bibi', 'Saudara', 'Wali', 'Lainnya'];
+            const hubunganOptions = ['Ayah', 'Ibu', 'Kakak Kandung', 'Adik Kandung', 'Kakek', 'Nenek', 'Paman', 'Bibi', 'Lainnya'];
 
             if (loading) return <div className="p-8 text-center text-gray-500 animate-pulse">Menyiapkan Form (Membaca data dari Google Sheets)...</div>;
 
