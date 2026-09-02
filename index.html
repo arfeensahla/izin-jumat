@@ -1532,6 +1532,16 @@
                     };
                     await apiService.request('savePermit', payload);
                     showToast('Pengajuan berhasil dikirim! Menunggu approval.', 'success');
+
+                    // --- KAMERA PENGINTAI: LOG PENGAJUAN ---
+                    apiService.request('saveLog', {
+                        role: user.role,
+                        nama: user.nama,
+                        aksi: 'AJUKAN_IZIN',
+                        keterangan: `Mengajukan izin keluar untuk ${selectedSantri.nama || selectedSantri.nama_santri} (Kelas ${selectedSantri.kelas})`
+                    }).catch(e => console.log("Log error:", e));
+                    // ---------------------------------------
+                    
                     setForm(initialForm);
                     setSearchSaudaraTerm(''); 
                     setCurrentRoute('histori');
@@ -1703,6 +1713,16 @@
                     // Pastikan nama tab Sheets untuk database izin Anda adalah 'PERIZINAN'
                     await apiService.request('deleteData', { sheetName: 'PERIZINAN', rowId: id });
                     showToast('Pengajuan berhasil dibatalkan/dihapus', 'success');
+
+                    // --- KAMERA PENGINTAI: LOG PEMBATALAN ---
+                    apiService.request('saveLog', {
+                        role: user.role,
+                        nama: user.nama,
+                        aksi: 'BATALKAN_IZIN',
+                        keterangan: `Membatalkan/Menghapus data perizinan dengan ID ${id}`
+                    }).catch(e => console.log("Log error:", e));
+                    // ----------------------------------------
+                    
                     fetchData(); // Refresh tabel setelah hapus sukses
                 } catch (e) { showToast(e.message, 'error'); }
             };
@@ -1939,6 +1959,16 @@
                     const payload = { permit_id: selectedPermit.permit_id || selectedPermit.id_perizinan, aksi_approval: action, alasan: rejectReason, username: user.nama };
                     const res = await apiService.request('processApproval', payload);
                     showToast(res.message, 'success');
+
+                    // --- KAMERA PENGINTAI: LOG SCREENING ---
+                    apiService.request('saveLog', {
+                        role: user.role,
+                        nama: user.nama,
+                        aksi: 'SCREENING_' + action,
+                        keterangan: `Memberikan status ${action} izin atas nama ${selectedPermit.nama_santri} (${selectedPermit.kelas}). Alasan: ${rejectReason || '-'}`
+                    }).catch(e => console.log("Log error:", e));
+                    // ---------------------------------------
+                    
                     setSelectedPermit(null);
                     setRejectReason('');
                     fetchPermits();
@@ -2788,6 +2818,16 @@
                     if (!res.data || !res.data.role) throw new Error("Login gagal. Periksa kembali backend/role.");
                     login(res.data);
                     showToast(`Selamat datang, ${res.data.nama}`, 'success');
+                    
+                    // --- KAMERA PENGINTAI: LOG LOGIN ---
+                    apiService.request('saveLog', {
+                        role: res.data.role,
+                        nama: res.data.nama,
+                        aksi: 'LOGIN',
+                        keterangan: 'Berhasil masuk ke dalam sistem'
+                    }).catch(e => console.log("Log error:", e));
+                    // -----------------------------------
+                    
                 } catch (err) { showToast(err.message, 'error'); } finally { setLoading(false); }
             };
 
@@ -2872,9 +2912,27 @@
                     
                     setScanResult({ success: true, data: resData, message: resData.pesan || 'Scan berhasil diproses.' });
                     showToast(resData.pesan || 'Scan berhasil!', "success");
+
+                    // --- KAMERA PENGINTAI: SCAN BERHASIL ---
+                    apiService.request('saveLog', {
+                        role: user.role,
+                        nama: user.nama,
+                        aksi: 'SCAN_GERBANG',
+                        keterangan: `Berhasil scan ${resData.type || ''} untuk santri ${resData.nama || '-'} (${resData.kelas || '-'})`
+                    }).catch(e => console.log("Log error:", e));
+                    
                 } catch (err) {
                     setScanResult({ success: false, message: err.message || 'QR Code ditolak / Kedaluwarsa.' });
                     showToast(err.message || 'Scan gagal.', "error");
+
+                    // --- KAMERA PENGINTAI: SCAN GAGAL/DITOLAK ---
+                    apiService.request('saveLog', {
+                        role: user.role,
+                        nama: user.nama,
+                        aksi: 'SCAN_DITOLAK',
+                        keterangan: `Percobaan scan ditolak: ${err.message || 'Token tidak valid'}`
+                    }).catch(e => console.log("Log error:", e));
+                    
                 } finally {
                     setProcessing(false);
                 }
