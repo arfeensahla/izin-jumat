@@ -1718,7 +1718,7 @@
             const [searchTerm, setSearchTerm] = useState('');
             const [filterBulan, setFilterBulan] = useState('');
             const [filterStatus, setFilterStatus] = useState('');
-            const [filterMobilitas, setFilterMobilitas] = useState(''); // FITUR BARU
+            const [filterMobilitas, setFilterMobilitas] = useState(''); 
             
             const [sortConfig, setSortConfig] = useState({ key: 'tanggal_izin', direction: 'desc' });
 
@@ -1737,7 +1737,6 @@
                 return strTgl; 
             };
 
-            // FITUR BARU: Menarik Permit DAN Scan Logs sekaligus
             const fetchData = async () => {
                 setLoading(true);
                 try { 
@@ -1759,7 +1758,6 @@
                     let myPermits = finalPermits.filter(p => p.kelas === user.kelas_id);
                     
                     const dataWithMobility = myPermits.map(p => {
-                        // Hitung Status Mobilitas dari Log Security
                         let mobilitas = '-';
                         if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
                             const pId = p.permit_id || p.id || p.id_perizinan;
@@ -1906,16 +1904,16 @@
                                         Tgl Izin <SortIcon columnKey="tanggal_izin"/>
                                     </th>
                                     <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('nama_santri')}>
-                                        Nama Santri <SortIcon columnKey="nama_santri"/>
+                                        Santri & Kelas <SortIcon columnKey="nama_santri"/>
                                     </th>
                                     <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('keperluan')}>
-                                        Keperluan & Tujuan <SortIcon columnKey="keperluan"/>
+                                        Keperluan <SortIcon columnKey="keperluan"/>
                                     </th>
-                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('wali_safar')}>
-                                        Wali Safar <SortIcon columnKey="wali_safar"/>
+                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_jadwal')}>
+                                        Penjadwalan <SortIcon columnKey="status_jadwal"/>
                                     </th>
                                     <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_pengajuan')}>
-                                        Status Approval <SortIcon columnKey="status_pengajuan"/>
+                                        Status ACC <SortIcon columnKey="status_pengajuan"/>
                                     </th>
                                     <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-200 bg-emerald-100/50" onClick={() => handleSort('_status_mobilitas')}>
                                         Posisi Santri <SortIcon columnKey="_status_mobilitas"/>
@@ -1931,18 +1929,23 @@
                                         <td className="p-4 font-medium text-gray-800">{p.tanggal_izin}</td>
                                         <td className="p-4">
                                             <p className="font-bold text-gray-700">{p.nama_santri}</p>
+                                            <p className="text-xs text-emerald-600 font-medium">{p.kelas}</p>
+                                        </td>
+                                        <td className="p-4 truncate max-w-[180px]" title={p.keperluan}>
+                                            <p className="font-medium text-gray-800">{p.keperluan}</p>
+                                            {/* PERBAIKAN: Menambahkan ({p.hubungan_wali}) dan informasi tujuan di baris yang sama */}
+                                            <p className="text-[10px] text-gray-500 mt-0.5">Tujuan: {p.tujuan} • Penjemput: {p.wali_safar} ({p.hubungan_wali})</p>
                                         </td>
                                         <td className="p-4">
-                                            <p className="text-gray-800 truncate max-w-[200px]" title={p.keperluan}>{p.keperluan}</p>
-                                            <p className="text-xs text-gray-500">Tujuan: {p.tujuan}</p>
-                                            {/* Keterangan Ikut Saudara disisipkan di sini */}
+                                            <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
+                                                {p.status_jadwal ? p.status_jadwal.toUpperCase() : 'TIDAK DIKETAHUI'}
+                                            </span>
                                             {(p.ikut_jadwal_saudara === 'Ya' || p.ikut_jadwal_saudara === true || p.ikut_jadwal_saudara === 'TRUE') && (
-                                                <p className="text-[10px] text-orange-600 mt-1 font-bold italic">
+                                                <p className="text-[10px] text-orange-600 mt-1.5 font-bold italic">
                                                     (Ikut Izin Saudara)
                                                 </p>
                                             )}
                                         </td>
-                                        <td className="p-4 text-gray-600">{p.wali_safar} <span className="text-xs text-gray-400">({p.hubungan_wali})</span></td>
                                         <td className="p-4">{getStatusBadge(p.status_pengajuan)}</td>
                                         <td className="p-4 bg-emerald-50/20">{getMobilityBadge(p._status_mobilitas)}</td>
                                         <td className="p-4">
@@ -2692,13 +2695,14 @@
             const { showToast } = useContext(ToastContext);
             const [permits, setPermits] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [selectedQrPermit, setSelectedQrPermit] = useState(null); // Ditambahkan agar fitur Lihat QR berjalan
 
             // --- STATE UNTUK PENCARIAN & FILTER ---
             const [searchTerm, setSearchTerm] = useState('');
             const [filterBulan, setFilterBulan] = useState('');
             const [filterKelas, setFilterKelas] = useState('');
             const [filterStatus, setFilterStatus] = useState('');
-            const [filterMobilitas, setFilterMobilitas] = useState(''); // FITUR BARU: Filter Mobilitas
+            const [filterMobilitas, setFilterMobilitas] = useState('');
 
             // --- STATE UNTUK SORTING (PENGURUTAN) ---
             const [sortConfig, setSortConfig] = useState({ key: 'tanggal_izin', direction: 'desc' });
@@ -2718,7 +2722,6 @@
                 return strTgl; 
             };
 
-            // FITUR BARU: Menarik Permit DAN Scan Logs sekaligus untuk menghitung status mobilitas
             useEffect(() => {
                 const fetchPermits = async () => {
                     try { 
@@ -2738,7 +2741,6 @@
                         else if (Array.isArray(resLogs)) finalLogs = resLogs;
                         
                         const dataWithMobility = finalData.map(p => {
-                            // Hitung Status Mobilitas dari Log Security
                             let mobilitas = '-';
                             if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
                                 const pId = p.permit_id || p.id || p.id_perizinan;
@@ -2770,7 +2772,6 @@
             const bulanOptions = [...new Set(permits.map(p => p._bulan_filter).filter(b => b && b !== '-'))];
             const kelasOptions = [...new Set(permits.map(p => p.kelas).filter(Boolean))].sort();
 
-            // 1. FILTERING (Menyaring Data + Filter Mobilitas)
             const filteredPermits = permits.filter(p => {
                 const nama = String(p.nama_santri || '').toLowerCase();
                 const kelas = String(p.kelas || '');
@@ -2787,7 +2788,6 @@
                 );
             });
 
-            // 2. SORTING
             const sortedPermits = [...filteredPermits].sort((a, b) => {
                 if (!sortConfig.key) return 0;
                 let aValue = a[sortConfig.key] || '';
@@ -2858,7 +2858,6 @@
                             <option value="DITOLAK">Ditolak</option>
                             <option value="SELESAI">Selesai</option>
                         </select>
-                        {/* FITUR BARU: Dropdown Filter Mobilitas */}
                         <select className="w-full p-2.5 border rounded-lg bg-emerald-50 outline-none text-sm font-bold text-emerald-800" value={filterMobilitas} onChange={(e) => setFilterMobilitas(e.target.value)}>
                             <option value="">Semua Posisi Santri</option>
                             <option value="Masih Di Luar">Masih Di Luar</option>
@@ -2891,15 +2890,15 @@
                                     <th className="p-4 cursor-pointer hover:bg-emerald-100 transition-colors select-none" onClick={() => handleSort('status_pengajuan')}>
                                         Status ACC <SortIcon columnKey="status_pengajuan" />
                                     </th>
-                                    {/* KOLOM BARU: Posisi Santri */}
                                     <th className="p-4 cursor-pointer hover:bg-emerald-200 transition-colors select-none bg-emerald-100/50" onClick={() => handleSort('_status_mobilitas')}>
                                         Posisi Santri <SortIcon columnKey="_status_mobilitas" />
                                     </th>
+                                    <th className="p-4 font-semibold">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {loading ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Memuat data...</td></tr> : 
-                                 sortedPermits.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-gray-500">Tidak ada data perizinan.</td></tr> :
+                                {loading ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Memuat data...</td></tr> : 
+                                 sortedPermits.length === 0 ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Tidak ada data perizinan.</td></tr> :
                                  
                                  sortedPermits.map((p, idx) => (
                                     <tr key={idx} className="hover:bg-gray-50">
@@ -2910,13 +2909,13 @@
                                         </td>
                                         <td className="p-4 truncate max-w-[180px]" title={p.keperluan}>
                                             <p className="font-medium text-gray-800">{p.keperluan || '-'}</p>
-                                            <p className="text-[10px] text-gray-500 mt-0.5">Penjemput: {p.wali_safar}</p>
+                                            {/* PERBAIKAN: Menambahkan ({p.hubungan_wali}) */}
+                                            <p className="text-[10px] text-gray-500 mt-0.5">Penjemput: {p.wali_safar} ({p.hubungan_wali})</p>
                                         </td>
                                         <td className="p-4">
                                             <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
                                                 {p.status_jadwal ? p.status_jadwal.toUpperCase() : 'TIDAK DIKETAHUI'}
                                             </span>
-                                            {/* FITUR BARU: Indikator Ikut Saudara */}
                                             {(p.ikut_jadwal_saudara === 'Ya' || p.ikut_jadwal_saudara === true || p.ikut_jadwal_saudara === 'TRUE') && (
                                                 <p className="text-[10px] text-orange-600 mt-1.5 font-bold italic">
                                                     (Ikut Izin Saudara)
@@ -2925,11 +2924,18 @@
                                         </td>
                                         <td className="p-4">{getStatusBadge(p.status_pengajuan)}</td>
                                         <td className="p-4 bg-emerald-50/20">{getMobilityBadge(p._status_mobilitas)}</td>
+                                        <td className="p-4">
+                                            {p.status_pengajuan === 'DISETUJUI' ? 
+                                                <button onClick={() => setSelectedQrPermit(p)} className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 shadow-sm transition-colors cursor-pointer">Lihat QR</button> 
+                                                : <span className="text-xs text-gray-400">-</span>
+                                            }
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </Card>
+                    <QrCardModal isOpen={!!selectedQrPermit} onClose={() => setSelectedQrPermit(null)} permit={selectedQrPermit} />
                 </div>
             );
         };
