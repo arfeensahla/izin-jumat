@@ -205,8 +205,14 @@
 
         const Layout = ({ children }) => {
             const { user, logout } = useContext(AuthContext);
+            const { showToast } = useContext(ToastContext); // Tambahan untuk notifikasi
             const [isSidebarOpen, setSidebarOpen] = useState(false);
             const [currentRoute, setCurrentRoute] = useState('dashboard');
+
+            // --- STATE UNTUK GANTI PASSWORD ---
+            const [isPasswordModalOpen, setPasswordModalOpen] = useState(false);
+            const [passForm, setPassForm] = useState({ old_password: '', new_password: '' });
+            const [passLoading, setPassLoading] = useState(false);
 
             if (!user) return null;
             const safeRole = user?.role || 'UNKNOWN';
@@ -240,6 +246,35 @@
 
             const currentMenu = menuItems[safeRole] || [];
 
+            // --- FUNGSI EKSEKUSI GANTI PASSWORD ---
+            const handleGantiPassword = async (e) => {
+                e.preventDefault();
+                setPassLoading(true);
+                try {
+                    await apiService.request('changePassword', { 
+                        username: user.username || user.nama, 
+                        old_password: passForm.old_password, 
+                        new_password: passForm.new_password 
+                    });
+                    showToast('Password berhasil diubah!', 'success');
+                    
+                    // Simpan Log aktivitas
+                    apiService.request('saveLog', { 
+                        role: user.role, 
+                        nama: user.nama, 
+                        aksi: 'GANTI_PASSWORD', 
+                        keterangan: 'Berhasil mengubah password secara mandiri' 
+                    }).catch(()=>{});
+                    
+                    setPasswordModalOpen(false);
+                    setPassForm({ old_password: '', new_password: '' });
+                } catch (e) { 
+                    showToast(e.message, 'error'); 
+                } finally { 
+                    setPassLoading(false); 
+                }
+            };
+
             return (
                 <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
                     <div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center sticky top-0 z-20">
@@ -262,19 +297,35 @@
                                 <SidebarItem key={item.id} icon={item.icon} label={item.label} active={currentRoute === item.id} onClick={() => { setCurrentRoute(item.id); setSidebarOpen(false); }} />
                             )) : <p className="text-red-500 text-sm px-4">Error Role.</p>}
                         </div>
-                        <div className="p-4 border-t">
-                            <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-red-600 hover:bg-red-50 transition-colors">
-                                <Icons.LogOut /> <span className="font-medium">Keluar</span>
+                        <div className="p-4 border-t space-y-1">
+                            {/* TOMBOL GANTI PASSWORD */}
+                            <button onClick={() => setPasswordModalOpen(true)} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left text-gray-700 hover:bg-gray-100 transition-colors">
+                                <Icons.Settings /> <span className="font-medium text-sm">Ganti Password</span>
+                            </button>
+                            {/* TOMBOL LOGOUT */}
+                            <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left text-red-600 hover:bg-red-50 transition-colors">
+                                <Icons.LogOut /> <span className="font-medium text-sm">Keluar</span>
                             </button>
                         </div>
                     </div>
 
                     {isSidebarOpen && <div className="fixed inset-0 bg-black/20 z-20 md:hidden" onClick={() => setSidebarOpen(false)} />}
+                    
                     <div className="flex-1 overflow-y-auto h-screen">
                         <main className="p-4 md:p-8 max-w-6xl mx-auto pb-24 md:pb-8">
                             {React.cloneElement(children, { currentRoute, setCurrentRoute })}
                         </main>
                     </div>
+
+                    {/* MODAL GANTI PASSWORD */}
+                    <Modal isOpen={isPasswordModalOpen} onClose={() => setPasswordModalOpen(false)} title="Ganti Password">
+                        <form onSubmit={handleGantiPassword} className="space-y-4">
+                            <Input label="Password Lama" type="password" required value={passForm.old_password} onChange={e => setPassForm({...passForm, old_password: e.target.value})} placeholder="Masukkan password saat ini" />
+                            <Input label="Password Baru" type="password" required value={passForm.new_password} onChange={e => setPassForm({...passForm, new_password: e.target.value})} placeholder="Masukkan password baru" />
+                            <Button fullWidth type="submit" disabled={passLoading}>{passLoading ? 'Memproses...' : 'Simpan Password Baru'}</Button>
+                        </form>
+                    </Modal>
+
                 </div>
             );
         };
