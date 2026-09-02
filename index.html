@@ -2235,7 +2235,6 @@
                 return strTgl; 
             };
 
-            // FITUR BARU: Tarik data Permits dan Scan Logs sekaligus
             useEffect(() => {
                 const fetchPermits = async () => {
                     try { 
@@ -2334,7 +2333,6 @@
                 return <span className={`px-2 py-1 text-xs font-bold rounded-full border ${styles[st] || 'bg-gray-100'}`}>{st.replace('_', ' ')}</span>;
             };
 
-            // FITUR BARU: Badge Status Mobilitas
             const getMobilityBadge = (mobilitas) => {
                 if (mobilitas === '-') return <span className="text-gray-400">-</span>;
                 if (mobilitas === 'Belum Keluar') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-gray-100 text-gray-600 border border-gray-200">BELUM KELUAR</span>;
@@ -2351,7 +2349,6 @@
                         <p className="text-gray-500">Arsip global seluruh pengajuan izin santri lintas kelas untuk pelaporan Mudir.</p>
                     </div>
 
-                    {/* KOTAK PENCARIAN & FILTER (Kini menjadi 5 kolom) */}
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                         <input 
                             type="text" placeholder="Cari Nama Santri..." 
@@ -2373,7 +2370,6 @@
                             <option value="DITOLAK">Ditolak</option>
                             <option value="SELESAI">Selesai</option>
                         </select>
-                        {/* FILTER BARU UNTUK MOBILITAS */}
                         <select className="w-full p-2.5 border rounded-lg bg-emerald-50 outline-none text-sm font-bold text-emerald-800" value={filterMobilitas} onChange={(e) => setFilterMobilitas(e.target.value)}>
                             <option value="">Semua Posisi Santri</option>
                             <option value="Masih Di Luar">Masih Di Luar</option>
@@ -2395,16 +2391,10 @@
                                         Tgl Izin <SortIcon columnKey="tanggal_izin"/>
                                     </th>
                                     <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('nama_santri')}>
-                                        Santri <SortIcon columnKey="nama_santri"/>
-                                    </th>
-                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('kelas')}>
-                                        Kelas <SortIcon columnKey="kelas"/>
+                                        Santri & Kelas <SortIcon columnKey="nama_santri"/>
                                     </th>
                                     <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('keperluan')}>
                                         Keperluan <SortIcon columnKey="keperluan"/>
-                                    </th>
-                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('wali_safar')}>
-                                        Wali Safar <SortIcon columnKey="wali_safar"/>
                                     </th>
                                     <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_jadwal')}>
                                         Status Jadwal <SortIcon columnKey="status_jadwal"/>
@@ -2412,7 +2402,6 @@
                                     <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_pengajuan')}>
                                         Status Approval <SortIcon columnKey="status_pengajuan"/>
                                     </th>
-                                    {/* KOLOM BARU: Posisi Santri */}
                                     <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-200 bg-emerald-100/50" onClick={() => handleSort('_status_mobilitas')}>
                                         Posisi Santri <SortIcon columnKey="_status_mobilitas"/>
                                     </th>
@@ -2420,20 +2409,23 @@
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {loading ? <tr><td colSpan="9" className="p-8 text-center text-gray-500">Memuat data arsip...</td></tr> : 
-                                 sortedPermits.length === 0 ? <tr><td colSpan="9" className="p-8 text-center text-gray-500">Tidak ada data yang sesuai pencarian.</td></tr> :
+                                {loading ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Memuat data arsip...</td></tr> : 
+                                 sortedPermits.length === 0 ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Tidak ada data yang sesuai pencarian.</td></tr> :
                                  sortedPermits.map((p, idx) => (
                                     <tr key={idx} className="hover:bg-gray-50">
                                         <td className="p-4 font-medium text-gray-800">{p.tanggal_izin}</td>
-                                        <td className="p-4 font-bold text-gray-700">{p.nama_santri}</td>
-                                        <td className="p-4 text-emerald-600 font-medium">{p.kelas}</td>
-                                        <td className="p-4"><p className="text-gray-800 truncate max-w-[150px]" title={p.keperluan}>{p.keperluan}</p></td>
-                                        <td className="p-4">{p.wali_safar} <span className="text-xs text-gray-500">({p.hubungan_wali})</span></td>
+                                        <td className="p-4">
+                                            <p className="font-bold text-gray-800">{p.nama_santri}</p>
+                                            <p className="text-xs text-emerald-600 font-medium">{p.kelas}</p>
+                                        </td>
+                                        <td className="p-4 truncate max-w-[180px]" title={p.keperluan}>
+                                            <p className="font-medium text-gray-800">{p.keperluan || '-'}</p>
+                                            <p className="text-[10px] text-gray-500 mt-0.5">Penjemput: {p.wali_safar} ({p.hubungan_wali})</p>
+                                        </td>
                                         <td className="p-4">
                                             <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
                                                 {p.status_jadwal ? p.status_jadwal.toUpperCase() : 'TIDAK DIKETAHUI'}
                                             </span>
-                                            {/* Keterangan Ikut Saudara disisipkan di sini */}
                                             {(p.ikut_jadwal_saudara === 'Ya' || p.ikut_jadwal_saudara === true || p.ikut_jadwal_saudara === 'TRUE') && (
                                                 <p className="text-[10px] text-orange-600 mt-1.5 font-bold italic">
                                                     (Ikut Izin Saudara)
