@@ -3035,6 +3035,8 @@
                     const res = await apiService.request('login', { username, password });
                     if (!res.data || !res.data.role) throw new Error("Login gagal. Periksa kembali backend/role.");
                     login(res.data);
+                    const sessionData = { ...res.data, username: username };
+                    login(sessionData);
                     showToast(`Selamat datang, ${res.data.nama}`, 'success');
                     
                     // --- KAMERA PENGINTAI: LOG LOGIN ---
