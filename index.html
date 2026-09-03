@@ -2066,7 +2066,7 @@
             const [permits, setPermits] = useState([]);
             const [santriList, setSantriList] = useState([]);
             const [loading, setLoading] = useState(true);
-            const [selectedPermit, setSelectedPermit] = useState(null);
+            const [selectedPermit, setSelectedPermit] = useState(null); // Hanya dipakai untuk modal Penolakan
             const [rejectReason, setRejectReason] = useState('');
             const [processing, setProcessing] = useState(false);
 
@@ -2101,26 +2101,46 @@
                     setSantriList(finalSantri);
                 } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
             };
+            
             useEffect(() => { fetchPermits(); }, []);
 
-            const handleAction = async (action) => {
-                if (action === 'REJECT' && !rejectReason) return showToast("Alasan penolakan wajib diisi!", "error");
-                if (action === 'APPROVE' && !confirm("Yakin menyetujui izin ini? QR Code akan otomatis diterbitkan.")) return;
+            // FUNGSI 1: Eksekusi Setuju Langsung (Sat-Set)
+            const handleApprove = async (permit) => {
+                if (!window.confirm(`Yakin menyetujui izin untuk ${permit.nama_santri}? QR Code akan otomatis diterbitkan.`)) return;
 
                 setProcessing(true);
                 try {
-                    const payload = { permit_id: selectedPermit.permit_id || selectedPermit.id_perizinan, aksi_approval: action, alasan: rejectReason, username: user.nama };
+                    const payload = { permit_id: permit.permit_id || permit.id_perizinan, aksi_approval: 'APPROVE', alasan: '', username: user.nama };
                     const res = await apiService.request('processApproval', payload);
-                    showToast(res.message, 'success');
+                    showToast(`Izin ${permit.nama_santri} berhasil disetujui!`, 'success');
 
-                    // --- KAMERA PENGINTAI: LOG SCREENING ---
                     apiService.request('saveLog', {
                         role: user.role,
                         nama: user.nama,
-                        aksi: 'SCREENING_' + action,
-                        keterangan: `Memberikan status ${action} izin atas nama ${selectedPermit.nama_santri} (${selectedPermit.kelas}). Alasan: ${rejectReason || '-'}`
+                        aksi: 'SCREENING_APPROVE',
+                        keterangan: `Memberikan status APPROVE izin atas nama ${permit.nama_santri} (${permit.kelas}).`
                     }).catch(e => console.log("Log error:", e));
-                    // ---------------------------------------
+                    
+                    fetchPermits(); // Refresh data agar kartu langsung hilang
+                } catch (e) { showToast(e.message, 'error'); } finally { setProcessing(false); }
+            };
+
+            // FUNGSI 2: Eksekusi Tolak (Dari dalam Modal)
+            const handleProcessReject = async () => {
+                if (!rejectReason) return showToast("Alasan penolakan wajib diisi!", "error");
+
+                setProcessing(true);
+                try {
+                    const payload = { permit_id: selectedPermit.permit_id || selectedPermit.id_perizinan, aksi_approval: 'REJECT', alasan: rejectReason, username: user.nama };
+                    const res = await apiService.request('processApproval', payload);
+                    showToast(`Izin ${selectedPermit.nama_santri} berhasil ditolak.`, 'success');
+
+                    apiService.request('saveLog', {
+                        role: user.role,
+                        nama: user.nama,
+                        aksi: 'SCREENING_REJECT',
+                        keterangan: `Memberikan status REJECT izin atas nama ${selectedPermit.nama_santri} (${selectedPermit.kelas}). Alasan: ${rejectReason}`
+                    }).catch(e => console.log("Log error:", e));
                     
                     setSelectedPermit(null);
                     setRejectReason('');
@@ -2128,10 +2148,8 @@
                 } catch (e) { showToast(e.message, 'error'); } finally { setProcessing(false); }
             };
 
-            // Menghasilkan daftar kelas unik dari antrean izin yang ada
             const kelasOptions = [...new Set(permits.map(p => p.kelas).filter(Boolean))].sort();
 
-            // Logika Penyaringan Tampilan Antrean
             const filteredPermits = permits.filter(p => {
                 const nama = String(p.nama_santri || '').toLowerCase();
                 const kelas = String(p.kelas || '');
@@ -2147,7 +2165,6 @@
                         <p className="text-gray-500">Tinjau dan berikan persetujuan untuk santri yang akan keluar.</p>
                     </div>
                     
-                    {/* FITUR PENCARIAN & FILTER KELAS */}
                     {!loading && permits.length > 0 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <input 
@@ -2197,11 +2214,9 @@
                                                 <p className="text-red-700 italic">{p.keterangan_luar_jadwal}</p>
                                             </div>
                                         )}
-                                        {/* Perbaikan deteksi nilai centang form */}
                                         {(p.ikut_jadwal_saudara === 'Ya' || p.ikut_jadwal_saudara === true || p.ikut_jadwal_saudara === 'TRUE') && (
                                             <div className="mt-2 p-2 bg-blue-50 text-blue-800 rounded-lg text-xs font-medium">
                                                 {(() => {
-                                                    // Pencarian saudara dengan aman (Sapu Jagat ID)
                                                     const saudara = santriList.find(s => (s.santri_id || s.nis || s.id) === p.saudara_santri_id);
                                                     return saudara 
                                                         ? `Ikut jadwal saudara: ${saudara.nama || saudara.nama_santri} (${saudara.kelas})` 
@@ -2211,35 +2226,63 @@
                                         )}
                                     </div>
                                 </div>
-                                <Button fullWidth onClick={() => setSelectedPermit(p)}>Tindak Lanjut</Button>
+                                {/* PERUBAHAN UI: Dua tombol berdampingan */}
+                                <div className="grid grid-cols-2 gap-3 mt-2 border-t pt-4">
+                                    <button 
+                                        onClick={() => setSelectedPermit(p)} 
+                                        disabled={processing}
+                                        className="py-2.5 px-4 bg-red-50 text-red-700 hover:bg-red-100 font-bold rounded-lg transition-colors border border-red-200"
+                                    >
+                                        Tolak Izin
+                                    </button>
+                                    <button 
+                                        onClick={() => handleApprove(p)} 
+                                        disabled={processing}
+                                        className="py-2.5 px-4 bg-emerald-600 text-white hover:bg-emerald-700 font-bold rounded-lg transition-colors shadow-sm"
+                                    >
+                                        {processing ? 'Memproses...' : 'Setujui & Buat QR'}
+                                    </button>
+                                </div>
                             </Card>
                         ))}
                      </div>
                     }
 
-                    {/* MODAL APPROVAL/REJECTION */}
-                    <Modal isOpen={!!selectedPermit} onClose={() => setSelectedPermit(null)} title="Tindak Lanjut Izin">
+                    {/* MODAL KHUSUS PENOLAKAN */}
+                    <Modal isOpen={!!selectedPermit} onClose={() => setSelectedPermit(null)} title="Tolak Pengajuan Izin">
                         {selectedPermit && (
-                            <div className="space-y-6">
-                                <div className="bg-gray-50 p-4 rounded-lg">
-                                    <p className="text-sm text-gray-500 mb-1">Konfirmasi izin untuk:</p>
-                                    <p className="text-lg font-bold text-gray-900">{selectedPermit.nama_santri} ({selectedPermit.kelas})</p>
+                            <div className="space-y-4">
+                                <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                                    <p className="text-sm text-red-600 mb-1">Anda akan menolak izin untuk:</p>
+                                    <p className="text-lg font-bold text-red-900">{selectedPermit.nama_santri} ({selectedPermit.kelas})</p>
                                 </div>
                                 
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Jika Anda MENOLAK, tuliskan alasannya di sini:</label>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">Alasan Penolakan <span className="text-red-500">*</span></label>
                                     <textarea 
                                         rows="3" 
                                         className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500 outline-none" 
-                                        placeholder="Contoh: Kuota izin bulan ini sudah habis, Alasan kurang jelas..."
+                                        placeholder="Contoh: Kuota izin bulan ini sudah habis, alasan kurang mendesak..."
                                         value={rejectReason}
                                         onChange={(e) => setRejectReason(e.target.value)}
                                     ></textarea>
                                 </div>
                                 
-                                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                                    <Button variant="danger" disabled={processing} onClick={() => handleAction('REJECT')}>Tolak Izin</Button>
-                                    <Button disabled={processing} onClick={() => handleAction('APPROVE')}>Setujui & Buat QR</Button>
+                                <div className="flex gap-3 pt-2">
+                                    <button 
+                                        className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-bold hover:bg-gray-200 transition-colors"
+                                        onClick={() => { setSelectedPermit(null); setRejectReason(''); }}
+                                        disabled={processing}
+                                    >
+                                        Batal
+                                    </button>
+                                    <button 
+                                        className="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors shadow-sm"
+                                        onClick={handleProcessReject}
+                                        disabled={processing}
+                                    >
+                                        {processing ? 'Memproses...' : 'Kirim Penolakan'}
+                                    </button>
                                 </div>
                             </div>
                         )}
