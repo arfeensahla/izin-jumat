@@ -2094,8 +2094,10 @@
                     else if (resSantri && Array.isArray(resSantri.data)) finalSantri = resSantri.data;
                     else if (Array.isArray(resSantri)) finalSantri = resSantri;
 
-                    // Ambil yang masih MENUNGGU atau MENUNGGU_APPROVAL
-                    const pendingPermits = finalPermits.filter(p => p.status_pengajuan === 'MENUNGGU_APPROVAL' || p.status_pengajuan === 'MENUNGGU');
+                    // PENAMBAHAN REVERSE() DI SINI AGAR FIFO (Terlama di atas)
+                    const pendingPermits = finalPermits
+                        .filter(p => p.status_pengajuan === 'MENUNGGU_APPROVAL' || p.status_pengajuan === 'MENUNGGU')
+                        .reverse(); 
                     
                     setPermits(pendingPermits);
                     setSantriList(finalSantri);
