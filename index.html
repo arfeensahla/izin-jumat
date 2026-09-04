@@ -3167,165 +3167,227 @@
 
         // --- SECURITY SCANNER PAGE ---
         const SecurityScannerPage = () => {
-            const { user } = useContext(AuthContext);
-            const { showToast } = useContext(ToastContext);
-            const [scanning, setScanning] = useState(false);
-            const [scanResult, setScanResult] = useState(null);
-            const [processing, setProcessing] = useState(false);
-            const html5QrCodeRef = React.useRef(null);
+    const { user } = useContext(AuthContext);
+    const { showToast } = useContext(ToastContext);
+    const [scanning, setScanning] = useState(false);
+    const [scanResult, setScanResult] = useState(null);
+    const [processing, setProcessing] = useState(false);
+    
+    // --- STATE UNTUK COOLDOWN 10 DETIK ---
+    const [cooldown, setCooldown] = useState(0);
+    const cooldownRef = React.useRef(0); 
+    const timerRef = React.useRef(null);
+    // -------------------------------------
 
-            useEffect(() => {
-                return () => {
-                    if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
-                        html5QrCodeRef.current.stop().catch(console.error);
-                    }
-                };
-            }, []);
+    const html5QrCodeRef = React.useRef(null);
 
-            const startScanner = async () => {
-                setScanResult(null);
-                setScanning(true);
-                try {
-                    const html5QrCode = new Html5Qrcode("reader");
-                    html5QrCodeRef.current = html5QrCode;
-                    
-                    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-                    await html5QrCode.start(
-                        { facingMode: "environment" }, 
-                        config,
-                        onScanSuccess
-                    );
-                } catch (err) {
-                    console.error("Gagal membuka kamera:", err);
-                    showToast("Gagal mengakses kamera. Pastikan izin kamera aktif.", "error");
-                    setScanning(false);
-                }
-            };
+    useEffect(() => {
+        return () => {
+            if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
+                html5QrCodeRef.current.stop().catch(console.error);
+            }
+            if (timerRef.current) clearInterval(timerRef.current);
+        };
+    }, []);
 
-            const stopScanner = async () => {
-                if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
-                    await html5QrCodeRef.current.stop();
-                }
-                setScanning(false);
-            };
+    const startScanner = async () => {
+        // Jangan izinkan buka kamera kalau masih cooldown
+        if (cooldownRef.current > 0) {
+            showToast(`Kamera sedang jeda. Tunggu ${cooldownRef.current} detik lagi.`, "warning");
+            return;
+        }
 
-            const onScanSuccess = async (decodedText) => {
-                await stopScanner();
-                
-                if (navigator.vibrate) navigator.vibrate(200);
+        setScanResult(null);
+        setScanning(true);
+        try {
+            const html5QrCode = new Html5Qrcode("reader");
+            html5QrCodeRef.current = html5QrCode;
+            
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            await html5QrCode.start(
+                { facingMode: "environment" }, 
+                config,
+                onScanSuccess
+            );
+        } catch (err) {
+            console.error("Gagal membuka kamera:", err);
+            showToast("Gagal mengakses kamera. Pastikan izin kamera aktif.", "error");
+            setScanning(false);
+        }
+    };
 
-                setProcessing(true);
-                try {
-                    const res = await apiService.request('scanQR', {
-                        qr_token: decodedText,
-                        security_name: user.nama
-                    });
-                    
-                    // Ekstrak aman respons server
-                    const resData = (res && res.data && res.data.data) ? res.data.data : (res.data || {});
-                    
-                    setScanResult({ success: true, data: resData, message: resData.pesan || 'Scan berhasil diproses.' });
-                    showToast(resData.pesan || 'Scan berhasil!', "success");
+    const stopScanner = async () => {
+        if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
+            await html5QrCodeRef.current.stop();
+        }
+        setScanning(false);
+    };
 
-                    // --- KAMERA PENGINTAI: SCAN BERHASIL ---
-                    apiService.request('saveLog', {
-                        role: user.role,
-                        nama: user.nama,
-                        aksi: 'SCAN_GERBANG',
-                        keterangan: `Berhasil scan ${resData.type || ''} untuk santri ${resData.nama || '-'} (${resData.kelas || '-'})`
-                    }).catch(e => console.log("Log error:", e));
-                    
-                } catch (err) {
-                    setScanResult({ success: false, message: err.message || 'QR Code ditolak / Kedaluwarsa.' });
-                    showToast(err.message || 'Scan gagal.', "error");
+    // --- FUNGSI MEMULAI COOLDOWN 10 DETIK ---
+    const startCooldown = () => {
+        setCooldown(10);
+        cooldownRef.current = 10;
+        
+        if (timerRef.current) clearInterval(timerRef.current);
+        
+        timerRef.current = setInterval(() => {
+            cooldownRef.current -= 1;
+            setCooldown(cooldownRef.current);
+            
+            if (cooldownRef.current <= 0) {
+                clearInterval(timerRef.current);
+            }
+        }, 1000);
+    };
+    // ----------------------------------------
 
-                    // --- KAMERA PENGINTAI: SCAN GAGAL/DITOLAK ---
-                    apiService.request('saveLog', {
-                        role: user.role,
-                        nama: user.nama,
-                        aksi: 'SCAN_DITOLAK',
-                        keterangan: `Percobaan scan ditolak: ${err.message || 'Token tidak valid'}`
-                    }).catch(e => console.log("Log error:", e));
-                    
-                } finally {
-                    setProcessing(false);
-                }
-            };
+    const onScanSuccess = async (decodedText) => {
+        // Jika karena suatu alasan kamera masih membaca saat cooldown, tolak mentah-mentah
+        if (cooldownRef.current > 0) return;
 
-            return (
-                <div className="space-y-6 max-w-lg mx-auto animate-fade-in-down">
-                    <div className="text-center">
-                        <h2 className="text-2xl font-bold text-gray-800">Scanner Pos Security</h2>
-                        <p className="text-sm text-gray-500 mt-1">Arahkan kamera ke QR Code pada kartu izin santri (Valid pada Hari-H).</p>
+        await stopScanner();
+        
+        if (navigator.vibrate) navigator.vibrate(200);
+
+        setProcessing(true);
+        try {
+            const res = await apiService.request('scanQR', {
+                qr_token: decodedText,
+                security_name: user.nama
+            });
+            
+            // Ekstrak aman respons server
+            const resData = (res && res.data && res.data.data) ? res.data.data : (res.data || {});
+            
+            setScanResult({ success: true, data: resData, message: resData.pesan || 'Scan berhasil diproses.' });
+            showToast(resData.pesan || 'Scan berhasil!', "success");
+
+            // --- MULAI JEDA 10 DETIK SETELAH SUKSES ---
+            startCooldown();
+            // ------------------------------------------
+
+            // --- KAMERA PENGINTAI: SCAN BERHASIL ---
+            apiService.request('saveLog', {
+                role: user.role,
+                nama: user.nama,
+                aksi: 'SCAN_GERBANG',
+                keterangan: `Berhasil scan ${resData.type || ''} untuk santri ${resData.nama || '-'} (${resData.kelas || '-'})`
+            }).catch(e => console.log("Log error:", e));
+            
+        } catch (err) {
+            setScanResult({ success: false, message: err.message || 'QR Code ditolak / Kedaluwarsa.' });
+            showToast(err.message || 'Scan gagal.', "error");
+
+            // --- JIKA GAGAL, BERI JEDA 3 DETIK SAJA AGAR BISA COBA LAGI ---
+            setCooldown(3);
+            cooldownRef.current = 3;
+            setTimeout(() => { setCooldown(0); cooldownRef.current = 0; }, 3000);
+            // --------------------------------------------------------------
+
+            // --- KAMERA PENGINTAI: SCAN GAGAL/DITOLAK ---
+            apiService.request('saveLog', {
+                role: user.role,
+                nama: user.nama,
+                aksi: 'SCAN_DITOLAK',
+                keterangan: `Percobaan scan ditolak: ${err.message || 'Token tidak valid'}`
+            }).catch(e => console.log("Log error:", e));
+            
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    return (
+        <div className="space-y-6 max-w-lg mx-auto animate-fade-in-down">
+            <div className="text-center">
+                <h2 className="text-2xl font-bold text-gray-800">Scanner Pos Security</h2>
+                <p className="text-sm text-gray-500 mt-1">Arahkan kamera ke QR Code pada kartu izin santri (Valid pada Hari-H).</p>
+            </div>
+
+            <Card className="p-4 flex flex-col items-center">
+                <div id="reader" className={`w-full bg-black rounded-lg overflow-hidden ${scanning ? 'block' : 'hidden'}`} style={{ minHeight: '300px' }}></div>
+
+                {!scanning && (
+                    <div className="py-12 flex flex-col items-center text-center">
+                        <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${cooldown > 0 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {cooldown > 0 ? <span className="text-2xl font-bold">{cooldown}s</span> : <Icons.Scan />}
+                        </div>
+                        
+                        <p className="text-gray-600 font-medium mb-6">
+                            {cooldown > 0 ? 'Sistem sedang jeda keamanan (Anti Double-Scan)' : 'Kamera pengawas gerbang siap'}
+                        </p>
+                        
+                        <Button 
+                            onClick={startScanner} 
+                            disabled={cooldown > 0} 
+                            className={`px-8 py-3 text-lg shadow-md ${cooldown > 0 ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                            icon={cooldown === 0 && <Icons.Scan />}
+                        >
+                            {cooldown > 0 ? `Tunggu ${cooldown} Detik...` : 'Buka Kamera Scan'}
+                        </Button>
                     </div>
+                )}
 
-                    <Card className="p-4 flex flex-col items-center">
-                        <div id="reader" className={`w-full bg-black rounded-lg overflow-hidden ${scanning ? 'block' : 'hidden'}`} style={{ minHeight: '300px' }}></div>
+                {scanning && (
+                    <div className="w-full mt-4">
+                        <Button variant="secondary" fullWidth onClick={stopScanner}>Tutup Kamera</Button>
+                    </div>
+                )}
+            </Card>
 
-                        {!scanning && (
-                            <div className="py-12 flex flex-col items-center text-center">
-                                <div className="w-20 h-20 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mb-4">
-                                    <Icons.Scan />
+            {processing && (
+                <div className="p-6 bg-white rounded-xl shadow-sm border text-center animate-pulse">
+                    <p className="text-emerald-700 font-bold">Memverifikasi masa berlaku QR ke database...</p>
+                </div>
+            )}
+
+            {scanResult && !processing && (
+                <Card className={`border-2 ${scanResult.success ? 'border-emerald-500 bg-emerald-50/30' : 'border-red-500 bg-red-50/30'}`}>
+                    <div className="flex items-start gap-4">
+                        <div className="mt-1">
+                            {scanResult.success ? <Icons.CheckCircle /> : <Icons.XCircle />}
+                        </div>
+                        <div className="flex-1">
+                            <h3 className={`font-bold text-lg ${scanResult.success ? 'text-emerald-800' : 'text-red-800'}`}>
+                                {scanResult.success ? `SCAN ${scanResult.data.type || 'BERHASIL'} BERHASIL` : 'SCAN DITOLAK / KEDALUWARSA'}
+                            </h3>
+                            <p className="text-sm text-gray-600 mt-1">{scanResult.message}</p>
+
+                            {scanResult.success && scanResult.data.nama && (
+                                <div className="mt-4 p-3 bg-white rounded-lg border border-gray-100 text-sm space-y-1">
+                                    <p><span className="text-gray-500">Nama:</span> <strong>{scanResult.data.nama}</strong> ({scanResult.data.kelas})</p>
+                                    <p><span className="text-gray-500">Waktu Scan:</span> <strong>{scanResult.data.waktu} WIB</strong></p>
+                                    {scanResult.data.status_kembali && (
+                                        <p className="mt-2">
+                                            <span className="text-gray-500">Status Kembali: </span>
+                                            <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
+                                                scanResult.data.status_kembali === 'TEPAT WAKTU' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                                            }`}>
+                                                {scanResult.data.status_kembali}
+                                            </span>
+                                        </p>
+                                    )}
                                 </div>
-                                <p className="text-gray-600 font-medium mb-6">Kamera pengawas gerbang siap</p>
-                                <Button onClick={startScanner} className="px-8 py-3 text-lg shadow-md" icon={<Icons.Scan />}>
-                                    Buka Kamera Scan
+                            )}
+
+                            <div className="mt-4">
+                                <Button 
+                                    fullWidth 
+                                    variant="secondary" 
+                                    onClick={startScanner}
+                                    disabled={cooldown > 0}
+                                    className={cooldown > 0 ? 'opacity-50 cursor-not-allowed' : ''}
+                                >
+                                    {cooldown > 0 ? `Scan Berikutnya dalam ${cooldown}s` : 'Scan Kartu Lainnya'}
                                 </Button>
                             </div>
-                        )}
-
-                        {scanning && (
-                            <div className="w-full mt-4">
-                                <Button variant="secondary" fullWidth onClick={stopScanner}>Tutup Kamera</Button>
-                            </div>
-                        )}
-                    </Card>
-
-                    {processing && (
-                        <div className="p-6 bg-white rounded-xl shadow-sm border text-center animate-pulse">
-                            <p className="text-emerald-700 font-bold">Memverifikasi masa berlaku QR ke database...</p>
                         </div>
-                    )}
-
-                    {scanResult && (
-                        <Card className={`border-2 ${scanResult.success ? 'border-emerald-500 bg-emerald-50/30' : 'border-red-500 bg-red-50/30'}`}>
-                            <div className="flex items-start gap-4">
-                                <div className="mt-1">
-                                    {scanResult.success ? <Icons.CheckCircle /> : <Icons.XCircle />}
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className={`font-bold text-lg ${scanResult.success ? 'text-emerald-800' : 'text-red-800'}`}>
-                                        {scanResult.success ? `SCAN ${scanResult.data.type || 'BERHASIL'} BERHASIL` : 'SCAN DITOLAK / KEDALUWARSA'}
-                                    </h3>
-                                    <p className="text-sm text-gray-600 mt-1">{scanResult.message}</p>
-
-                                    {scanResult.success && scanResult.data.nama && (
-                                        <div className="mt-4 p-3 bg-white rounded-lg border border-gray-100 text-sm space-y-1">
-                                            <p><span className="text-gray-500">Nama:</span> <strong>{scanResult.data.nama}</strong> ({scanResult.data.kelas})</p>
-                                            <p><span className="text-gray-500">Waktu Scan:</span> <strong>{scanResult.data.waktu} WIB</strong></p>
-                                            {scanResult.data.status_kembali && (
-                                                <p className="mt-2">
-                                                    <span className="text-gray-500">Status Kembali: </span>
-                                                    <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
-                                                        scanResult.data.status_kembali === 'TEPAT WAKTU' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-                                                    }`}>
-                                                        {scanResult.data.status_kembali}
-                                                    </span>
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    <div className="mt-4">
-                                        <Button fullWidth variant="secondary" onClick={startScanner}>Scan Kartu Lainnya</Button>
-                                    </div>
-                                </div>
-                            </div>
-                        </Card>
-                    )}
-                </div>
-            );
-        };
+                    </div>
+                </Card>
+            )}
+        </div>
+    );
+};
 
         const MainRouter = ({ currentRoute, setCurrentRoute }) => {
             const { user } = useContext(AuthContext);
