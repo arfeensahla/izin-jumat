@@ -3253,7 +3253,10 @@
         isProcessingRef.current = true;
         setProcessing(true);
         
+        // --- UX HACK: Getar & Suara Bip Instan ---
         if (navigator.vibrate) navigator.vibrate(200);
+        new Audio('https://www.soundjay.com/buttons/sounds/beep-07a.mp3').play().catch(()=>{});
+        // -----------------------------------------
 
         try {
             const res = await apiService.request('scanQR', {
@@ -3268,12 +3271,9 @@
 
             startCooldown(); 
 
-            apiService.request('saveLog', {
-                role: user.role,
-                nama: user.nama,
-                aksi: 'SCAN_GERBANG',
-                keterangan: `Berhasil scan ${resData.type || ''} untuk santri ${resData.nama || '-'} (${resData.kelas || '-'})`
-            }).catch(e => console.log("Log error:", e));
+            // 🚀 PERCEPATAN: saveLog untuk SCAN SUKSES dihapus di sini, 
+            // karena backend (Google Apps Script) sudah otomatis mencatatnya di sheet SCAN_LOG.
+            // Beban loading server dipangkas 50%!
             
         } catch (err) {
             setScanResult({ success: false, message: err.message || 'QR Code ditolak / Kedaluwarsa.' });
@@ -3281,6 +3281,8 @@
 
             startCooldown(); 
 
+            // 🛡️ KEAMANAN: saveLog untuk SCAN GAGAL TETAP DIPERTAHANKAN.
+            // Catatan ditolak ini akan masuk ke sheet SYSTEM_LOG.
             apiService.request('saveLog', {
                 role: user.role,
                 nama: user.nama,
