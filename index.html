@@ -3060,11 +3060,12 @@
                 fetchLogs();
             }, []);
 
+            // REVISI: Filter pencarian sekarang mencari Nama Santri (bukan ID lagi)
             const filteredLogs = logs.filter(log => {
-                const idSantri = String(log.santri_id || '').toLowerCase();
+                const nama = String(log.nama_santri || log.santri_id || '').toLowerCase();
                 const ket = String(log.keterangan || '').toLowerCase();
                 const search = searchTerm.toLowerCase();
-                return idSantri.includes(search) || ket.includes(search);
+                return nama.includes(search) || ket.includes(search);
             });
 
             return (
@@ -3075,9 +3076,10 @@
                     </div>
 
                     <div className="w-full md:w-1/3">
+                        {/* REVISI: Mengubah teks placeholder */}
                         <input 
                             type="text" 
-                            placeholder="Cari ID Santri / Keterangan..." 
+                            placeholder="Cari Nama Santri / Keterangan..." 
                             className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -3090,7 +3092,8 @@
                                 <tr className="bg-emerald-50 text-emerald-800 border-b">
                                     <th className="p-4">Waktu</th>
                                     <th className="p-4">Aksi</th>
-                                    <th className="p-4">ID Santri</th>
+                                    {/* REVISI: Mengubah Judul Kolom */}
+                                    <th className="p-4">Nama Santri</th>
                                     <th className="p-4">Keterangan</th>
                                 </tr>
                             </thead>
@@ -3105,7 +3108,8 @@
                                                 {log.tipe_scan}
                                             </span>
                                         </td>
-                                        <td className="p-4 font-mono font-bold">{log.santri_id}</td>
+                                        {/* REVISI: Menampilkan Nama Santri, dengan fallback ke ID jika data log lama belum ada namanya */}
+                                        <td className="p-4 font-bold text-gray-900">{log.nama_santri || log.santri_id}</td>
                                         <td className="p-4 text-gray-600">{log.keterangan}</td>
                                     </tr>
                                 ))}
