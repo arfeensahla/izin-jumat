@@ -1511,7 +1511,17 @@
             
             const [searchSaudaraTerm, setSearchSaudaraTerm] = useState('');
 
-            const nextFriday = useMemo(() => helper.getNextFriday(), []);
+            // --- PERBAIKAN BUG TANGGAL JUMAT DI SINI 👇 ---
+            const nextFriday = useMemo(() => {
+                const today = new Date();
+                // Jika hari ini adalah Jumat (Index hari ke-5), gunakan hari ini.
+                if (today.getDay() === 5) {
+                    return today;
+                }
+                // Jika hari lain, gunakan helper untuk mencari Jumat terdekat.
+                return helper.getNextFriday();
+            }, []);
+            // ----------------------------------------------
             const weekNumber = useMemo(() => {
                 let week = helper.getWeekOfMonth(nextFriday);
                 return week > 4 ? '4' : week.toString();
