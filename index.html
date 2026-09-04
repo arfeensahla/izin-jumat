@@ -3180,7 +3180,7 @@
     // --- JEDA 3 DETIK & ANTI DOUBLE-HIT ---
     const [cooldown, setCooldown] = useState(0);
     const cooldownRef = React.useRef(0); 
-    const isProcessingRef = React.useRef(false); // Mencegah scan bertumpuk saat API loading
+    const isProcessingRef = React.useRef(false); 
     const timerRef = React.useRef(null);
     // --------------------------------------
 
@@ -3204,7 +3204,13 @@
             const html5QrCode = new Html5Qrcode("reader");
             html5QrCodeRef.current = html5QrCode;
             
-            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            // REVISI UI: aspectRatio: 1.0 memaksa rasio kamera menjadi KOTAK (tidak memanjang)
+            const config = { 
+                fps: 10, 
+                qrbox: { width: 220, height: 220 },
+                aspectRatio: 1.0 
+            };
+            
             await html5QrCode.start(
                 { facingMode: "environment" }, 
                 config,
@@ -3226,7 +3232,7 @@
     };
 
     const startCooldown = () => {
-        setCooldown(3); // Diubah menjadi 3 detik
+        setCooldown(3); 
         cooldownRef.current = 3;
         
         if (timerRef.current) clearInterval(timerRef.current);
@@ -3237,23 +3243,17 @@
             
             if (cooldownRef.current <= 0) {
                 clearInterval(timerRef.current);
-                // Kita tidak menghapus scanResult agar datanya tetap terbaca oleh Satpam,
-                // Result ini akan otomatis terganti saat scan santri berikutnya.
             }
         }, 1000);
     };
 
     const onScanSuccess = async (decodedText) => {
-        // Abaikan scan jika sedang memproses data atau masih dalam jeda 3 detik
         if (cooldownRef.current > 0 || isProcessingRef.current) return;
 
         isProcessingRef.current = true;
         setProcessing(true);
         
         if (navigator.vibrate) navigator.vibrate(200);
-
-        // PERHATIKAN: Kita MENGHAPUS perintah `stopScanner()` di sini. 
-        // Kamera akan terus menyala (Continuous Scan).
 
         try {
             const res = await apiService.request('scanQR', {
@@ -3266,7 +3266,7 @@
             setScanResult({ success: true, data: resData, message: resData.pesan || 'Scan berhasil diproses.' });
             showToast(resData.pesan || 'Scan berhasil!', "success");
 
-            startCooldown(); // Mulai jeda 3 detik
+            startCooldown(); 
 
             apiService.request('saveLog', {
                 role: user.role,
@@ -3279,7 +3279,7 @@
             setScanResult({ success: false, message: err.message || 'QR Code ditolak / Kedaluwarsa.' });
             showToast(err.message || 'Scan gagal.', "error");
 
-            startCooldown(); // Tetap beri jeda 3 detik meski gagal agar layar tidak berkedip cepat
+            startCooldown(); 
 
             apiService.request('saveLog', {
                 role: user.role,
@@ -3295,46 +3295,22 @@
     };
 
     return (
-        <div className="space-y-6 max-w-lg mx-auto animate-fade-in-down">
-            <div className="text-center">
+        <div className="space-y-4 max-w-lg mx-auto animate-fade-in-down">
+            <div className="text-center mb-2">
                 <h2 className="text-2xl font-bold text-gray-800">Scanner Pos Security</h2>
                 <p className="text-sm text-emerald-600 mt-1 font-semibold">Mode Auto-Scan (Berkelanjutan)</p>
             </div>
 
-            <Card className={`p-4 flex flex-col items-center border-2 transition-colors duration-300 ${cooldown > 0 ? 'border-orange-400' : 'border-transparent'}`}>
-                <div id="reader" className={`w-full bg-black rounded-lg overflow-hidden ${scanning ? 'block' : 'hidden'}`} style={{ minHeight: '300px' }}></div>
-
-                {!scanning && (
-                    <div className="py-12 flex flex-col items-center text-center">
-                        <div className="w-20 h-20 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mb-4">
-                            <Icons.Scan />
-                        </div>
-                        <p className="text-gray-600 font-medium mb-6">Kamera pengawas gerbang siap</p>
-                        <Button onClick={startScanner} className="px-8 py-3 text-lg shadow-md" icon={<Icons.Scan />}>
-                            Buka Kamera Scan
-                        </Button>
-                    </div>
-                )}
-
-                {scanning && (
-                    <div className="w-full mt-4 space-y-3">
-                        {/* INDIKATOR STATUS SCANNER DI BAWAH KAMERA */}
-                        <div className={`p-3 text-center rounded-lg font-bold transition-colors duration-300 ${cooldown > 0 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700 animate-pulse'}`}>
-                            {cooldown > 0 ? `Jeda Keamanan... ${cooldown}s` : 'KAMERA AKTIF - SIAP SCAN'}
-                        </div>
-                        <Button variant="secondary" fullWidth onClick={stopScanner}>Tutup Kamera</Button>
-                    </div>
-                )}
-            </Card>
-
+            {/* --- REVISI UI: KOTAK HASIL DIPINDAH KE ATAS KAMERA --- */}
+            {/* Dengan begini, hasil selalu ada di tengah layar, Satpam tidak perlu scroll! */}
             {processing && (
-                <div className="p-6 bg-white rounded-xl shadow-sm border text-center animate-pulse">
+                <div className="p-4 bg-white rounded-xl shadow-md border text-center animate-pulse">
                     <p className="text-emerald-700 font-bold">Memproses data ke server...</p>
                 </div>
             )}
 
             {scanResult && !processing && (
-                <Card className={`border-2 ${scanResult.success ? 'border-emerald-500 bg-emerald-50/30' : 'border-red-500 bg-red-50/30'}`}>
+                <Card className={`border-2 shadow-lg mb-4 ${scanResult.success ? 'border-emerald-500 bg-emerald-50/50' : 'border-red-500 bg-red-50/50'}`}>
                     <div className="flex items-start gap-4">
                         <div className="mt-1">
                             {scanResult.success ? <Icons.CheckCircle /> : <Icons.XCircle />}
@@ -3343,15 +3319,14 @@
                             <h3 className={`font-bold text-lg ${scanResult.success ? 'text-emerald-800' : 'text-red-800'}`}>
                                 {scanResult.success ? `SCAN ${scanResult.data?.type || 'BERHASIL'} SUKSES` : 'SCAN DITOLAK'}
                             </h3>
-                            <p className="text-sm text-gray-600 mt-1">{scanResult.message}</p>
+                            <p className="text-sm text-gray-700 mt-1">{scanResult.message}</p>
 
                             {scanResult.success && scanResult.data && scanResult.data.nama && (
-                                <div className="mt-4 p-3 bg-white rounded-lg border border-gray-100 text-sm space-y-1">
+                                <div className="mt-3 p-2 bg-white/80 rounded border border-gray-200 text-sm space-y-1">
                                     <p><span className="text-gray-500">Nama:</span> <strong>{scanResult.data.nama}</strong> ({scanResult.data.kelas})</p>
                                     <p><span className="text-gray-500">Waktu Scan:</span> <strong>{scanResult.data.waktu} WIB</strong></p>
                                     {scanResult.data.status_kembali && (
-                                        <p className="mt-2">
-                                            <span className="text-gray-500">Status: </span>
+                                        <p className="mt-1">
                                             <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
                                                 scanResult.data.status_kembali === 'TEPAT WAKTU' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
                                             }`}>
@@ -3365,6 +3340,33 @@
                     </div>
                 </Card>
             )}
+            {/* ------------------------------------------------------ */}
+
+            <Card className={`p-4 flex flex-col items-center border-2 transition-colors duration-300 ${cooldown > 0 ? 'border-orange-400' : 'border-transparent'}`}>
+                {/* REVISI UI: Hapus minHeight 300px agar tidak memanjang */}
+                <div id="reader" className={`w-full bg-black rounded-lg overflow-hidden shadow-inner ${scanning ? 'block' : 'hidden'}`}></div>
+
+                {!scanning && (
+                    <div className="py-8 flex flex-col items-center text-center">
+                        <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mb-4 shadow-sm">
+                            <Icons.Scan />
+                        </div>
+                        <p className="text-gray-600 font-medium mb-6">Kamera pengawas gerbang siap</p>
+                        <Button onClick={startScanner} className="px-6 py-2.5 shadow-md" icon={<Icons.Scan />}>
+                            Buka Kamera Scan
+                        </Button>
+                    </div>
+                )}
+
+                {scanning && (
+                    <div className="w-full mt-4 space-y-3">
+                        <div className={`p-2.5 text-sm text-center rounded-lg font-bold transition-colors duration-300 ${cooldown > 0 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700 animate-pulse'}`}>
+                            {cooldown > 0 ? `Jeda Keamanan... ${cooldown}s` : 'KAMERA AKTIF - SIAP SCAN'}
+                        </div>
+                        <Button variant="secondary" fullWidth onClick={stopScanner}>Tutup Kamera</Button>
+                    </div>
+                )}
+            </Card>
         </div>
     );
 };
