@@ -2560,11 +2560,10 @@
             </tr>
         );
 
-        // --- DASHBOARD ADMIN & SEKRETARIS MUDIR ---
+       // --- DASHBOARD ADMIN & SEKRETARIS MUDIR ---
 const DashboardManajemen = ({ title, subtitle }) => {
     const { showToast } = useContext(ToastContext);
     
-    // KITA BELAH DUA: State khusus pekan ini (Atas) & State total (Bawah)
     const [statsPekan, setStatsPekan] = useState({ ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0 });
     const [statsTotal, setStatsTotal] = useState({ ajuan: 0, rekapTepat: 0, terlambat: 0 });
     const [loading, setLoading] = useState(true);
@@ -2574,13 +2573,11 @@ const DashboardManajemen = ({ title, subtitle }) => {
             try {
                 const [resPermits, resLogs] = await Promise.all([ apiService.request('getPermits'), apiService.request('getScanLogs') ]);
                 
-                // Ekstrak Aman Array Perizinan
                 let allPermits = [];
                 if (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) allPermits = resPermits.data.data;
                 else if (resPermits && Array.isArray(resPermits.data)) allPermits = resPermits.data;
                 else if (Array.isArray(resPermits)) allPermits = resPermits;
 
-                // Ekstrak Aman Array Logs
                 let allLogs = [];
                 if (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) allLogs = resLogs.data.data;
                 else if (resLogs && Array.isArray(resLogs.data)) allLogs = resLogs.data;
@@ -2589,34 +2586,40 @@ const DashboardManajemen = ({ title, subtitle }) => {
                 let sPekan = { ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0 };
                 let sTotal = { ajuan: allPermits.length, rekapTepat: 0, terlambat: 0 };
                 
-                // RUMUS WAKTU: Menentukan rentang hari Senin s.d. Minggu pada pekan berjalan
+                // --- RUMUS WAKTU: Kalender Pondok (Sabtu - Jumat) ---
                 const now = new Date();
-                const day = now.getDay() || 7; // Ubah index hari Minggu dari 0 menjadi 7
+                const jsDay = now.getDay(); 
+                const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1; 
+
                 const startOfWeek = new Date(now);
                 startOfWeek.setHours(0, 0, 0, 0);
-                startOfWeek.setDate(now.getDate() - day + 1); // Tarik mundur ke hari Senin
+                startOfWeek.setDate(now.getDate() - diffToSaturday); 
                 
                 const endOfWeek = new Date(startOfWeek);
-                endOfWeek.setDate(startOfWeek.getDate() + 6); // Tarik maju ke hari Minggu
+                endOfWeek.setDate(startOfWeek.getDate() + 6); 
                 endOfWeek.setHours(23, 59, 59, 999);
+                // ----------------------------------------------------
 
                 allPermits.forEach(p => {
                     const pLogs = allLogs.filter(l => l.permit_id === p.permit_id || l.permit_id === p.id_perizinan);
                     const hasExit = pLogs.some(l => l.tipe_scan === 'EXIT');
                     const returnLog = pLogs.find(l => l.tipe_scan === 'RETURN');
                     
-                    // --- 1. LOGIKA HISTORI TOTAL (Tabel Bawah) ---
                     if (returnLog) {
                         if (returnLog.keterangan && returnLog.keterangan.includes('TERLAMBAT')) sTotal.terlambat++;
                         else sTotal.rekapTepat++;
                     }
 
-                    // --- 2. LOGIKA PEKAN INI (Kotak Atas) ---
-                    // Coba tangkap tanggal dari berbagai kemungkinan nama kolom di Sheets
                     const permitDateStr = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu; 
-                    const pDate = new Date(permitDateStr);
                     
-                    // Cek apakah tanggal ajuan ini berada di dalam pekan berjalan
+                    // --- TRIK KEBAL FORMAT TANGGAL ---
+                    let pDate = new Date(permitDateStr);
+                    if (isNaN(pDate) && typeof permitDateStr === 'string' && permitDateStr.includes('/')) {
+                        const parts = permitDateStr.split('/');
+                        if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                    }
+                    // ---------------------------------
+                    
                     if (!isNaN(pDate) && pDate >= startOfWeek && pDate <= endOfWeek) {
                         sPekan.ajuan++;
                         if (p.status_pengajuan === 'DISETUJUI') sPekan.disetujui++;
@@ -2663,7 +2666,6 @@ const DashboardManajemen = ({ title, subtitle }) => {
                         </tr>
                     </thead>
                     <tbody>
-                        {/* Menggunakan statsTotal agar semua riwayat tetap terhitung abadi */}
                         <RekapRow periode="Bulan Ini" ajuan={loading ? "..." : statsTotal.ajuan} tepatWaktu={loading ? "..." : statsTotal.rekapTepat} terlambat={loading ? "..." : statsTotal.terlambat} />
                         <RekapRow periode="Semester Ini" ajuan={loading ? "..." : statsTotal.ajuan} tepatWaktu={loading ? "..." : statsTotal.rekapTepat} terlambat={loading ? "..." : statsTotal.terlambat} />
                         <RekapRow periode="Tahun Pelajaran Ini" ajuan={loading ? "..." : statsTotal.ajuan} tepatWaktu={loading ? "..." : statsTotal.rekapTepat} terlambat={loading ? "..." : statsTotal.terlambat} />
@@ -2674,12 +2676,11 @@ const DashboardManajemen = ({ title, subtitle }) => {
     );
 };
 
-        // --- DASHBOARD WALI KELAS ---
+// --- DASHBOARD WALI KELAS ---
 const DashboardWaliKelas = ({ setCurrentRoute }) => {
     const { user } = useContext(AuthContext);
     const { showToast } = useContext(ToastContext);
     
-    // Karena Wali Kelas hanya butuh laporan per-pekan
     const [statsPekan, setStatsPekan] = useState({ ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0 });
     const [loading, setLoading] = useState(true);
 
@@ -2701,19 +2702,30 @@ const DashboardWaliKelas = ({ setCurrentRoute }) => {
                 const myPermits = finalPermits.filter(p => p.kelas === user.kelas_id);
                 let sPekan = { ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0 };
                 
+                // --- RUMUS WAKTU: Kalender Pondok (Sabtu - Jumat) ---
                 const now = new Date();
-                const day = now.getDay() || 7;
+                const jsDay = now.getDay();
+                const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
+                
                 const startOfWeek = new Date(now);
                 startOfWeek.setHours(0, 0, 0, 0);
-                startOfWeek.setDate(now.getDate() - day + 1);
+                startOfWeek.setDate(now.getDate() - diffToSaturday);
                 
                 const endOfWeek = new Date(startOfWeek);
                 endOfWeek.setDate(startOfWeek.getDate() + 6);
                 endOfWeek.setHours(23, 59, 59, 999);
+                // ----------------------------------------------------
                 
                 myPermits.forEach(p => {
                     const permitDateStr = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu; 
-                    const pDate = new Date(permitDateStr);
+                    
+                    // --- TRIK KEBAL FORMAT TANGGAL ---
+                    let pDate = new Date(permitDateStr);
+                    if (isNaN(pDate) && typeof permitDateStr === 'string' && permitDateStr.includes('/')) {
+                        const parts = permitDateStr.split('/');
+                        if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                    }
+                    // ---------------------------------
                     
                     if (!isNaN(pDate) && pDate >= startOfWeek && pDate <= endOfWeek) {
                         sPekan.ajuan++;
@@ -2760,11 +2772,10 @@ const DashboardWaliKelas = ({ setCurrentRoute }) => {
     );
 };
 
-        // --- DASHBOARD SECURITY ---
+// --- DASHBOARD SECURITY ---
 const DashboardSecurity = ({ setCurrentRoute }) => {
     const { showToast } = useContext(ToastContext);
     
-    // Satpam hanya melihat statistik pekan berjalan
     const [stats, setStats] = useState({ disetujui: 0, keluar: 0, diluar: 0, kembali: 0, terlambat: 0 });
     const [loading, setLoading] = useState(true);
 
@@ -2773,13 +2784,11 @@ const DashboardSecurity = ({ setCurrentRoute }) => {
             try {
                 const [resPermits, resLogs] = await Promise.all([ apiService.request('getPermits'), apiService.request('getScanLogs') ]);
                 
-                // --- EKSTRAK AMAN PERIZINAN ---
                 let allPermits = [];
                 if (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) allPermits = resPermits.data.data;
                 else if (resPermits && Array.isArray(resPermits.data)) allPermits = resPermits.data;
                 else if (Array.isArray(resPermits)) allPermits = resPermits;
 
-                // --- EKSTRAK AMAN SCAN LOGS ---
                 let allLogs = [];
                 if (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) allLogs = resLogs.data.data;
                 else if (resLogs && Array.isArray(resLogs.data)) allLogs = resLogs.data;
@@ -2787,30 +2796,37 @@ const DashboardSecurity = ({ setCurrentRoute }) => {
                 
                 let s = { disetujui: 0, keluar: 0, diluar: 0, kembali: 0, terlambat: 0 };
                 
-                // RUMUS WAKTU: Menentukan rentang hari Senin s.d. Minggu pada pekan berjalan
+                // --- RUMUS WAKTU: Kalender Pondok (Sabtu - Jumat) ---
                 const now = new Date();
-                const day = now.getDay() || 7;
+                const jsDay = now.getDay();
+                const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
+                
                 const startOfWeek = new Date(now);
                 startOfWeek.setHours(0, 0, 0, 0);
-                startOfWeek.setDate(now.getDate() - day + 1);
+                startOfWeek.setDate(now.getDate() - diffToSaturday);
                 
                 const endOfWeek = new Date(startOfWeek);
                 endOfWeek.setDate(startOfWeek.getDate() + 6);
                 endOfWeek.setHours(23, 59, 59, 999);
+                // ----------------------------------------------------
                 
                 allPermits.forEach(p => {
                     const permitDateStr = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu; 
-                    const pDate = new Date(permitDateStr);
                     
-                    // FILTER: Hanya hitung jika tanggal pengajuan ada di pekan ini
+                    // --- TRIK KEBAL FORMAT TANGGAL ---
+                    let pDate = new Date(permitDateStr);
+                    if (isNaN(pDate) && typeof permitDateStr === 'string' && permitDateStr.includes('/')) {
+                        const parts = permitDateStr.split('/');
+                        if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                    }
+                    // ---------------------------------
+                    
                     if (!isNaN(pDate) && pDate >= startOfWeek && pDate <= endOfWeek) {
                         
-                        // Ambil ID perizinan dengan toleransi berbagai nama kolom
                         const pId = p.permit_id || p.id || p.id_perizinan;
 
                         if (String(p.status_pengajuan || '').toUpperCase() === 'DISETUJUI') s.disetujui++;
                         
-                        // Filter log berdasarkan ID yang cocok
                         const pLogs = allLogs.filter(l => l.permit_id === pId || l.id_perizinan === pId);
                         const hasExit = pLogs.some(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
                         const returnLog = pLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'RETURN');
