@@ -1757,265 +1757,319 @@
 
         // --- HISTORI KELAS PAGE ---
         const HistoriKelasPage = () => {
-            const { user } = useContext(AuthContext); 
-            const { showToast } = useContext(ToastContext);
-            const [permits, setPermits] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [selectedQrPermit, setSelectedQrPermit] = useState(null);
+    const { user } = useContext(AuthContext); 
+    const { showToast } = useContext(ToastContext);
+    const [permits, setPermits] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedQrPermit, setSelectedQrPermit] = useState(null);
 
-            // --- STATE UNTUK PENCARIAN & FILTER ---
-            const [searchTerm, setSearchTerm] = useState('');
-            const [filterBulan, setFilterBulan] = useState('');
-            const [filterStatus, setFilterStatus] = useState('');
-            const [filterMobilitas, setFilterMobilitas] = useState(''); 
+    // --- TAB STATE BARU ---
+    const [activeTab, setActiveTab] = useState('pekan_ini');
+
+    // --- STATE UNTUK PENCARIAN & FILTER ---
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterBulan, setFilterBulan] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+    const [filterMobilitas, setFilterMobilitas] = useState(''); 
+    
+    const [sortConfig, setSortConfig] = useState({ key: 'tanggal_izin', direction: 'desc' });
+
+    const getBulanTahun = (tgl) => {
+        if (!tgl) return '-';
+        const strTgl = String(tgl).trim();
+        const d = new Date(strTgl);
+        if (!isNaN(d.getTime())) return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+        const parts = strTgl.split(/[\/\- ]/);
+        if (parts.length >= 3) {
+            const monthNames = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            let m = parseInt(parts[1], 10);
+            let y = parts[2].length === 4 ? parts[2] : (parts[0].length === 4 ? parts[0] : parts[2]); 
+            if (m >= 1 && m <= 12 && String(y).length === 4) return `${monthNames[m]} ${y}`;
+        }
+        return strTgl; 
+    };
+
+    const fetchData = async () => {
+        setLoading(true);
+        try { 
+            const [resPermits, resLogs] = await Promise.all([
+                apiService.request('getPermits'),
+                apiService.request('getScanLogs')
+            ]);
             
-            const [sortConfig, setSortConfig] = useState({ key: 'tanggal_izin', direction: 'desc' });
+            let finalPermits = [];
+            if (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) finalPermits = resPermits.data.data;
+            else if (resPermits && Array.isArray(resPermits.data)) finalPermits = resPermits.data;
+            else if (Array.isArray(resPermits)) finalPermits = resPermits;
 
-            const getBulanTahun = (tgl) => {
-                if (!tgl) return '-';
-                const strTgl = String(tgl).trim();
-                const d = new Date(strTgl);
-                if (!isNaN(d.getTime())) return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-                const parts = strTgl.split(/[\/\- ]/);
-                if (parts.length >= 3) {
-                    const monthNames = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-                    let m = parseInt(parts[1], 10);
-                    let y = parts[2].length === 4 ? parts[2] : (parts[0].length === 4 ? parts[0] : parts[2]); 
-                    if (m >= 1 && m <= 12 && String(y).length === 4) return `${monthNames[m]} ${y}`;
+            let finalLogs = [];
+            if (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) finalLogs = resLogs.data.data;
+            else if (resLogs && Array.isArray(resLogs.data)) finalLogs = resLogs.data;
+            else if (Array.isArray(resLogs)) finalLogs = resLogs;
+
+            let myPermits = finalPermits.filter(p => p.kelas === user.kelas_id);
+            
+            const dataWithMobility = myPermits.map(p => {
+                let mobilitas = '-';
+                if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
+                    const pId = p.permit_id || p.id || p.id_perizinan;
+                    const myLogs = finalLogs.filter(l => l.permit_id === pId || l.id_perizinan === pId);
+                    const hasExit = myLogs.some(l => String(l.tipe_scan||'').toUpperCase() === 'EXIT');
+                    const returnLog = myLogs.find(l => String(l.tipe_scan||'').toUpperCase() === 'RETURN');
+                    
+                    if (!hasExit) mobilitas = 'Belum Keluar';
+                    else if (hasExit && !returnLog) mobilitas = 'Masih Di Luar';
+                    else if (returnLog) {
+                        if (String(returnLog.keterangan||'').toUpperCase().includes('TERLAMBAT')) mobilitas = 'Terlambat';
+                        else mobilitas = 'Tepat Waktu';
+                    }
                 }
-                return strTgl; 
-            };
 
-            const fetchData = async () => {
-                setLoading(true);
-                try { 
-                    const [resPermits, resLogs] = await Promise.all([
-                        apiService.request('getPermits'),
-                        apiService.request('getScanLogs')
-                    ]);
-                    
-                    let finalPermits = [];
-                    if (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) finalPermits = resPermits.data.data;
-                    else if (resPermits && Array.isArray(resPermits.data)) finalPermits = resPermits.data;
-                    else if (Array.isArray(resPermits)) finalPermits = resPermits;
-
-                    let finalLogs = [];
-                    if (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) finalLogs = resLogs.data.data;
-                    else if (resLogs && Array.isArray(resLogs.data)) finalLogs = resLogs.data;
-                    else if (Array.isArray(resLogs)) finalLogs = resLogs;
-
-                    let myPermits = finalPermits.filter(p => p.kelas === user.kelas_id);
-                    
-                    const dataWithMobility = myPermits.map(p => {
-                        let mobilitas = '-';
-                        if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
-                            const pId = p.permit_id || p.id || p.id_perizinan;
-                            const myLogs = finalLogs.filter(l => l.permit_id === pId || l.id_perizinan === pId);
-                            const hasExit = myLogs.some(l => String(l.tipe_scan||'').toUpperCase() === 'EXIT');
-                            const returnLog = myLogs.find(l => String(l.tipe_scan||'').toUpperCase() === 'RETURN');
-                            
-                            if (!hasExit) mobilitas = 'Belum Keluar';
-                            else if (hasExit && !returnLog) mobilitas = 'Masih Di Luar';
-                            else if (returnLog) {
-                                if (String(returnLog.keterangan||'').toUpperCase().includes('TERLAMBAT')) mobilitas = 'Terlambat';
-                                else mobilitas = 'Tepat Waktu';
-                            }
-                        }
-
-                        return {
-                            ...p,
-                            _bulan_filter: getBulanTahun(p.tanggal_izin),
-                            _status_mobilitas: mobilitas
-                        };
-                    });
-                    setPermits(dataWithMobility); 
-                } catch (e) { showToast(e.message, 'error'); } 
-                finally { setLoading(false); }
-            };
-
-            useEffect(() => {
-                if (user.kelas_id) fetchData(); else setLoading(false);
-            }, [user.kelas_id]);
-
-            const handleDelete = async (id) => {
-                if (!window.confirm('Yakin ingin membatalkan dan menghapus pengajuan izin ini secara permanen?')) return;
-                try {
-                    await apiService.request('deleteData', { sheetName: 'PERIZINAN', rowId: id });
-                    showToast('Pengajuan berhasil dibatalkan/dihapus', 'success');
-
-                    apiService.request('saveLog', {
-                        role: user.role,
-                        nama: user.nama,
-                        aksi: 'BATALKAN_IZIN',
-                        keterangan: `Membatalkan/Menghapus data perizinan dengan ID ${id}`
-                    }).catch(e => console.log("Log error:", e));
-                    
-                    fetchData(); 
-                } catch (e) { showToast(e.message, 'error'); }
-            };
-
-            const bulanOptions = [...new Set(permits.map(p => p._bulan_filter).filter(b => b && b !== '-'))];
-
-            const filteredPermits = permits.filter(p => {
-                const nama = String(p.nama_santri || '').toLowerCase();
-                const status = String(p.status_pengajuan || '').toUpperCase();
-                const bulan = String(p._bulan_filter || '');
-                const mobilitas = String(p._status_mobilitas || '');
-                
-                return (
-                    nama.includes(searchTerm.toLowerCase()) &&
-                    (filterBulan === '' || bulan === filterBulan) &&
-                    (filterStatus === '' || status.includes(filterStatus)) &&
-                    (filterMobilitas === '' || mobilitas === filterMobilitas)
-                );
+                return {
+                    ...p,
+                    _bulan_filter: getBulanTahun(p.tanggal_izin),
+                    _status_mobilitas: mobilitas
+                };
             });
+            setPermits(dataWithMobility); 
+        } catch (e) { showToast(e.message, 'error'); } 
+        finally { setLoading(false); }
+    };
 
-            const sortedPermits = [...filteredPermits].sort((a, b) => {
-                if (!sortConfig.key) return 0;
-                let aValue = a[sortConfig.key] || '';
-                let bValue = b[sortConfig.key] || '';
-                if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-                if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-                if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-                if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-                return 0;
-            });
+    useEffect(() => {
+        if (user.kelas_id) fetchData(); else setLoading(false);
+    }, [user.kelas_id]);
 
-            const handleSort = (key) => {
-                let direction = 'asc';
-                if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
-                setSortConfig({ key, direction });
-            };
+    const handleDelete = async (id) => {
+        if (!window.confirm('Yakin ingin membatalkan dan menghapus pengajuan izin ini secara permanen?')) return;
+        try {
+            await apiService.request('deleteData', { sheetName: 'PERIZINAN', rowId: id });
+            showToast('Pengajuan berhasil dibatalkan/dihapus', 'success');
 
-            const SortIcon = ({ columnKey }) => {
-                if (sortConfig.key !== columnKey) return <span className="text-gray-300 ml-1">↕</span>;
-                return sortConfig.direction === 'asc' ? <span className="text-emerald-600 ml-1">▲</span> : <span className="text-emerald-600 ml-1">▼</span>;
-            };
+            apiService.request('saveLog', {
+                role: user.role,
+                nama: user.nama,
+                aksi: 'BATALKAN_IZIN',
+                keterangan: `Membatalkan/Menghapus data perizinan dengan ID ${id}`
+            }).catch(e => console.log("Log error:", e));
+            
+            fetchData(); 
+        } catch (e) { showToast(e.message, 'error'); }
+    };
 
-            const getStatusBadge = (status) => {
-                if (!status) return <span className="bg-gray-100 px-2 py-1 text-xs font-bold rounded-full border">-</span>;
-                const styles = { 'MENUNGGU': 'bg-yellow-100 text-yellow-800 border-yellow-200', 'MENUNGGU_APPROVAL': 'bg-yellow-100 text-yellow-800 border-yellow-200', 'DISETUJUI': 'bg-emerald-100 text-emerald-800 border-emerald-200', 'DITOLAK': 'bg-red-100 text-red-800 border-red-200', 'SELESAI': 'bg-gray-100 text-gray-800 border-gray-200' };
-                const st = status.toUpperCase();
-                return <span className={`px-2 py-1 text-xs font-bold rounded-full border ${styles[st] || 'bg-gray-100'}`}>{st.replace('_', ' ')}</span>;
-            };
+    const bulanOptions = [...new Set(permits.map(p => p._bulan_filter).filter(b => b && b !== '-'))];
 
-            const getMobilityBadge = (mobilitas) => {
-                if (mobilitas === '-') return <span className="text-gray-400">-</span>;
-                if (mobilitas === 'Belum Keluar') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-gray-100 text-gray-600 border border-gray-200">BELUM KELUAR</span>;
-                if (mobilitas === 'Masih Di Luar') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-orange-100 text-orange-600 border border-orange-200">MASIH DI LUAR</span>;
-                if (mobilitas === 'Tepat Waktu') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-emerald-100 text-emerald-700 border border-emerald-200">TEPAT WAKTU</span>;
-                if (mobilitas === 'Terlambat') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-red-100 text-red-700 border border-red-200">TERLAMBAT</span>;
-                return <span>{mobilitas}</span>;
-            };
+    // --- RUMUS KALENDER PONDOK (Sabtu-Jumat) ---
+    const now = new Date();
+    const jsDay = now.getDay();
+    const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
+    const startOfWeek = new Date(now);
+    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(now.getDate() - diffToSaturday);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+    // -------------------------------------------
 
-            return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-800">Histori Pengajuan Kelas <span className="text-emerald-700">{user.kelas_id}</span></h2>
-                        <p className="text-gray-500">Pantau status approval perizinan yang telah diajukan khusus untuk kelas Anda.</p>
-                    </div>
+    const filteredPermits = permits.filter(p => {
+        const nama = String(p.nama_santri || '').toLowerCase();
+        const status = String(p.status_pengajuan || '').toUpperCase();
+        const bulan = String(p._bulan_filter || '');
+        const mobilitas = String(p._status_mobilitas || '');
+        
+        // --- LOGIKA FILTER TAB ---
+        let isTabMatch = true;
+        if (activeTab === 'pekan_ini') {
+            const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
+            let pDate = new Date(rawDate);
+            
+            if (isNaN(pDate) && typeof rawDate === 'string' && rawDate.includes('/')) {
+                const parts = rawDate.split('/');
+                if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+            }
+            
+            if (!isNaN(pDate)) {
+                isTabMatch = (pDate >= startOfWeek && pDate <= endOfWeek);
+            } else {
+                isTabMatch = false;
+            }
+        }
+        // -------------------------
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <input 
-                            type="text" placeholder="Cari Nama Santri..." 
-                            className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium"
-                            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterBulan} onChange={(e) => setFilterBulan(e.target.value)}>
-                            <option value="">Semua Bulan</option>
-                            {bulanOptions.map((b, idx) => <option key={idx} value={b}>{b}</option>)}
-                        </select>
-                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                            <option value="">Semua Status Approval</option>
-                            <option value="MENUNGGU">Menunggu</option>
-                            <option value="DISETUJUI">Disetujui</option>
-                            <option value="DITOLAK">Ditolak</option>
-                            <option value="SELESAI">Selesai</option>
-                        </select>
-                        <select className="w-full p-2.5 border rounded-lg bg-emerald-50 outline-none text-sm font-bold text-emerald-800" value={filterMobilitas} onChange={(e) => setFilterMobilitas(e.target.value)}>
-                            <option value="">Semua Posisi Santri</option>
-                            <option value="Masih Di Luar">Masih Di Luar</option>
-                            <option value="Tepat Waktu">Kembali Tepat Waktu</option>
-                            <option value="Terlambat">Terlambat</option>
-                            <option value="Belum Keluar">Belum Keluar</option>
-                        </select>
-                    </div>
+        return (
+            isTabMatch &&
+            nama.includes(searchTerm.toLowerCase()) &&
+            (filterBulan === '' || bulan === filterBulan) &&
+            (filterStatus === '' || status.includes(filterStatus)) &&
+            (filterMobilitas === '' || mobilitas === filterMobilitas)
+        );
+    });
 
-                    <div className="text-sm text-gray-500">
-                        Menampilkan <span className="font-bold text-emerald-600">{sortedPermits.length}</span> pengajuan di kelas ini.
-                    </div>
+    const sortedPermits = [...filteredPermits].sort((a, b) => {
+        if (!sortConfig.key) return 0;
+        let aValue = a[sortConfig.key] || '';
+        let bValue = b[sortConfig.key] || '';
+        if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+        if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
 
-                    <Card className="overflow-x-auto p-0">
-                        <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
-                            <thead>
-                                <tr className="bg-emerald-50 text-emerald-800 border-b">
-                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('tanggal_izin')}>
-                                        Tgl Izin <SortIcon columnKey="tanggal_izin"/>
-                                    </th>
-                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('nama_santri')}>
-                                        Santri & Kelas <SortIcon columnKey="nama_santri"/>
-                                    </th>
-                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('keperluan')}>
-                                        Keperluan <SortIcon columnKey="keperluan"/>
-                                    </th>
-                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_jadwal')}>
-                                        Penjadwalan <SortIcon columnKey="status_jadwal"/>
-                                    </th>
-                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_pengajuan')}>
-                                        Status ACC <SortIcon columnKey="status_pengajuan"/>
-                                    </th>
-                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-200 bg-emerald-100/50" onClick={() => handleSort('_status_mobilitas')}>
-                                        Posisi Santri <SortIcon columnKey="_status_mobilitas"/>
-                                    </th>
-                                    <th className="p-4 font-semibold">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {loading ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Memuat data histori...</td></tr> : 
-                                 sortedPermits.length === 0 ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Tidak ada pengajuan yang sesuai pencarian.</td></tr> :
-                                 sortedPermits.map((p, idx) => (
-                                    <tr key={idx} className="hover:bg-gray-50">
-                                        <td className="p-4 font-medium text-gray-800">{p.tanggal_izin}</td>
-                                        <td className="p-4">
-                                            <p className="font-bold text-gray-700">{p.nama_santri}</p>
-                                            <p className="text-xs text-emerald-600 font-medium">{p.kelas}</p>
-                                        </td>
-                                        <td className="p-4 max-w-[250px] whitespace-normal break-words" title={p.keperluan}>
-                                            <p className="font-medium text-gray-800">{p.keperluan || '-'}</p>
-                                            <p className="text-[11px] text-gray-500 mt-1 leading-tight">
-                                            Penjemput: <span className="font-medium text-gray-700">{p.wali_safar}</span> ({p.hubungan_wali})
-                                            </p>
-                                        </td>
-                                        <td className="p-4">
-                                            <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
-                                                {p.status_jadwal ? p.status_jadwal.toUpperCase() : 'TIDAK DIKETAHUI'}
-                                            </span>
-                                            {(p.ikut_jadwal_saudara === 'Ya' || p.ikut_jadwal_saudara === true || p.ikut_jadwal_saudara === 'TRUE') && (
-                                                <p className="text-[10px] text-orange-600 mt-1.5 font-bold italic">
-                                                    (Ikut Izin Saudara)
-                                                </p>
-                                            )}
-                                        </td>
-                                        <td className="p-4">{getStatusBadge(p.status_pengajuan)}</td>
-                                        <td className="p-4 bg-emerald-50/20">{getMobilityBadge(p._status_mobilitas)}</td>
-                                        <td className="p-4">
-                                            <div className="flex gap-2 items-center">
-                                                {p.status_pengajuan === 'DISETUJUI' ? 
-                                                    <button onClick={() => setSelectedQrPermit(p)} className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 shadow-sm transition-colors cursor-pointer">Lihat QR</button> 
-                                                    : <span className="text-xs text-gray-400 italic">Menunggu</span>
-                                                }
-                                                <button onClick={() => handleDelete(p.permit_id || p.id || p.id_perizinan)} className="px-3 py-1 bg-red-50 text-red-600 rounded text-xs font-bold hover:bg-red-100 shadow-sm transition-colors cursor-pointer">Batal</button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </Card>
-                    <QrCardModal isOpen={!!selectedQrPermit} onClose={() => setSelectedQrPermit(null)} permit={selectedQrPermit} />
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+        setSortConfig({ key, direction });
+    };
+
+    const SortIcon = ({ columnKey }) => {
+        if (sortConfig.key !== columnKey) return <span className="text-gray-300 ml-1">↕</span>;
+        return sortConfig.direction === 'asc' ? <span className="text-emerald-600 ml-1">▲</span> : <span className="text-emerald-600 ml-1">▼</span>;
+    };
+
+    const getStatusBadge = (status) => {
+        if (!status) return <span className="bg-gray-100 px-2 py-1 text-xs font-bold rounded-full border">-</span>;
+        const styles = { 'MENUNGGU': 'bg-yellow-100 text-yellow-800 border-yellow-200', 'MENUNGGU_APPROVAL': 'bg-yellow-100 text-yellow-800 border-yellow-200', 'DISETUJUI': 'bg-emerald-100 text-emerald-800 border-emerald-200', 'DITOLAK': 'bg-red-100 text-red-800 border-red-200', 'SELESAI': 'bg-gray-100 text-gray-800 border-gray-200' };
+        const st = status.toUpperCase();
+        return <span className={`px-2 py-1 text-xs font-bold rounded-full border ${styles[st] || 'bg-gray-100'}`}>{st.replace('_', ' ')}</span>;
+    };
+
+    const getMobilityBadge = (mobilitas) => {
+        if (mobilitas === '-') return <span className="text-gray-400">-</span>;
+        if (mobilitas === 'Belum Keluar') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-gray-100 text-gray-600 border border-gray-200">BELUM KELUAR</span>;
+        if (mobilitas === 'Masih Di Luar') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-orange-100 text-orange-600 border border-orange-200">MASIH DI LUAR</span>;
+        if (mobilitas === 'Tepat Waktu') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-emerald-100 text-emerald-700 border border-emerald-200">TEPAT WAKTU</span>;
+        if (mobilitas === 'Terlambat') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-red-100 text-red-700 border border-red-200">TERLAMBAT</span>;
+        return <span>{mobilitas}</span>;
+    };
+
+    return (
+        <div className="space-y-6 animate-fade-in-down">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800">Histori Pengajuan Kelas <span className="text-emerald-700">{user.kelas_id}</span></h2>
+                    <p className="text-gray-500">Pantau status approval perizinan yang telah diajukan khusus untuk kelas Anda.</p>
                 </div>
-            );
-        };
+
+                {/* --- UI SWITCH TAB --- */}
+                <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 shadow-inner w-full md:w-auto">
+                    <button 
+                        onClick={() => setActiveTab('pekan_ini')}
+                        className={`flex-1 md:flex-none px-6 py-2 text-sm font-bold rounded-md transition-all duration-200 ${activeTab === 'pekan_ini' ? 'bg-white text-emerald-700 shadow border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Pekan Ini
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('semua')}
+                        className={`flex-1 md:flex-none px-6 py-2 text-sm font-bold rounded-md transition-all duration-200 ${activeTab === 'semua' ? 'bg-white text-emerald-700 shadow border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Semua Riwayat
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <input 
+                    type="text" placeholder="Cari Nama Santri..." 
+                    className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium"
+                    value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterBulan} onChange={(e) => setFilterBulan(e.target.value)}>
+                    <option value="">Semua Bulan</option>
+                    {bulanOptions.map((b, idx) => <option key={idx} value={b}>{b}</option>)}
+                </select>
+                <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                    <option value="">Semua Status Approval</option>
+                    <option value="MENUNGGU">Menunggu</option>
+                    <option value="DISETUJUI">Disetujui</option>
+                    <option value="DITOLAK">Ditolak</option>
+                    <option value="SELESAI">Selesai</option>
+                </select>
+                <select className="w-full p-2.5 border rounded-lg bg-emerald-50 outline-none text-sm font-bold text-emerald-800" value={filterMobilitas} onChange={(e) => setFilterMobilitas(e.target.value)}>
+                    <option value="">Semua Posisi Santri</option>
+                    <option value="Masih Di Luar">Masih Di Luar</option>
+                    <option value="Tepat Waktu">Kembali Tepat Waktu</option>
+                    <option value="Terlambat">Terlambat</option>
+                    <option value="Belum Keluar">Belum Keluar</option>
+                </select>
+            </div>
+
+            <div className="text-sm text-gray-500">
+                Menampilkan <span className="font-bold text-emerald-600">{sortedPermits.length}</span> pengajuan di kelas ini
+                {activeTab === 'pekan_ini' ? ' untuk pekan berjalan.' : ' dari total keseluruhan.'}
+            </div>
+
+            <Card className="overflow-x-auto p-0">
+                <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+                    <thead>
+                        <tr className="bg-emerald-50 text-emerald-800 border-b">
+                            <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('tanggal_izin')}>
+                                Tgl Izin <SortIcon columnKey="tanggal_izin"/>
+                            </th>
+                            <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('nama_santri')}>
+                                Santri & Kelas <SortIcon columnKey="nama_santri"/>
+                            </th>
+                            <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('keperluan')}>
+                                Keperluan <SortIcon columnKey="keperluan"/>
+                            </th>
+                            <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_jadwal')}>
+                                Penjadwalan <SortIcon columnKey="status_jadwal"/>
+                            </th>
+                            <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_pengajuan')}>
+                                Status ACC <SortIcon columnKey="status_pengajuan"/>
+                            </th>
+                            <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-200 bg-emerald-100/50" onClick={() => handleSort('_status_mobilitas')}>
+                                Posisi Santri <SortIcon columnKey="_status_mobilitas"/>
+                            </th>
+                            <th className="p-4 font-semibold">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {loading ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Memuat data histori...</td></tr> : 
+                         sortedPermits.length === 0 ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Tidak ada pengajuan yang sesuai pencarian.</td></tr> :
+                         sortedPermits.map((p, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50">
+                                <td className="p-4 font-medium text-gray-800">{p.tanggal_izin}</td>
+                                <td className="p-4">
+                                    <p className="font-bold text-gray-700">{p.nama_santri}</p>
+                                    <p className="text-xs text-emerald-600 font-medium">{p.kelas}</p>
+                                </td>
+                                <td className="p-4 max-w-[250px] whitespace-normal break-words" title={p.keperluan}>
+                                    <p className="font-medium text-gray-800">{p.keperluan || '-'}</p>
+                                    <p className="text-[11px] text-gray-500 mt-1 leading-tight">
+                                    Penjemput: <span className="font-medium text-gray-700">{p.wali_safar}</span> ({p.hubungan_wali})
+                                    </p>
+                                </td>
+                                <td className="p-4">
+                                    <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
+                                        {p.status_jadwal ? p.status_jadwal.toUpperCase() : 'TIDAK DIKETAHUI'}
+                                    </span>
+                                    {(p.ikut_jadwal_saudara === 'Ya' || p.ikut_jadwal_saudara === true || p.ikut_jadwal_saudara === 'TRUE') && (
+                                        <p className="text-[10px] text-orange-600 mt-1.5 font-bold italic">
+                                            (Ikut Izin Saudara)
+                                        </p>
+                                    )}
+                                </td>
+                                <td className="p-4">{getStatusBadge(p.status_pengajuan)}</td>
+                                <td className="p-4 bg-emerald-50/20">{getMobilityBadge(p._status_mobilitas)}</td>
+                                <td className="p-4">
+                                    <div className="flex gap-2 items-center">
+                                        {p.status_pengajuan === 'DISETUJUI' ? 
+                                            <button onClick={() => setSelectedQrPermit(p)} className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 shadow-sm transition-colors cursor-pointer">Lihat QR</button> 
+                                            : <span className="text-xs text-gray-400 italic">Menunggu</span>
+                                        }
+                                        <button onClick={() => handleDelete(p.permit_id || p.id || p.id_perizinan)} className="px-3 py-1 bg-red-50 text-red-600 rounded text-xs font-bold hover:bg-red-100 shadow-sm transition-colors cursor-pointer">Batal</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </Card>
+            <QrCardModal isOpen={!!selectedQrPermit} onClose={() => setSelectedQrPermit(null)} permit={selectedQrPermit} />
+        </div>
+    );
+};
 
         // --- PHASE 6 COMPONENTS ---
         // --- DASHBOARD SEKRETARIS MUDIR ---
@@ -2305,250 +2359,303 @@
 
         // --- HISTORI GLOBAL SEKRETARIS ---
         const HistoriSekretarisPage = () => {
-            const { showToast } = useContext(ToastContext);
-            const [permits, setPermits] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [selectedQrPermit, setSelectedQrPermit] = useState(null);
+    const { showToast } = useContext(ToastContext);
+    const [permits, setPermits] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedQrPermit, setSelectedQrPermit] = useState(null);
 
-            // --- STATE UNTUK PENCARIAN, FILTER, & SORTING ---
-            const [searchTerm, setSearchTerm] = useState('');
-            const [filterBulan, setFilterBulan] = useState('');
-            const [filterKelas, setFilterKelas] = useState('');
-            const [filterStatus, setFilterStatus] = useState('');
-            const [filterMobilitas, setFilterMobilitas] = useState(''); // FITUR BARU: Filter Mobilitas
-            const [sortConfig, setSortConfig] = useState({ key: 'tanggal_izin', direction: 'desc' });
+    // --- TAB STATE BARU ---
+    const [activeTab, setActiveTab] = useState('pekan_ini');
 
-            const getBulanTahun = (tgl) => {
-                if (!tgl) return '-';
-                const strTgl = String(tgl).trim();
-                const d = new Date(strTgl);
-                if (!isNaN(d.getTime())) return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-                const parts = strTgl.split(/[\/\- ]/);
-                if (parts.length >= 3) {
-                    const monthNames = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-                    let m = parseInt(parts[1], 10);
-                    let y = parts[2].length === 4 ? parts[2] : (parts[0].length === 4 ? parts[0] : parts[2]); 
-                    if (m >= 1 && m <= 12 && String(y).length === 4) return `${monthNames[m]} ${y}`;
-                }
-                return strTgl; 
-            };
+    // --- STATE UNTUK PENCARIAN, FILTER, & SORTING ---
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterBulan, setFilterBulan] = useState('');
+    const [filterKelas, setFilterKelas] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+    const [filterMobilitas, setFilterMobilitas] = useState(''); 
+    const [sortConfig, setSortConfig] = useState({ key: 'tanggal_izin', direction: 'desc' });
 
-            useEffect(() => {
-                const fetchPermits = async () => {
-                    try { 
-                        const [resPermits, resLogs] = await Promise.all([
-                            apiService.request('getPermits'),
-                            apiService.request('getScanLogs')
-                        ]);
-                        
-                        let finalPermits = [];
-                        if (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) finalPermits = resPermits.data.data;
-                        else if (resPermits && Array.isArray(resPermits.data)) finalPermits = resPermits.data;
-                        else if (Array.isArray(resPermits)) finalPermits = resPermits;
+    const getBulanTahun = (tgl) => {
+        if (!tgl) return '-';
+        const strTgl = String(tgl).trim();
+        const d = new Date(strTgl);
+        if (!isNaN(d.getTime())) return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+        const parts = strTgl.split(/[\/\- ]/);
+        if (parts.length >= 3) {
+            const monthNames = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            let m = parseInt(parts[1], 10);
+            let y = parts[2].length === 4 ? parts[2] : (parts[0].length === 4 ? parts[0] : parts[2]); 
+            if (m >= 1 && m <= 12 && String(y).length === 4) return `${monthNames[m]} ${y}`;
+        }
+        return strTgl; 
+    };
 
-                        let finalLogs = [];
-                        if (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) finalLogs = resLogs.data.data;
-                        else if (resLogs && Array.isArray(resLogs.data)) finalLogs = resLogs.data;
-                        else if (Array.isArray(resLogs)) finalLogs = resLogs;
-
-                        const dataWithMobilitas = finalPermits.map(p => {
-                            // Hitung Status Mobilitas dari Log Security
-                            let mobilitas = '-';
-                            if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
-                                const pId = p.permit_id || p.id || p.id_perizinan;
-                                const myLogs = finalLogs.filter(l => l.permit_id === pId || l.id_perizinan === pId);
-                                const hasExit = myLogs.some(l => String(l.tipe_scan||'').toUpperCase() === 'EXIT');
-                                const returnLog = myLogs.find(l => String(l.tipe_scan||'').toUpperCase() === 'RETURN');
-                                
-                                if (!hasExit) mobilitas = 'Belum Keluar';
-                                else if (hasExit && !returnLog) mobilitas = 'Masih Di Luar';
-                                else if (returnLog) {
-                                    if (String(returnLog.keterangan||'').toUpperCase().includes('TERLAMBAT')) mobilitas = 'Terlambat';
-                                    else mobilitas = 'Tepat Waktu';
-                                }
-                            }
-
-                            return {
-                                ...p,
-                                _bulan_filter: getBulanTahun(p.tanggal_izin),
-                                _status_mobilitas: mobilitas
-                            };
-                        });
-
-                        setPermits(dataWithMobilitas); 
-                    } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
-                };
-                fetchPermits();
-            }, []);
-
-            const bulanOptions = [...new Set(permits.map(p => p._bulan_filter).filter(b => b && b !== '-'))];
-            const kelasOptions = [...new Set(permits.map(p => p.kelas).filter(Boolean))].sort();
-
-            // 1. FILTERING
-            const filteredPermits = permits.filter(p => {
-                const nama = String(p.nama_santri || '').toLowerCase();
-                const kelas = String(p.kelas || '');
-                const status = String(p.status_pengajuan || '').toUpperCase();
-                const bulan = String(p._bulan_filter || '');
-                const mobilitas = String(p._status_mobilitas || '');
+    useEffect(() => {
+        const fetchPermits = async () => {
+            try { 
+                const [resPermits, resLogs] = await Promise.all([
+                    apiService.request('getPermits'),
+                    apiService.request('getScanLogs')
+                ]);
                 
-                return (
-                    nama.includes(searchTerm.toLowerCase()) &&
-                    (filterBulan === '' || bulan === filterBulan) &&
-                    (filterKelas === '' || kelas === filterKelas) &&
-                    (filterStatus === '' || status.includes(filterStatus)) &&
-                    (filterMobilitas === '' || mobilitas === filterMobilitas)
-                );
-            });
+                let finalPermits = [];
+                if (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) finalPermits = resPermits.data.data;
+                else if (resPermits && Array.isArray(resPermits.data)) finalPermits = resPermits.data;
+                else if (Array.isArray(resPermits)) finalPermits = resPermits;
 
-            // 2. SORTING
-            const sortedPermits = [...filteredPermits].sort((a, b) => {
-                if (!sortConfig.key) return 0;
-                let aValue = a[sortConfig.key] || '';
-                let bValue = b[sortConfig.key] || '';
-                if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-                if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-                if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-                if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-                return 0;
-            });
+                let finalLogs = [];
+                if (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) finalLogs = resLogs.data.data;
+                else if (resLogs && Array.isArray(resLogs.data)) finalLogs = resLogs.data;
+                else if (Array.isArray(resLogs)) finalLogs = resLogs;
 
-            const handleSort = (key) => {
-                let direction = 'asc';
-                if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
-                setSortConfig({ key, direction });
-            };
+                const dataWithMobilitas = finalPermits.map(p => {
+                    let mobilitas = '-';
+                    if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
+                        const pId = p.permit_id || p.id || p.id_perizinan;
+                        const myLogs = finalLogs.filter(l => l.permit_id === pId || l.id_perizinan === pId);
+                        const hasExit = myLogs.some(l => String(l.tipe_scan||'').toUpperCase() === 'EXIT');
+                        const returnLog = myLogs.find(l => String(l.tipe_scan||'').toUpperCase() === 'RETURN');
+                        
+                        if (!hasExit) mobilitas = 'Belum Keluar';
+                        else if (hasExit && !returnLog) mobilitas = 'Masih Di Luar';
+                        else if (returnLog) {
+                            if (String(returnLog.keterangan||'').toUpperCase().includes('TERLAMBAT')) mobilitas = 'Terlambat';
+                            else mobilitas = 'Tepat Waktu';
+                        }
+                    }
 
-            const SortIcon = ({ columnKey }) => {
-                if (sortConfig.key !== columnKey) return <span className="text-gray-300 ml-1">↕</span>;
-                return sortConfig.direction === 'asc' ? <span className="text-emerald-600 ml-1">▲</span> : <span className="text-emerald-600 ml-1">▼</span>;
-            };
+                    return {
+                        ...p,
+                        _bulan_filter: getBulanTahun(p.tanggal_izin),
+                        _status_mobilitas: mobilitas
+                    };
+                });
 
-            const getStatusBadge = (status) => {
-                if (!status) return <span className="bg-gray-100 px-2 py-1 text-xs font-bold rounded-full border">-</span>;
-                const styles = { 'MENUNGGU': 'bg-yellow-100 text-yellow-800 border-yellow-200', 'MENUNGGU_APPROVAL': 'bg-yellow-100 text-yellow-800 border-yellow-200', 'DISETUJUI': 'bg-emerald-100 text-emerald-800 border-emerald-200', 'DITOLAK': 'bg-red-100 text-red-800 border-red-200', 'SELESAI': 'bg-gray-100 text-gray-800 border-gray-200' };
-                const st = status.toUpperCase();
-                return <span className={`px-2 py-1 text-xs font-bold rounded-full border ${styles[st] || 'bg-gray-100'}`}>{st.replace('_', ' ')}</span>;
-            };
-
-            const getMobilityBadge = (mobilitas) => {
-                if (mobilitas === '-') return <span className="text-gray-400">-</span>;
-                if (mobilitas === 'Belum Keluar') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-gray-100 text-gray-600 border border-gray-200">BELUM KELUAR</span>;
-                if (mobilitas === 'Masih Di Luar') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-orange-100 text-orange-600 border border-orange-200">MASIH DI LUAR</span>;
-                if (mobilitas === 'Tepat Waktu') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-emerald-100 text-emerald-700 border border-emerald-200">TEPAT WAKTU</span>;
-                if (mobilitas === 'Terlambat') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-red-100 text-red-700 border border-red-200">TERLAMBAT</span>;
-                return <span>{mobilitas}</span>;
-            };
-
-            return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-800">Riwayat Seluruh Perizinan</h2>
-                        <p className="text-gray-500">Arsip global seluruh pengajuan izin santri lintas kelas untuk pelaporan Mudir.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                        <input 
-                            type="text" placeholder="Cari Nama Santri..." 
-                            className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium"
-                            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterBulan} onChange={(e) => setFilterBulan(e.target.value)}>
-                            <option value="">Semua Bulan</option>
-                            {bulanOptions.map((b, idx) => <option key={idx} value={b}>{b}</option>)}
-                        </select>
-                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterKelas} onChange={(e) => setFilterKelas(e.target.value)}>
-                            <option value="">Semua Kelas</option>
-                            {kelasOptions.map((k, idx) => <option key={idx} value={k}>{k}</option>)}
-                        </select>
-                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                            <option value="">Semua Status Approval</option>
-                            <option value="MENUNGGU_APPROVAL">Menunggu</option>
-                            <option value="DISETUJUI">Disetujui</option>
-                            <option value="DITOLAK">Ditolak</option>
-                            <option value="SELESAI">Selesai</option>
-                        </select>
-                        <select className="w-full p-2.5 border rounded-lg bg-emerald-50 outline-none text-sm font-bold text-emerald-800" value={filterMobilitas} onChange={(e) => setFilterMobilitas(e.target.value)}>
-                            <option value="">Semua Posisi Santri</option>
-                            <option value="Masih Di Luar">Masih Di Luar</option>
-                            <option value="Tepat Waktu">Kembali Tepat Waktu</option>
-                            <option value="Terlambat">Terlambat</option>
-                            <option value="Belum Keluar">Belum Keluar</option>
-                        </select>
-                    </div>
-
-                    <div className="text-sm text-gray-500">
-                        Menampilkan <span className="font-bold text-emerald-600">{sortedPermits.length}</span> data riwayat perizinan.
-                    </div>
-
-                    <Card className="overflow-x-auto p-0">
-                        <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
-                            <thead>
-                                <tr className="bg-emerald-50 text-emerald-800 border-b">
-                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('tanggal_izin')}>
-                                        Tgl Izin <SortIcon columnKey="tanggal_izin"/>
-                                    </th>
-                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('nama_santri')}>
-                                        Santri & Kelas <SortIcon columnKey="nama_santri"/>
-                                    </th>
-                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('keperluan')}>
-                                        Keperluan <SortIcon columnKey="keperluan"/>
-                                    </th>
-                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_jadwal')}>
-                                        Status Jadwal <SortIcon columnKey="status_jadwal"/>
-                                    </th>
-                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_pengajuan')}>
-                                        Status Approval <SortIcon columnKey="status_pengajuan"/>
-                                    </th>
-                                    <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-200 bg-emerald-100/50" onClick={() => handleSort('_status_mobilitas')}>
-                                        Posisi Santri <SortIcon columnKey="_status_mobilitas"/>
-                                    </th>
-                                    <th className="p-4 font-semibold">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {loading ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Memuat data arsip...</td></tr> : 
-                                 sortedPermits.length === 0 ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Tidak ada data yang sesuai pencarian.</td></tr> :
-                                 sortedPermits.map((p, idx) => (
-                                    <tr key={idx} className="hover:bg-gray-50">
-                                        <td className="p-4 font-medium text-gray-800">{p.tanggal_izin}</td>
-                                        <td className="p-4">
-                                            <p className="font-bold text-gray-800">{p.nama_santri}</p>
-                                            <p className="text-xs text-emerald-600 font-medium">{p.kelas}</p>
-                                        </td>
-                                        <td className="p-4 max-w-[250px] whitespace-normal break-words" title={p.keperluan}>
-                                            <p className="font-medium text-gray-800">{p.keperluan || '-'}</p>
-                                            <p className="text-[11px] text-gray-500 mt-1 leading-tight">
-                                            Penjemput: <span className="font-medium text-gray-700">{p.wali_safar}</span> ({p.hubungan_wali})
-                                            </p>
-                                        </td>
-                                        <td className="p-4">
-                                            <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
-                                                {p.status_jadwal ? p.status_jadwal.toUpperCase() : 'TIDAK DIKETAHUI'}
-                                            </span>
-                                            {(p.ikut_jadwal_saudara === 'Ya' || p.ikut_jadwal_saudara === true || p.ikut_jadwal_saudara === 'TRUE') && (
-                                                <p className="text-[10px] text-orange-600 mt-1.5 font-bold italic">
-                                                    (Ikut Izin Saudara)
-                                                </p>
-                                            )}
-                                        </td>
-                                        <td className="p-4">{getStatusBadge(p.status_pengajuan)}</td>
-                                        <td className="p-4 bg-emerald-50/20">{getMobilityBadge(p._status_mobilitas)}</td>
-                                        <td className="p-4">
-                                            {p.status_pengajuan === 'DISETUJUI' ? 
-                                                <button onClick={() => setSelectedQrPermit(p)} className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 shadow-sm transition-colors cursor-pointer">Lihat QR</button> 
-                                                : <span className="text-xs text-gray-400">-</span>
-                                            }
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </Card>
-                    <QrCardModal isOpen={!!selectedQrPermit} onClose={() => setSelectedQrPermit(null)} permit={selectedQrPermit} />
-                </div>
-            );
+                setPermits(dataWithMobilitas); 
+            } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
         };
+        fetchPermits();
+    }, []);
+
+    const bulanOptions = [...new Set(permits.map(p => p._bulan_filter).filter(b => b && b !== '-'))];
+    const kelasOptions = [...new Set(permits.map(p => p.kelas).filter(Boolean))].sort();
+
+    // --- RUMUS KALENDER PONDOK (Sabtu-Jumat) ---
+    const now = new Date();
+    const jsDay = now.getDay();
+    const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
+    const startOfWeek = new Date(now);
+    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(now.getDate() - diffToSaturday);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+    // -------------------------------------------
+
+    // 1. FILTERING
+    const filteredPermits = permits.filter(p => {
+        const nama = String(p.nama_santri || '').toLowerCase();
+        const kelas = String(p.kelas || '');
+        const status = String(p.status_pengajuan || '').toUpperCase();
+        const bulan = String(p._bulan_filter || '');
+        const mobilitas = String(p._status_mobilitas || '');
+        
+        // --- LOGIKA FILTER TAB ---
+        let isTabMatch = true;
+        if (activeTab === 'pekan_ini') {
+            const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
+            let pDate = new Date(rawDate);
+            
+            if (isNaN(pDate) && typeof rawDate === 'string' && rawDate.includes('/')) {
+                const parts = rawDate.split('/');
+                if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+            }
+            
+            if (!isNaN(pDate)) {
+                isTabMatch = (pDate >= startOfWeek && pDate <= endOfWeek);
+            } else {
+                isTabMatch = false;
+            }
+        }
+        // -------------------------
+
+        return (
+            isTabMatch &&
+            nama.includes(searchTerm.toLowerCase()) &&
+            (filterBulan === '' || bulan === filterBulan) &&
+            (filterKelas === '' || kelas === filterKelas) &&
+            (filterStatus === '' || status.includes(filterStatus)) &&
+            (filterMobilitas === '' || mobilitas === filterMobilitas)
+        );
+    });
+
+    // 2. SORTING
+    const sortedPermits = [...filteredPermits].sort((a, b) => {
+        if (!sortConfig.key) return 0;
+        let aValue = a[sortConfig.key] || '';
+        let bValue = b[sortConfig.key] || '';
+        if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+        if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+        setSortConfig({ key, direction });
+    };
+
+    const SortIcon = ({ columnKey }) => {
+        if (sortConfig.key !== columnKey) return <span className="text-gray-300 ml-1">↕</span>;
+        return sortConfig.direction === 'asc' ? <span className="text-emerald-600 ml-1">▲</span> : <span className="text-emerald-600 ml-1">▼</span>;
+    };
+
+    const getStatusBadge = (status) => {
+        if (!status) return <span className="bg-gray-100 px-2 py-1 text-xs font-bold rounded-full border">-</span>;
+        const styles = { 'MENUNGGU': 'bg-yellow-100 text-yellow-800 border-yellow-200', 'MENUNGGU_APPROVAL': 'bg-yellow-100 text-yellow-800 border-yellow-200', 'DISETUJUI': 'bg-emerald-100 text-emerald-800 border-emerald-200', 'DITOLAK': 'bg-red-100 text-red-800 border-red-200', 'SELESAI': 'bg-gray-100 text-gray-800 border-gray-200' };
+        const st = status.toUpperCase();
+        return <span className={`px-2 py-1 text-xs font-bold rounded-full border ${styles[st] || 'bg-gray-100'}`}>{st.replace('_', ' ')}</span>;
+    };
+
+    const getMobilityBadge = (mobilitas) => {
+        if (mobilitas === '-') return <span className="text-gray-400">-</span>;
+        if (mobilitas === 'Belum Keluar') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-gray-100 text-gray-600 border border-gray-200">BELUM KELUAR</span>;
+        if (mobilitas === 'Masih Di Luar') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-orange-100 text-orange-600 border border-orange-200">MASIH DI LUAR</span>;
+        if (mobilitas === 'Tepat Waktu') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-emerald-100 text-emerald-700 border border-emerald-200">TEPAT WAKTU</span>;
+        if (mobilitas === 'Terlambat') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-red-100 text-red-700 border border-red-200">TERLAMBAT</span>;
+        return <span>{mobilitas}</span>;
+    };
+
+    return (
+        <div className="space-y-6 animate-fade-in-down">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800">Riwayat Seluruh Perizinan</h2>
+                    <p className="text-gray-500">Arsip global seluruh pengajuan izin santri lintas kelas untuk pelaporan Mudir.</p>
+                </div>
+
+                {/* --- UI SWITCH TAB --- */}
+                <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 shadow-inner w-full md:w-auto">
+                    <button 
+                        onClick={() => setActiveTab('pekan_ini')}
+                        className={`flex-1 md:flex-none px-6 py-2 text-sm font-bold rounded-md transition-all duration-200 ${activeTab === 'pekan_ini' ? 'bg-white text-emerald-700 shadow border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Pekan Ini
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('semua')}
+                        className={`flex-1 md:flex-none px-6 py-2 text-sm font-bold rounded-md transition-all duration-200 ${activeTab === 'semua' ? 'bg-white text-emerald-700 shadow border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Semua Riwayat
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <input 
+                    type="text" placeholder="Cari Nama Santri..." 
+                    className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium"
+                    value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterBulan} onChange={(e) => setFilterBulan(e.target.value)}>
+                    <option value="">Semua Bulan</option>
+                    {bulanOptions.map((b, idx) => <option key={idx} value={b}>{b}</option>)}
+                </select>
+                <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterKelas} onChange={(e) => setFilterKelas(e.target.value)}>
+                    <option value="">Semua Kelas</option>
+                    {kelasOptions.map((k, idx) => <option key={idx} value={k}>{k}</option>)}
+                </select>
+                <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                    <option value="">Semua Status Approval</option>
+                    <option value="MENUNGGU_APPROVAL">Menunggu</option>
+                    <option value="DISETUJUI">Disetujui</option>
+                    <option value="DITOLAK">Ditolak</option>
+                    <option value="SELESAI">Selesai</option>
+                </select>
+                <select className="w-full p-2.5 border rounded-lg bg-emerald-50 outline-none text-sm font-bold text-emerald-800" value={filterMobilitas} onChange={(e) => setFilterMobilitas(e.target.value)}>
+                    <option value="">Semua Posisi Santri</option>
+                    <option value="Masih Di Luar">Masih Di Luar</option>
+                    <option value="Tepat Waktu">Kembali Tepat Waktu</option>
+                    <option value="Terlambat">Terlambat</option>
+                    <option value="Belum Keluar">Belum Keluar</option>
+                </select>
+            </div>
+
+            <div className="text-sm text-gray-500">
+                Menampilkan <span className="font-bold text-emerald-600">{sortedPermits.length}</span> data riwayat perizinan
+                {activeTab === 'pekan_ini' ? ' untuk pekan berjalan.' : ' dari total keseluruhan.'}
+            </div>
+
+            <Card className="overflow-x-auto p-0">
+                <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+                    <thead>
+                        <tr className="bg-emerald-50 text-emerald-800 border-b">
+                            <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('tanggal_izin')}>
+                                Tgl Izin <SortIcon columnKey="tanggal_izin"/>
+                            </th>
+                            <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('nama_santri')}>
+                                Santri & Kelas <SortIcon columnKey="nama_santri"/>
+                            </th>
+                            <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('keperluan')}>
+                                Keperluan <SortIcon columnKey="keperluan"/>
+                            </th>
+                            <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_jadwal')}>
+                                Status Jadwal <SortIcon columnKey="status_jadwal"/>
+                            </th>
+                            <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-100" onClick={() => handleSort('status_pengajuan')}>
+                                Status Approval <SortIcon columnKey="status_pengajuan"/>
+                            </th>
+                            <th className="p-4 font-semibold cursor-pointer select-none hover:bg-emerald-200 bg-emerald-100/50" onClick={() => handleSort('_status_mobilitas')}>
+                                Posisi Santri <SortIcon columnKey="_status_mobilitas"/>
+                            </th>
+                            <th className="p-4 font-semibold">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {loading ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Memuat data arsip...</td></tr> : 
+                         sortedPermits.length === 0 ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Tidak ada data yang sesuai pencarian.</td></tr> :
+                         sortedPermits.map((p, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50">
+                                <td className="p-4 font-medium text-gray-800">{p.tanggal_izin}</td>
+                                <td className="p-4">
+                                    <p className="font-bold text-gray-800">{p.nama_santri}</p>
+                                    <p className="text-xs text-emerald-600 font-medium">{p.kelas}</p>
+                                </td>
+                                <td className="p-4 max-w-[250px] whitespace-normal break-words" title={p.keperluan}>
+                                    <p className="font-medium text-gray-800">{p.keperluan || '-'}</p>
+                                    <p className="text-[11px] text-gray-500 mt-1 leading-tight">
+                                    Penjemput: <span className="font-medium text-gray-700">{p.wali_safar}</span> ({p.hubungan_wali})
+                                    </p>
+                                </td>
+                                <td className="p-4">
+                                    <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
+                                        {p.status_jadwal ? p.status_jadwal.toUpperCase() : 'TIDAK DIKETAHUI'}
+                                    </span>
+                                    {(p.ikut_jadwal_saudara === 'Ya' || p.ikut_jadwal_saudara === true || p.ikut_jadwal_saudara === 'TRUE') && (
+                                        <p className="text-[10px] text-orange-600 mt-1.5 font-bold italic">
+                                            (Ikut Izin Saudara)
+                                        </p>
+                                    )}
+                                </td>
+                                <td className="p-4">{getStatusBadge(p.status_pengajuan)}</td>
+                                <td className="p-4 bg-emerald-50/20">{getMobilityBadge(p._status_mobilitas)}</td>
+                                <td className="p-4">
+                                    {p.status_pengajuan === 'DISETUJUI' ? 
+                                        <button onClick={() => setSelectedQrPermit(p)} className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 shadow-sm transition-colors cursor-pointer">Lihat QR</button> 
+                                        : <span className="text-xs text-gray-400">-</span>
+                                    }
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </Card>
+            <QrCardModal isOpen={!!selectedQrPermit} onClose={() => setSelectedQrPermit(null)} permit={selectedQrPermit} />
+        </div>
+    );
+};
              
         // --- KOMPONEN BANTUAN UNTUK TABEL REKAP ---
         const RekapRow = ({ periode, ajuan, tepatWaktu, terlambat }) => (
@@ -2874,336 +2981,298 @@ const DashboardSecurity = ({ setCurrentRoute }) => {
 };
 
         const SemuaPerizinanPage = () => {
-            const { showToast } = useContext(ToastContext);
-            const [permits, setPermits] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [selectedQrPermit, setSelectedQrPermit] = useState(null); // Ditambahkan agar fitur Lihat QR berjalan
+    const { showToast } = useContext(ToastContext);
+    const [permits, setPermits] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedQrPermit, setSelectedQrPermit] = useState(null);
 
-            // --- STATE UNTUK PENCARIAN & FILTER ---
-            const [searchTerm, setSearchTerm] = useState('');
-            const [filterBulan, setFilterBulan] = useState('');
-            const [filterKelas, setFilterKelas] = useState('');
-            const [filterStatus, setFilterStatus] = useState('');
-            const [filterMobilitas, setFilterMobilitas] = useState('');
+    // --- TAB STATE BARU ---
+    const [activeTab, setActiveTab] = useState('pekan_ini'); // Default langsung fokus ke minggu ini
 
-            // --- STATE UNTUK SORTING (PENGURUTAN) ---
-            const [sortConfig, setSortConfig] = useState({ key: 'tanggal_izin', direction: 'desc' });
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterBulan, setFilterBulan] = useState('');
+    const [filterKelas, setFilterKelas] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+    const [filterMobilitas, setFilterMobilitas] = useState('');
 
-            const getBulanTahun = (tgl) => {
-                if (!tgl) return '-';
-                const strTgl = String(tgl).trim();
-                const d = new Date(strTgl);
-                if (!isNaN(d.getTime())) return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-                const parts = strTgl.split(/[\/\- ]/);
-                if (parts.length >= 3) {
-                    const monthNames = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-                    let m = parseInt(parts[1], 10);
-                    let y = parts[2].length === 4 ? parts[2] : (parts[0].length === 4 ? parts[0] : parts[2]); 
-                    if (m >= 1 && m <= 12 && String(y).length === 4) return `${monthNames[m]} ${y}`;
-                }
-                return strTgl; 
-            };
+    const [sortConfig, setSortConfig] = useState({ key: 'tanggal_izin', direction: 'desc' });
 
-            useEffect(() => {
-                const fetchPermits = async () => {
-                    try { 
-                        const [resPermits, resLogs] = await Promise.all([
-                            apiService.request('getPermits'),
-                            apiService.request('getScanLogs')
-                        ]);
-                        
-                        let finalData = [];
-                        if (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) finalData = resPermits.data.data;
-                        else if (resPermits && Array.isArray(resPermits.data)) finalData = resPermits.data;
-                        else if (Array.isArray(resPermits)) finalData = resPermits;
+    const getBulanTahun = (tgl) => {
+        if (!tgl) return '-';
+        const strTgl = String(tgl).trim();
+        const d = new Date(strTgl);
+        if (!isNaN(d.getTime())) return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+        const parts = strTgl.split(/[\/\- ]/);
+        if (parts.length >= 3) {
+            const monthNames = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            let m = parseInt(parts[1], 10);
+            let y = parts[2].length === 4 ? parts[2] : (parts[0].length === 4 ? parts[0] : parts[2]); 
+            if (m >= 1 && m <= 12 && String(y).length === 4) return `${monthNames[m]} ${y}`;
+        }
+        return strTgl; 
+    };
 
-                        let finalLogs = [];
-                        if (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) finalLogs = resLogs.data.data;
-                        else if (resLogs && Array.isArray(resLogs.data)) finalLogs = resLogs.data;
-                        else if (Array.isArray(resLogs)) finalLogs = resLogs;
-                        
-                        const dataWithMobility = finalData.map(p => {
-                            let mobilitas = '-';
-                            if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
-                                const pId = p.permit_id || p.id || p.id_perizinan;
-                                const myLogs = finalLogs.filter(l => l.permit_id === pId || l.id_perizinan === pId);
-                                const hasExit = myLogs.some(l => String(l.tipe_scan||'').toUpperCase() === 'EXIT');
-                                const returnLog = myLogs.find(l => String(l.tipe_scan||'').toUpperCase() === 'RETURN');
-                                
-                                if (!hasExit) mobilitas = 'Belum Keluar';
-                                else if (hasExit && !returnLog) mobilitas = 'Masih Di Luar';
-                                else if (returnLog) {
-                                    if (String(returnLog.keterangan||'').toUpperCase().includes('TERLAMBAT')) mobilitas = 'Terlambat';
-                                    else mobilitas = 'Tepat Waktu';
-                                }
-                            }
-
-                            return {
-                                ...p,
-                                _bulan_filter: getBulanTahun(p.tanggal_izin),
-                                _status_mobilitas: mobilitas
-                            };
-                        });
-                        setPermits(dataWithMobility); 
-                    } catch (e) { showToast(e.message, 'error'); } 
-                    finally { setLoading(false); }
-                };
-                fetchPermits();
-            }, []);
-
-            const bulanOptions = [...new Set(permits.map(p => p._bulan_filter).filter(b => b && b !== '-'))];
-            const kelasOptions = [...new Set(permits.map(p => p.kelas).filter(Boolean))].sort();
-
-            const filteredPermits = permits.filter(p => {
-                const nama = String(p.nama_santri || '').toLowerCase();
-                const kelas = String(p.kelas || '');
-                const status = String(p.status_pengajuan || '').toUpperCase();
-                const bulan = String(p._bulan_filter || '');
-                const mobilitas = String(p._status_mobilitas || '');
+    useEffect(() => {
+        const fetchPermits = async () => {
+            try { 
+                const [resPermits, resLogs] = await Promise.all([
+                    apiService.request('getPermits'),
+                    apiService.request('getScanLogs')
+                ]);
                 
-                return (
-                    nama.includes(searchTerm.toLowerCase()) &&
-                    (filterBulan === '' || bulan === filterBulan) &&
-                    (filterKelas === '' || kelas === filterKelas) &&
-                    (filterStatus === '' || status.includes(filterStatus)) &&
-                    (filterMobilitas === '' || mobilitas === filterMobilitas)
-                );
-            });
+                let finalData = [];
+                if (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) finalData = resPermits.data.data;
+                else if (resPermits && Array.isArray(resPermits.data)) finalData = resPermits.data;
+                else if (Array.isArray(resPermits)) finalData = resPermits;
 
-            const sortedPermits = [...filteredPermits].sort((a, b) => {
-                if (!sortConfig.key) return 0;
-                let aValue = a[sortConfig.key] || '';
-                let bValue = b[sortConfig.key] || '';
+                let finalLogs = [];
+                if (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) finalLogs = resLogs.data.data;
+                else if (resLogs && Array.isArray(resLogs.data)) finalLogs = resLogs.data;
+                else if (Array.isArray(resLogs)) finalLogs = resLogs;
+                
+                const dataWithMobility = finalData.map(p => {
+                    let mobilitas = '-';
+                    if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
+                        const pId = p.permit_id || p.id || p.id_perizinan;
+                        const myLogs = finalLogs.filter(l => l.permit_id === pId || l.id_perizinan === pId);
+                        const hasExit = myLogs.some(l => String(l.tipe_scan||'').toUpperCase() === 'EXIT');
+                        const returnLog = myLogs.find(l => String(l.tipe_scan||'').toUpperCase() === 'RETURN');
+                        
+                        if (!hasExit) mobilitas = 'Belum Keluar';
+                        else if (hasExit && !returnLog) mobilitas = 'Masih Di Luar';
+                        else if (returnLog) {
+                            if (String(returnLog.keterangan||'').toUpperCase().includes('TERLAMBAT')) mobilitas = 'Terlambat';
+                            else mobilitas = 'Tepat Waktu';
+                        }
+                    }
 
-                if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-                if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-
-                if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-                if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-                return 0;
-            });
-
-            const handleSort = (key) => {
-                let direction = 'asc';
-                if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
-                setSortConfig({ key, direction });
-            };
-
-            const SortIcon = ({ columnKey }) => {
-                if (sortConfig.key !== columnKey) return <span className="text-gray-300 ml-1">↕</span>;
-                return sortConfig.direction === 'asc' ? <span className="text-emerald-600 ml-1">▲</span> : <span className="text-emerald-600 ml-1">▼</span>;
-            };
-
-            const getStatusBadge = (status) => {
-                if (!status) return <span className="bg-gray-100 px-2 py-1 text-xs font-bold rounded-full border">-</span>;
-                const styles = { 'MENUNGGU': 'bg-yellow-100 text-yellow-800 border-yellow-200', 'MENUNGGU_APPROVAL': 'bg-yellow-100 text-yellow-800 border-yellow-200', 'DISETUJUI': 'bg-emerald-100 text-emerald-800 border-emerald-200', 'DITOLAK': 'bg-red-100 text-red-800 border-red-200', 'SELESAI': 'bg-gray-100 text-gray-800 border-gray-200' };
-                const st = status.toUpperCase();
-                return <span className={`px-2 py-1 text-xs font-bold rounded-full border ${styles[st] || 'bg-gray-100'}`}>{st.replace('_', ' ')}</span>;
-            };
-
-            const getMobilityBadge = (mobilitas) => {
-                if (mobilitas === '-') return <span className="text-gray-400">-</span>;
-                if (mobilitas === 'Belum Keluar') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-gray-100 text-gray-600 border border-gray-200">BELUM KELUAR</span>;
-                if (mobilitas === 'Masih Di Luar') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-orange-100 text-orange-600 border border-orange-200">MASIH DI LUAR</span>;
-                if (mobilitas === 'Tepat Waktu') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-emerald-100 text-emerald-700 border border-emerald-200">TEPAT WAKTU</span>;
-                if (mobilitas === 'Terlambat') return <span className="px-2 py-1 text-[10px] font-bold rounded bg-red-100 text-red-700 border border-red-200">TERLAMBAT</span>;
-                return <span>{mobilitas}</span>;
-            };
-
-            return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-4">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-800">Laporan Semua Perizinan</h2>
-                            <p className="text-gray-500">Data seluruh pengajuan izin dan pantauan posisi santri lintas kelas.</p>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                        <input 
-                            type="text" placeholder="Cari Nama Santri..." 
-                            className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium"
-                            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterBulan} onChange={(e) => setFilterBulan(e.target.value)}>
-                            <option value="">Semua Bulan</option>
-                            {bulanOptions.map((b, idx) => <option key={idx} value={b}>{b}</option>)}
-                        </select>
-                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterKelas} onChange={(e) => setFilterKelas(e.target.value)}>
-                            <option value="">Semua Kelas</option>
-                            {kelasOptions.map((k, idx) => <option key={idx} value={k}>{k}</option>)}
-                        </select>
-                        <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                            <option value="">Semua Status Approval</option>
-                            <option value="MENUNGGU">Menunggu</option>
-                            <option value="DISETUJUI">Disetujui</option>
-                            <option value="DITOLAK">Ditolak</option>
-                            <option value="SELESAI">Selesai</option>
-                        </select>
-                        <select className="w-full p-2.5 border rounded-lg bg-emerald-50 outline-none text-sm font-bold text-emerald-800" value={filterMobilitas} onChange={(e) => setFilterMobilitas(e.target.value)}>
-                            <option value="">Semua Posisi Santri</option>
-                            <option value="Masih Di Luar">Masih Di Luar</option>
-                            <option value="Tepat Waktu">Kembali Tepat Waktu</option>
-                            <option value="Terlambat">Terlambat</option>
-                            <option value="Belum Keluar">Belum Keluar</option>
-                        </select>
-                    </div>
-
-                    <div className="text-sm text-gray-500">
-                        Menampilkan <span className="font-bold text-emerald-600">{sortedPermits.length}</span> dari {permits.length} perizinan
-                    </div>
-
-                    <Card className="overflow-x-auto p-0">
-                        <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
-                            <thead>
-                                <tr className="bg-emerald-50 text-emerald-800 border-b">
-                                    <th className="p-4 cursor-pointer hover:bg-emerald-100 transition-colors select-none" onClick={() => handleSort('tanggal_izin')}>
-                                        Tgl Izin <SortIcon columnKey="tanggal_izin" />
-                                    </th>
-                                    <th className="p-4 cursor-pointer hover:bg-emerald-100 transition-colors select-none" onClick={() => handleSort('nama_santri')}>
-                                        Santri & Kelas <SortIcon columnKey="nama_santri" />
-                                    </th>
-                                    <th className="p-4 cursor-pointer hover:bg-emerald-100 transition-colors select-none" onClick={() => handleSort('keperluan')}>
-                                        Keperluan <SortIcon columnKey="keperluan" />
-                                    </th>
-                                    <th className="p-4 cursor-pointer hover:bg-emerald-100 transition-colors select-none" onClick={() => handleSort('status_jadwal')}>
-                                        Penjadwalan <SortIcon columnKey="status_jadwal" />
-                                    </th>
-                                    <th className="p-4 cursor-pointer hover:bg-emerald-100 transition-colors select-none" onClick={() => handleSort('status_pengajuan')}>
-                                        Status ACC <SortIcon columnKey="status_pengajuan" />
-                                    </th>
-                                    <th className="p-4 cursor-pointer hover:bg-emerald-200 transition-colors select-none bg-emerald-100/50" onClick={() => handleSort('_status_mobilitas')}>
-                                        Posisi Santri <SortIcon columnKey="_status_mobilitas" />
-                                    </th>
-                                    <th className="p-4 font-semibold">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {loading ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Memuat data...</td></tr> : 
-                                 sortedPermits.length === 0 ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Tidak ada data perizinan.</td></tr> :
-                                 
-                                 sortedPermits.map((p, idx) => (
-                                    <tr key={idx} className="hover:bg-gray-50">
-                                        <td className="p-4">{p.tanggal_izin}</td>
-                                        <td className="p-4">
-                                            <p className="font-bold text-gray-800">{p.nama_santri}</p>
-                                            <p className="text-xs text-emerald-600 font-medium">{p.kelas}</p>
-                                        </td>
-                                        <td className="p-4 max-w-[250px] whitespace-normal break-words" title={p.keperluan}>
-                                            <p className="font-medium text-gray-800">{p.keperluan || '-'}</p>
-                                            <p className="text-[11px] text-gray-500 mt-1 leading-tight">
-                                            Penjemput: <span className="font-medium text-gray-700">{p.wali_safar}</span> ({p.hubungan_wali})
-                                            </p>
-                                        </td>
-                                        <td className="p-4">
-                                            <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
-                                                {p.status_jadwal ? p.status_jadwal.toUpperCase() : 'TIDAK DIKETAHUI'}
-                                            </span>
-                                            {(p.ikut_jadwal_saudara === 'Ya' || p.ikut_jadwal_saudara === true || p.ikut_jadwal_saudara === 'TRUE') && (
-                                                <p className="text-[10px] text-orange-600 mt-1.5 font-bold italic">
-                                                    (Ikut Izin Saudara)
-                                                </p>
-                                            )}
-                                        </td>
-                                        <td className="p-4">{getStatusBadge(p.status_pengajuan)}</td>
-                                        <td className="p-4 bg-emerald-50/20">{getMobilityBadge(p._status_mobilitas)}</td>
-                                        <td className="p-4">
-                                            {p.status_pengajuan === 'DISETUJUI' ? 
-                                                <button onClick={() => setSelectedQrPermit(p)} className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 shadow-sm transition-colors cursor-pointer">Lihat QR</button> 
-                                                : <span className="text-xs text-gray-400">-</span>
-                                            }
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </Card>
-                    <QrCardModal isOpen={!!selectedQrPermit} onClose={() => setSelectedQrPermit(null)} permit={selectedQrPermit} />
-                </div>
-            );
+                    return {
+                        ...p,
+                        _bulan_filter: getBulanTahun(p.tanggal_izin),
+                        _status_mobilitas: mobilitas
+                    };
+                });
+                setPermits(dataWithMobility); 
+            } catch (e) { showToast(e.message, 'error'); } 
+            finally { setLoading(false); }
         };
+        fetchPermits();
+    }, []);
+
+    const bulanOptions = [...new Set(permits.map(p => p._bulan_filter).filter(b => b && b !== '-'))];
+    const kelasOptions = [...new Set(permits.map(p => p.kelas).filter(Boolean))].sort();
+
+    // --- RUMUS KALENDER DI LUAR FILTER (AGAR TIDAK LAG) ---
+    const now = new Date();
+    const jsDay = now.getDay();
+    const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
+    const startOfWeek = new Date(now);
+    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(now.getDate() - diffToSaturday);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+    // ------------------------------------------------------
+
+    const filteredPermits = permits.filter(p => {
+        const nama = String(p.nama_santri || '').toLowerCase();
+        const kelas = String(p.kelas || '');
+        const status = String(p.status_pengajuan || '').toUpperCase();
+        const bulan = String(p._bulan_filter || '');
+        const mobilitas = String(p._status_mobilitas || '');
+        
+        // --- LOGIKA FILTER TAB ---
+        let isTabMatch = true;
+        if (activeTab === 'pekan_ini') {
+            const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
+            let pDate = new Date(rawDate);
+            
+            if (isNaN(pDate) && typeof rawDate === 'string' && rawDate.includes('/')) {
+                const parts = rawDate.split('/');
+                if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+            }
+            
+            if (!isNaN(pDate)) {
+                isTabMatch = (pDate >= startOfWeek && pDate <= endOfWeek);
+            } else {
+                isTabMatch = false;
+            }
+        }
+        // -------------------------
+
+        return (
+            isTabMatch &&
+            nama.includes(searchTerm.toLowerCase()) &&
+            (filterBulan === '' || bulan === filterBulan) &&
+            (filterKelas === '' || kelas === filterKelas) &&
+            (filterStatus === '' || status.includes(filterStatus)) &&
+            (filterMobilitas === '' || mobilitas === filterMobilitas)
+        );
+    });
+
+    const sortedPermits = [...filteredPermits].sort((a, b) => {
+        if (!sortConfig.key) return 0;
+        let aValue = a[sortConfig.key] || '';
+        let bValue = b[sortConfig.key] || '';
+
+        if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+        if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+
+        if (aValue < bValue) return sortConfig.direction === 'asc'
 
         // --- RIWAYAT SCAN PAGE ---
         const RiwayatScanPage = () => {
-            const { showToast } = useContext(ToastContext);
-            const [logs, setLogs] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [searchTerm, setSearchTerm] = useState('');
+    const { showToast } = useContext(ToastContext);
+    const [logs, setLogs] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
 
-            useEffect(() => {
-                const fetchLogs = async () => {
-                    try { 
-                        const res = await apiService.request('getScanLogs'); 
-                        let finalLogs = [];
-                        if (res && res.data && Array.isArray(res.data.data)) finalLogs = res.data.data;
-                        else if (res && Array.isArray(res.data)) finalLogs = res.data;
-                        else if (Array.isArray(res)) finalLogs = res;
+    // --- TAB STATE BARU ---
+    const [activeTab, setActiveTab] = useState('pekan_ini');
 
-                        setLogs(finalLogs); 
-                    } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
-                };
-                fetchLogs();
-            }, []);
+    useEffect(() => {
+        const fetchLogs = async () => {
+            try { 
+                const res = await apiService.request('getScanLogs'); 
+                let finalLogs = [];
+                if (res && res.data && Array.isArray(res.data.data)) finalLogs = res.data.data;
+                else if (res && Array.isArray(res.data)) finalLogs = res.data;
+                else if (Array.isArray(res)) finalLogs = res;
 
-            // REVISI: Filter pencarian sekarang mencari Nama Santri (bukan ID lagi)
-            const filteredLogs = logs.filter(log => {
-                const nama = String(log.nama_santri || log.santri_id || '').toLowerCase();
-                const ket = String(log.keterangan || '').toLowerCase();
-                const search = searchTerm.toLowerCase();
-                return nama.includes(search) || ket.includes(search);
-            });
-
-            return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-800">Riwayat Scan Security</h2>
-                        <p className="text-gray-500">Log aktivitas santri keluar & masuk gerbang pos keamanan.</p>
-                    </div>
-
-                    <div className="w-full md:w-1/3">
-                        {/* REVISI: Mengubah teks placeholder */}
-                        <input 
-                            type="text" 
-                            placeholder="Cari Nama Santri / Keterangan..." 
-                            className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-
-                    <Card className="overflow-x-auto p-0">
-                        <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
-                            <thead>
-                                <tr className="bg-emerald-50 text-emerald-800 border-b">
-                                    <th className="p-4">Waktu</th>
-                                    <th className="p-4">Aksi</th>
-                                    {/* REVISI: Mengubah Judul Kolom */}
-                                    <th className="p-4">Nama Santri</th>
-                                    <th className="p-4">Keterangan</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {loading ? <tr><td colSpan="4" className="p-8 text-center text-gray-500">Memuat log...</td></tr> : 
-                                 filteredLogs.length === 0 ? <tr><td colSpan="4" className="p-8 text-center text-gray-500">Belum ada riwayat scan.</td></tr> :
-                                 filteredLogs.map((log, idx) => (
-                                    <tr key={idx} className="hover:bg-gray-50">
-                                        <td className="p-4 font-medium text-gray-800">{log.waktu} WIB</td>
-                                        <td className="p-4">
-                                            <span className={`px-2 py-1 text-xs font-bold rounded-full ${log.tipe_scan === 'EXIT' ? 'bg-orange-100 text-orange-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                                                {log.tipe_scan}
-                                            </span>
-                                        </td>
-                                        {/* REVISI: Menampilkan Nama Santri, dengan fallback ke ID jika data log lama belum ada namanya */}
-                                        <td className="p-4 font-bold text-gray-900">{log.nama_santri || log.santri_id}</td>
-                                        <td className="p-4 text-gray-600">{log.keterangan}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </Card>
-                </div>
-            );
+                setLogs(finalLogs); 
+            } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
         };
+        fetchLogs();
+    }, []);
+
+    // --- RUMUS KALENDER PONDOK (Sabtu-Jumat) ---
+    const now = new Date();
+    const jsDay = now.getDay();
+    const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
+    const startOfWeek = new Date(now);
+    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(now.getDate() - diffToSaturday);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+    // -------------------------------------------
+
+    const filteredLogs = logs.filter(log => {
+        const nama = String(log.nama_santri || log.santri_id || '').toLowerCase();
+        const ket = String(log.keterangan || '').toLowerCase();
+        const search = searchTerm.toLowerCase();
+
+        // --- LOGIKA FILTER TAB ---
+        let isTabMatch = true;
+        if (activeTab === 'pekan_ini') {
+            let logDate = null;
+
+            // Trik 1: Cek apakah ada kolom tanggal eksplisit di database log
+            const rawDate = log.tanggal || log.tanggal_scan || log.waktu_scan;
+            if (rawDate) {
+                logDate = new Date(rawDate);
+                if (isNaN(logDate) && typeof rawDate === 'string' && rawDate.includes('/')) {
+                    const parts = rawDate.split('/');
+                    if (parts.length === 3) logDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                }
+            } 
+            // Trik 2: Jika tidak ada kolom tanggal, ekstrak tanggal dari ID Scan (Contoh: SCN-1725523423423)
+            else {
+                const scanId = log.id || log.scan_id || log.id_scan || log[0] || '';
+                if (typeof scanId === 'string' && scanId.startsWith('SCN-')) {
+                    const timestamp = parseInt(scanId.replace('SCN-', ''), 10);
+                    if (!isNaN(timestamp)) logDate = new Date(timestamp);
+                }
+            }
+            
+            // Validasi apakah tanggal masuk ke dalam pekan berjalan
+            if (logDate && !isNaN(logDate)) {
+                isTabMatch = (logDate >= startOfWeek && logDate <= endOfWeek);
+            } else {
+                // Jika gagal mengekstrak tanggal sama sekali, fallback dimunculkan
+                isTabMatch = false; 
+            }
+        }
+        // -------------------------
+
+        return isTabMatch && (nama.includes(search) || ket.includes(search));
+    });
+
+    return (
+        <div className="space-y-6 animate-fade-in-down">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800">Riwayat Scan Security</h2>
+                    <p className="text-gray-500">Log aktivitas santri keluar & masuk gerbang pos keamanan.</p>
+                </div>
+
+                {/* --- UI SWITCH TAB --- */}
+                <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 shadow-inner w-full md:w-auto">
+                    <button 
+                        onClick={() => setActiveTab('pekan_ini')}
+                        className={`flex-1 md:flex-none px-6 py-2 text-sm font-bold rounded-md transition-all duration-200 ${activeTab === 'pekan_ini' ? 'bg-white text-emerald-700 shadow border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Pekan Ini
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('semua')}
+                        className={`flex-1 md:flex-none px-6 py-2 text-sm font-bold rounded-md transition-all duration-200 ${activeTab === 'semua' ? 'bg-white text-emerald-700 shadow border border-gray-200/50' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Semua Riwayat
+                    </button>
+                </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="w-full md:w-1/3">
+                    <input 
+                        type="text" 
+                        placeholder="Cari Nama Santri / Keterangan..." 
+                        className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+                <div className="text-sm text-gray-500 text-left w-full md:text-right">
+                    Menampilkan <span className="font-bold text-emerald-600">{filteredLogs.length}</span> log aktivitas
+                    {activeTab === 'pekan_ini' ? ' untuk pekan berjalan.' : ' dari total keseluruhan.'}
+                </div>
+            </div>
+
+            <Card className="overflow-x-auto p-0">
+                <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+                    <thead>
+                        <tr className="bg-emerald-50 text-emerald-800 border-b">
+                            <th className="p-4 font-semibold">Waktu Scan</th>
+                            <th className="p-4 font-semibold">Aksi</th>
+                            <th className="p-4 font-semibold">Nama Santri</th>
+                            <th className="p-4 font-semibold">Keterangan</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {loading ? <tr><td colSpan="4" className="p-8 text-center text-gray-500">Memuat log...</td></tr> : 
+                         filteredLogs.length === 0 ? <tr><td colSpan="4" className="p-8 text-center text-gray-500">Belum ada riwayat scan yang sesuai.</td></tr> :
+                         filteredLogs.map((log, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50">
+                                <td className="p-4 font-medium text-gray-800">
+                                    {/* Format tampilan waktu tetap sama sesuai yang tersimpan di sheet (HH:mm) */}
+                                    {log.waktu} WIB 
+                                </td>
+                                <td className="p-4">
+                                    <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${log.tipe_scan === 'EXIT' ? 'bg-orange-100 text-orange-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                        {log.tipe_scan}
+                                    </span>
+                                </td>
+                                <td className="p-4 font-bold text-gray-900">{log.nama_santri || log.santri_id}</td>
+                                <td className="p-4 text-gray-600">{log.keterangan || '-'}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </Card>
+        </div>
+    );
+};
 
         const LoginPage = () => {
             const { login } = useContext(AuthContext);
