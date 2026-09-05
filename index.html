@@ -3158,39 +3158,51 @@ const DashboardSecurity = ({ setCurrentRoute }) => {
     // -------------------------------------------
 
     const filteredLogs = logs.filter(log => {
+        // --- PELINDUNG 1: Lewati jika data baris ini kosong/rusak ---
+        if (!log) return false; 
+        
+        // --- PELINDUNG 2: Pastikan semua data diubah ke string dengan aman ---
         const nama = String(log.nama_santri || log.santri_id || '').toLowerCase();
         const ket = String(log.keterangan || '').toLowerCase();
-        const search = searchTerm.toLowerCase();
+        const search = String(searchTerm || '').toLowerCase();
 
         // --- LOGIKA FILTER TAB ---
         let isTabMatch = true;
         if (activeTab === 'pekan_ini') {
             let logDate = null;
-
-            // Trik 1: Cek apakah ada kolom tanggal eksplisit di database log
-            const rawDate = log.tanggal || log.tanggal_scan || log.waktu_scan;
-            if (rawDate) {
-                logDate = new Date(rawDate);
-                if (isNaN(logDate) && typeof rawDate === 'string' && rawDate.includes('/')) {
-                    const parts = rawDate.split('/');
-                    if (parts.length === 3) logDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                }
-            } 
-            // Trik 2: Jika tidak ada kolom tanggal, ekstrak tanggal dari ID Scan (Contoh: SCN-1725523423423)
-            else {
-                const scanId = log.id || log.scan_id || log.id_scan || log[0] || '';
-                if (typeof scanId === 'string' && scanId.startsWith('SCN-')) {
-                    const timestamp = parseInt(scanId.replace('SCN-', ''), 10);
-                    if (!isNaN(timestamp)) logDate = new Date(timestamp);
-                }
-            }
             
-            // Validasi apakah tanggal masuk ke dalam pekan berjalan
-            if (logDate && !isNaN(logDate)) {
-                isTabMatch = (logDate >= startOfWeek && logDate <= endOfWeek);
-            } else {
-                // Jika gagal mengekstrak tanggal sama sekali, fallback dimunculkan
-                isTabMatch = false; 
+            try {
+                // Trik 1: Cek apakah ada kolom tanggal eksplisit di database log
+                const rawDate = log.tanggal || log.tanggal_scan || log.waktu_scan;
+                if (rawDate) {
+                    logDate = new Date(rawDate);
+                    // Pastikan pengecekan Valid Date lebih aman
+                    if (isNaN(logDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
+                        const parts = rawDate.split('/');
+                        if (parts.length === 3) logDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                    }
+                } 
+                // Trik 2: Jika tidak ada kolom tanggal, ekstrak tanggal dari ID Scan
+                else {
+                    const scanId = log.id || log.scan_id || log.id_scan || log[0] || '';
+                    if (typeof scanId === 'string' && scanId.startsWith('SCN-')) {
+                        const timestamp = parseInt(scanId.replace('SCN-', ''), 10);
+                        if (!isNaN(timestamp)) {
+                            logDate = new Date(timestamp);
+                        }
+                    }
+                }
+                
+                // Validasi apakah tanggal masuk ke dalam pekan berjalan
+                if (logDate && !isNaN(logDate.getTime())) {
+                    isTabMatch = (logDate >= startOfWeek && logDate <= endOfWeek);
+                } else {
+                    isTabMatch = false; 
+                }
+            } catch (err) {
+                // Jika terjadi error saat mengolah tanggal, diam-diam sembunyikan baris tersebut
+                console.warn("Format tanggal bermasalah pada baris log ini:", log);
+                isTabMatch = false;
             }
         }
         // -------------------------
@@ -3255,7 +3267,6 @@ const DashboardSecurity = ({ setCurrentRoute }) => {
                          filteredLogs.map((log, idx) => (
                             <tr key={idx} className="hover:bg-gray-50">
                                 <td className="p-4 font-medium text-gray-800">
-                                    {/* Format tampilan waktu tetap sama sesuai yang tersimpan di sheet (HH:mm) */}
                                     {log.waktu} WIB 
                                 </td>
                                 <td className="p-4">
