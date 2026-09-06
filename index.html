@@ -1845,14 +1845,24 @@
 
                     const dataWithMobility = myPermits.map(p => {
                         let mobilitas = '-';
+                        // --- TAMBAHAN BARU: Variabel penyimpan jam ---
+                        let wKeluar = null;
+                        let wKembali = null;
+
                         if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
                             const pId = p.permit_id || p.id || p.id_perizinan;
                             const myLogs = finalLogs.filter(l => l.permit_id === pId || l.id_perizinan === pId);
-                            const hasExit = myLogs.some(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
+
+                            // Ekstrak log spesifik (mencari jam keluar dan kembali)
+                            const exitLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
                             const returnLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'RETURN');
 
-                            if (!hasExit) mobilitas = 'Belum Keluar';
-                            else if (hasExit && !returnLog) mobilitas = 'Masih Di Luar';
+                            // Simpan jamnya jika ada
+                            if (exitLog) wKeluar = exitLog.waktu;
+                            if (returnLog) wKembali = returnLog.waktu;
+
+                            if (!exitLog) mobilitas = 'Belum Keluar';
+                            else if (exitLog && !returnLog) mobilitas = 'Masih Di Luar';
                             else if (returnLog) {
                                 if (String(returnLog.keterangan || '').toUpperCase().includes('TERLAMBAT')) mobilitas = 'Terlambat';
                                 else mobilitas = 'Tepat Waktu';
@@ -1862,7 +1872,9 @@
                         return {
                             ...p,
                             _bulan_filter: getBulanTahun(p.tanggal_izin),
-                            _status_mobilitas: mobilitas
+                            _status_mobilitas: mobilitas,
+                            _waktu_keluar: wKeluar,   // <--- Menambahkan data jam keluar
+                            _waktu_kembali: wKembali  // <--- Menambahkan data jam kembali
                         };
                     });
                     setPermits(dataWithMobility);
@@ -2104,7 +2116,18 @@
                                                         )}
                                                     </td>
                                                     <td className="p-4">{getStatusBadge(p.status_pengajuan)}</td>
-                                                    <td className="p-4 bg-emerald-50/20">{getMobilityBadge(p._status_mobilitas)}</td>
+                                                    <td className="p-4 bg-emerald-50/20">
+                                                        <div>{getMobilityBadge(p._status_mobilitas)}</div>
+
+                                                        {/* --- TAMBAHAN BARU: Menampilkan Jam Keluar & Kembali --- */}
+                                                        {(p._waktu_keluar || p._waktu_kembali) && (
+                                                            <div className="mt-2 text-[10px] text-gray-500 space-y-0.5 leading-tight">
+                                                                {p._waktu_keluar && <div>Keluar: <span className="font-semibold text-gray-700">{p._waktu_keluar}</span></div>}
+                                                                {p._waktu_kembali && <div>Kembali: <span className="font-semibold text-gray-700">{p._waktu_kembali}</span></div>}
+                                                            </div>
+                                                        )}
+                                                        {/* ------------------------------------------------------- */}
+                                                    </td>
                                                     <td className="p-4">
                                                         {/* --- PERUBAHAN LOGIKA TOMBOL AKSI KADALUARSA --- */}
                                                         {isKadaluarsa ? (
@@ -2469,14 +2492,24 @@
 
                         const dataWithMobilitas = finalPermits.map(p => {
                             let mobilitas = '-';
+                            // --- TAMBAHAN BARU: Variabel penyimpan jam ---
+                            let wKeluar = null;
+                            let wKembali = null;
+
                             if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
                                 const pId = p.permit_id || p.id || p.id_perizinan;
                                 const myLogs = finalLogs.filter(l => l.permit_id === pId || l.id_perizinan === pId);
-                                const hasExit = myLogs.some(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
+
+                                // Ekstrak log spesifik
+                                const exitLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
                                 const returnLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'RETURN');
 
-                                if (!hasExit) mobilitas = 'Belum Keluar';
-                                else if (hasExit && !returnLog) mobilitas = 'Masih Di Luar';
+                                // Simpan jamnya
+                                if (exitLog) wKeluar = exitLog.waktu;
+                                if (returnLog) wKembali = returnLog.waktu;
+
+                                if (!exitLog) mobilitas = 'Belum Keluar';
+                                else if (exitLog && !returnLog) mobilitas = 'Masih Di Luar';
                                 else if (returnLog) {
                                     if (String(returnLog.keterangan || '').toUpperCase().includes('TERLAMBAT')) mobilitas = 'Terlambat';
                                     else mobilitas = 'Tepat Waktu';
@@ -2486,7 +2519,9 @@
                             return {
                                 ...p,
                                 _bulan_filter: getBulanTahun(p.tanggal_izin),
-                                _status_mobilitas: mobilitas
+                                _status_mobilitas: mobilitas,
+                                _waktu_keluar: wKeluar, // <--- Menyimpan jam keluar
+                                _waktu_kembali: wKembali // <--- Menyimpan jam kembali
                             };
                         });
 
@@ -2717,7 +2752,18 @@
                                                         )}
                                                     </td>
                                                     <td className="p-4">{getStatusBadge(p.status_pengajuan)}</td>
-                                                    <td className="p-4 bg-emerald-50/20">{getMobilityBadge(p._status_mobilitas)}</td>
+                                                    <td className="p-4 bg-emerald-50/20">
+                                                        <div>{getMobilityBadge(p._status_mobilitas)}</div>
+
+                                                        {/* --- TAMBAHAN BARU: Menampilkan Jam Keluar & Kembali --- */}
+                                                        {(p._waktu_keluar || p._waktu_kembali) && (
+                                                            <div className="mt-2 text-[10px] text-gray-500 space-y-0.5 leading-tight">
+                                                                {p._waktu_keluar && <div>Keluar: <span className="font-semibold text-gray-700">{p._waktu_keluar}</span></div>}
+                                                                {p._waktu_kembali && <div>Kembali: <span className="font-semibold text-gray-700">{p._waktu_kembali}</span></div>}
+                                                            </div>
+                                                        )}
+                                                        {/* ------------------------------------------------------- */}
+                                                    </td>
                                                     <td className="p-4">
                                                         {/* --- PERUBAHAN TOMBOL AKSI DI SINI --- */}
                                                         {p.status_pengajuan === 'DISETUJUI' ?
@@ -3114,14 +3160,24 @@
 
                         const dataWithMobility = finalData.map(p => {
                             let mobilitas = '-';
+                            // --- TAMBAHAN BARU: Variabel penyimpan jam ---
+                            let wKeluar = null;
+                            let wKembali = null;
+
                             if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
                                 const pId = p.permit_id || p.id || p.id_perizinan;
                                 const myLogs = finalLogs.filter(l => l.permit_id === pId || l.id_perizinan === pId);
-                                const hasExit = myLogs.some(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
+
+                                // Ekstrak log spesifik (mencari jam keluar dan kembali)
+                                const exitLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
                                 const returnLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'RETURN');
 
-                                if (!hasExit) mobilitas = 'Belum Keluar';
-                                else if (hasExit && !returnLog) mobilitas = 'Masih Di Luar';
+                                // Simpan jamnya jika ada
+                                if (exitLog) wKeluar = exitLog.waktu;
+                                if (returnLog) wKembali = returnLog.waktu;
+
+                                if (!exitLog) mobilitas = 'Belum Keluar';
+                                else if (exitLog && !returnLog) mobilitas = 'Masih Di Luar';
                                 else if (returnLog) {
                                     if (String(returnLog.keterangan || '').toUpperCase().includes('TERLAMBAT')) mobilitas = 'Terlambat';
                                     else mobilitas = 'Tepat Waktu';
@@ -3131,7 +3187,9 @@
                             return {
                                 ...p,
                                 _bulan_filter: getBulanTahun(p.tanggal_izin),
-                                _status_mobilitas: mobilitas
+                                _status_mobilitas: mobilitas,
+                                _waktu_keluar: wKeluar,   // <--- Menambahkan data jam keluar
+                                _waktu_kembali: wKembali  // <--- Menambahkan data jam kembali
                             };
                         });
                         setPermits(dataWithMobility);
@@ -3364,7 +3422,18 @@
                                                         )}
                                                     </td>
                                                     <td className="p-4">{getStatusBadge(p.status_pengajuan)}</td>
-                                                    <td className="p-4 bg-emerald-50/20">{getMobilityBadge(p._status_mobilitas)}</td>
+                                                    <td className="p-4 bg-emerald-50/20">
+                                                        <div>{getMobilityBadge(p._status_mobilitas)}</div>
+
+                                                        {/* --- TAMBAHAN BARU: Menampilkan Jam Keluar & Kembali --- */}
+                                                        {(p._waktu_keluar || p._waktu_kembali) && (
+                                                            <div className="mt-2 text-[10px] text-gray-500 space-y-0.5 leading-tight">
+                                                                {p._waktu_keluar && <div>Keluar: <span className="font-semibold text-gray-700">{p._waktu_keluar}</span></div>}
+                                                                {p._waktu_kembali && <div>Kembali: <span className="font-semibold text-gray-700">{p._waktu_kembali}</span></div>}
+                                                            </div>
+                                                        )}
+                                                        {/* ------------------------------------------------------- */}
+                                                    </td>
                                                     <td className="p-4">
                                                         {/* --- PERUBAHAN TOMBOL AKSI DI SINI --- */}
                                                         {p.status_pengajuan === 'DISETUJUI' ?
