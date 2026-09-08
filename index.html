@@ -2212,9 +2212,13 @@
             const [permits, setPermits] = useState([]);
             const [santriList, setSantriList] = useState([]);
             const [loading, setLoading] = useState(true);
-            const [selectedPermit, setSelectedPermit] = useState(null); // Hanya dipakai untuk modal Penolakan
+            const [selectedPermit, setSelectedPermit] = useState(null);
             const [rejectReason, setRejectReason] = useState('');
             const [processing, setProcessing] = useState(false);
+
+            // --- STATE BULK APPROVAL ---
+            const [selectedApproveIds, setSelectedApproveIds] = useState([]);
+            const [isApproving, setIsApproving] = useState(false);
 
             // State Pencarian dan Filter
             const [searchTerm, setSearchTerm] = useState('');
@@ -2228,19 +2232,16 @@
                         apiService.request('getSantri')
                     ]);
 
-                    // Ekstrak Aman Perizinan
                     let finalPermits = [];
                     if (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) finalPermits = resPermits.data.data;
                     else if (resPermits && Array.isArray(resPermits.data)) finalPermits = resPermits.data;
                     else if (Array.isArray(resPermits)) finalPermits = resPermits;
 
-                    // Ekstrak Aman Data Santri
                     let finalSantri = [];
                     if (resSantri && resSantri.data && Array.isArray(resSantri.data.data)) finalSantri = resSantri.data.data;
                     else if (resSantri && Array.isArray(resSantri.data)) finalSantri = resSantri.data;
                     else if (Array.isArray(resSantri)) finalSantri = resSantri;
 
-                    // PENAMBAHAN REVERSE() DI SINI AGAR FIFO (Terlama di atas)
                     const pendingPermits = finalPermits
                         .filter(p => p.status_pengajuan === 'MENUNGGU_APPROVAL' || p.status_pengajuan === 'MENUNGGU')
                         .reverse();
@@ -2252,14 +2253,14 @@
 
             useEffect(() => { fetchPermits(); }, []);
 
-            // FUNGSI 1: Eksekusi Setuju Langsung (Sat-Set)
+            // --- FUNGSI 1: Eksekusi Setuju Langsung (Sat-Set Individual) ---
             const handleApprove = async (permit) => {
                 if (!window.confirm(`Yakin menyetujui izin untuk ${permit.nama_santri}? QR Code akan otomatis diterbitkan.`)) return;
 
                 setProcessing(true);
                 try {
                     const payload = { permit_id: permit.permit_id || permit.id_perizinan, aksi_approval: 'APPROVE', alasan: '', username: user.nama };
-                    const res = await apiService.request('processApproval', payload);
+                    await apiService.request('processApproval', payload);
                     showToast(`Izin ${permit.nama_santri} berhasil disetujui!`, 'success');
 
                     apiService.request('saveLog', {
@@ -2269,18 +2270,52 @@
                         keterangan: `Memberikan status APPROVE izin atas nama ${permit.nama_santri} (${permit.kelas}).`
                     }).catch(e => console.log("Log error:", e));
 
-                    fetchPermits(); // Refresh data agar kartu langsung hilang
+                    fetchPermits();
                 } catch (e) { showToast(e.message, 'error'); } finally { setProcessing(false); }
             };
 
-            // FUNGSI 2: Eksekusi Tolak (Dari dalam Modal)
+            // --- FUNGSI BARU: Eksekusi Bulk Approve (Setujui Massal) ---
+            const handleBulkApprove = async () => {
+                if (!window.confirm(`Yakin ingin menyetujui ${selectedApproveIds.length} pengajuan secara bersamaan? QR Code akan digenerate otomatis.`)) return;
+
+                setIsApproving(true);
+                try {
+                    // Looping untuk memanggil API processApproval milik Bapak per ID yang dicentang
+                    for (const id of selectedApproveIds) {
+                        const permitTarget = permits.find(p => (p.permit_id || p.id_perizinan) === id);
+                        if (permitTarget) {
+                            const payload = { permit_id: id, aksi_approval: 'APPROVE', alasan: '', username: user.nama };
+                            await apiService.request('processApproval', payload);
+
+                            // Log per santri agar tetap tercatat di system_log
+                            await apiService.request('saveLog', {
+                                role: user.role,
+                                nama: user.nama,
+                                aksi: 'SCREENING_APPROVE_BULK',
+                                keterangan: `Memberikan status APPROVE izin massal atas nama ${permitTarget.nama_santri} (${permitTarget.kelas}).`
+                            }).catch(e => console.log("Log error:", e));
+                        }
+                    }
+
+                    showToast(`${selectedApproveIds.length} pengajuan berhasil disetujui!`, 'success');
+                    setSelectedApproveIds([]); // Kosongkan centang setelah sukses
+                    fetchPermits(); // Refresh halaman
+                } catch (error) {
+                    showToast('Gagal menyetujui beberapa pengajuan: ' + error.message, 'error');
+                } finally {
+                    setIsApproving(false);
+                }
+            };
+            // -------------------------------------------------------------
+
+            // --- FUNGSI 2: Eksekusi Tolak (Dari dalam Modal) ---
             const handleProcessReject = async () => {
                 if (!rejectReason) return showToast("Alasan penolakan wajib diisi!", "error");
 
                 setProcessing(true);
                 try {
                     const payload = { permit_id: selectedPermit.permit_id || selectedPermit.id_perizinan, aksi_approval: 'REJECT', alasan: rejectReason, username: user.nama };
-                    const res = await apiService.request('processApproval', payload);
+                    await apiService.request('processApproval', payload);
                     showToast(`Izin ${selectedPermit.nama_santri} berhasil ditolak.`, 'success');
 
                     apiService.request('saveLog', {
@@ -2335,64 +2370,129 @@
                         </div>
                     )}
 
+                    {/* --- PANEL BULK ACTION --- */}
+                    {selectedApproveIds.length > 0 && (
+                        <div className="bg-emerald-100 border border-emerald-300 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center shadow-sm animate-fade-in-down gap-4">
+                            <span className="text-emerald-800 font-bold">
+                                {selectedApproveIds.length} pengajuan dipilih.
+                            </span>
+                            <div className="flex gap-3 w-full sm:w-auto">
+                                <button
+                                    onClick={() => setSelectedApproveIds([])}
+                                    disabled={isApproving || processing}
+                                    className="flex-1 sm:flex-none px-4 py-2 bg-white text-gray-600 rounded-lg shadow-sm text-sm font-bold hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    onClick={handleBulkApprove}
+                                    disabled={isApproving || processing}
+                                    className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 text-white rounded-lg shadow-sm text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    {isApproving ? 'Memproses...' : 'Setujui Terpilih ✓'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- FITUR PILIH SEMUA --- */}
+                    {!loading && filteredPermits.length > 0 && (
+                        <div className="flex items-center gap-2 mt-2">
+                            <input
+                                type="checkbox"
+                                id="selectAll"
+                                className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500 cursor-pointer"
+                                onChange={(e) => {
+                                    if (e.target.checked) setSelectedApproveIds(filteredPermits.map(p => p.permit_id || p.id_perizinan));
+                                    else setSelectedApproveIds([]);
+                                }}
+                                checked={filteredPermits.length > 0 && selectedApproveIds.length === filteredPermits.length}
+                            />
+                            <label htmlFor="selectAll" className="text-sm font-bold text-gray-700 cursor-pointer">
+                                Pilih Semua ({filteredPermits.length})
+                            </label>
+                        </div>
+                    )}
+                    {/* ------------------------- */}
+
                     {loading ? <div className="p-12 text-center text-gray-500">Membaca antrean izin dari server...</div> :
                         permits.length === 0 ? <div className="p-12 text-center bg-white rounded-xl border border-dashed border-gray-300 text-gray-500">Yeay! Tidak ada antrean perizinan saat ini.</div> :
                             filteredPermits.length === 0 ? <div className="p-12 text-center bg-white rounded-xl border border-dashed border-gray-300 text-gray-500">Santri yang dicari tidak ditemukan dalam antrean.</div> :
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    {filteredPermits.map((p, idx) => (
-                                        <Card key={idx} className="flex flex-col justify-between border-l-4 border-yellow-400 hover:shadow-md transition-shadow">
-                                            <div>
-                                                <div className="flex justify-between items-start mb-4 border-b pb-4">
-                                                    <div>
-                                                        <h3 className="text-xl font-bold text-gray-900">{p.nama_santri}</h3>
-                                                        <p className="text-sm text-gray-500">{p.kelas} • Tgl Izin: <strong>{p.tanggal_izin}</strong></p>
-                                                    </div>
-                                                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                                                        {p.status_jadwal}
-                                                    </span>
-                                                </div>
-                                                <div className="space-y-2 text-sm text-gray-700 mb-6">
-                                                    <p><span className="text-gray-500 w-24 inline-block">Keperluan:</span> <strong>{p.keperluan}</strong></p>
-                                                    <p><span className="text-gray-500 w-24 inline-block">Tujuan:</span> <strong>{p.tujuan}</strong></p>
-                                                    <p><span className="text-gray-500 w-24 inline-block">Penjemput:</span> <strong>{p.wali_safar} ({p.hubungan_wali})</strong></p>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+                                    {filteredPermits.map((p, idx) => {
+                                        const permitId = p.permit_id || p.id_perizinan;
+                                        const isSelected = selectedApproveIds.includes(permitId);
 
-                                                    {p.status_jadwal === 'Di Luar Jadwal' && (
-                                                        <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg">
-                                                            <p className="text-red-800 text-xs font-bold mb-1">ALASAN DI LUAR JADWAL:</p>
-                                                            <p className="text-red-700 italic">{p.keterangan_luar_jadwal}</p>
-                                                        </div>
-                                                    )}
-                                                    {(p.ikut_jadwal_saudara === 'Ya' || p.ikut_jadwal_saudara === true || p.ikut_jadwal_saudara === 'TRUE') && (
-                                                        <div className="mt-2 p-2 bg-blue-50 text-blue-800 rounded-lg text-xs font-medium">
-                                                            {(() => {
-                                                                const saudara = santriList.find(s => (s.santri_id || s.nis || s.id) === p.saudara_santri_id);
-                                                                return saudara
-                                                                    ? `Ikut jadwal saudara: ${saudara.nama || saudara.nama_santri} (${saudara.kelas})`
-                                                                    : `Ikut jadwal saudara (ID: ${p.saudara_santri_id})`;
-                                                            })()}
-                                                        </div>
-                                                    )}
+                                        return (
+                                            <Card key={idx} className={`flex flex-col justify-between border-l-4 transition-all relative ${isSelected ? 'border-emerald-500 bg-emerald-50/50 shadow-md' : 'border-yellow-400 hover:shadow-md'}`}>
+
+                                                {/* --- CHECKBOX DI POJOK KANAN KARTU --- */}
+                                                <div className="absolute top-4 right-4 z-10">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="w-5 h-5 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500 cursor-pointer"
+                                                        checked={isSelected}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setSelectedApproveIds([...selectedApproveIds, permitId]);
+                                                            else setSelectedApproveIds(selectedApproveIds.filter(id => id !== permitId));
+                                                        }}
+                                                    />
                                                 </div>
-                                            </div>
-                                            {/* PERUBAHAN UI: Dua tombol berdampingan */}
-                                            <div className="grid grid-cols-2 gap-3 mt-2 border-t pt-4">
-                                                <button
-                                                    onClick={() => setSelectedPermit(p)}
-                                                    disabled={processing}
-                                                    className="py-2.5 px-4 bg-red-50 text-red-700 hover:bg-red-100 font-bold rounded-lg transition-colors border border-red-200"
-                                                >
-                                                    Tolak Izin
-                                                </button>
-                                                <button
-                                                    onClick={() => handleApprove(p)}
-                                                    disabled={processing}
-                                                    className="py-2.5 px-4 bg-emerald-600 text-white hover:bg-emerald-700 font-bold rounded-lg transition-colors shadow-sm"
-                                                >
-                                                    {processing ? 'Memproses...' : 'Setujui & Buat QR'}
-                                                </button>
-                                            </div>
-                                        </Card>
-                                    ))}
+                                                {/* ------------------------------------ */}
+
+                                                <div>
+                                                    <div className="flex justify-between items-start mb-4 border-b pb-4 pr-8">
+                                                        <div>
+                                                            <h3 className="text-xl font-bold text-gray-900">{p.nama_santri}</h3>
+                                                            <p className="text-sm text-gray-500">{p.kelas} • Tgl Izin: <strong>{p.tanggal_izin}</strong></p>
+                                                        </div>
+                                                        <span className={`px-3 py-1 text-xs font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                                                            {p.status_jadwal}
+                                                        </span>
+                                                    </div>
+                                                    <div className="space-y-2 text-sm text-gray-700 mb-6">
+                                                        <p><span className="text-gray-500 w-24 inline-block">Keperluan:</span> <strong>{p.keperluan}</strong></p>
+                                                        <p><span className="text-gray-500 w-24 inline-block">Tujuan:</span> <strong>{p.tujuan}</strong></p>
+                                                        <p><span className="text-gray-500 w-24 inline-block">Penjemput:</span> <strong>{p.wali_safar} ({p.hubungan_wali})</strong></p>
+
+                                                        {p.status_jadwal === 'Di Luar Jadwal' && (
+                                                            <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg">
+                                                                <p className="text-red-800 text-xs font-bold mb-1">ALASAN DI LUAR JADWAL:</p>
+                                                                <p className="text-red-700 italic">{p.keterangan_luar_jadwal}</p>
+                                                            </div>
+                                                        )}
+                                                        {(p.ikut_jadwal_saudara === 'Ya' || p.ikut_jadwal_saudara === true || p.ikut_jadwal_saudara === 'TRUE') && (
+                                                            <div className="mt-2 p-2 bg-blue-50 text-blue-800 rounded-lg text-xs font-medium">
+                                                                {(() => {
+                                                                    const saudara = santriList.find(s => (s.santri_id || s.nis || s.id) === p.saudara_santri_id);
+                                                                    return saudara
+                                                                        ? `Ikut jadwal saudara: ${saudara.nama || saudara.nama_santri} (${saudara.kelas})`
+                                                                        : `Ikut jadwal saudara (ID: ${p.saudara_santri_id})`;
+                                                                })()}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-3 mt-2 border-t pt-4">
+                                                    <button
+                                                        onClick={() => setSelectedPermit(p)}
+                                                        disabled={processing || isApproving}
+                                                        className="py-2.5 px-4 bg-red-50 text-red-700 hover:bg-red-100 font-bold rounded-lg transition-colors border border-red-200"
+                                                    >
+                                                        Tolak Izin
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleApprove(p)}
+                                                        disabled={processing || isApproving}
+                                                        className="py-2.5 px-4 bg-emerald-600 text-white hover:bg-emerald-700 font-bold rounded-lg transition-colors shadow-sm"
+                                                    >
+                                                        {processing ? 'Memproses...' : 'Setujui & Buat QR'}
+                                                    </button>
+                                                </div>
+                                            </Card>
+                                        )
+                                    })}
                                 </div>
                     }
 
