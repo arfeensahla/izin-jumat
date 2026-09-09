@@ -3723,10 +3723,8 @@
                                                         const batasMenit = (16 * 60) + 30; // 990 menit (16:30)
 
                                                         if (totalMenit > batasMenit) {
-                                                            // Kalau di atas 16:30
                                                             displayKeterangan = 'TERLAMBAT';
                                                         } else {
-                                                            // Kalau jam 16:30 ke bawah
                                                             displayKeterangan = 'TEPAT WAKTU';
                                                         }
                                                     }
@@ -3747,12 +3745,21 @@
                                                     </td>
                                                     <td className="p-4 font-bold text-gray-900">{log.nama_santri || log.santri_id}</td>
 
-                                                    {/* Menampilkan keterangan yang sudah dipaksa sederhana */}
-                                                    <td className="p-4 text-gray-600 max-w-[250px] whitespace-normal break-words font-medium">
-                                                        <span className={displayKeterangan === 'TERLAMBAT' ? 'text-red-600 font-bold' : ''}>
-                                                            {displayKeterangan}
-                                                        </span>
+                                                    {/* --- INI DIA TAMPILAN BADGE KETERANGAN YANG BARU --- */}
+                                                    <td className="p-4 max-w-[250px] whitespace-normal break-words font-medium">
+                                                        {displayKeterangan === 'TEPAT WAKTU' ? (
+                                                            <span className="px-2 py-1 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
+                                                                TEPAT WAKTU
+                                                            </span>
+                                                        ) : displayKeterangan === 'TERLAMBAT' ? (
+                                                            <span className="px-2 py-1 text-[10px] font-bold rounded-full bg-red-100 text-red-800 border border-red-200 shadow-sm animate-pulse">
+                                                                TERLAMBAT
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-gray-600">{displayKeterangan}</span>
+                                                        )}
                                                     </td>
+                                                    {/* --------------------------------------------------- */}
                                                 </tr>
                                             )
                                         })}
