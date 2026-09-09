@@ -3708,12 +3708,35 @@
                                                     }
                                                 }
                                             }
-                                            // -----------------------------------------------
+
+                                            // --- LOGIKA KETERANGAN SEDERHANA (Ubah teks asli dari database) ---
+                                            let displayKeterangan = log.keterangan || '-';
+
+                                            // Jika scan RETURN, paksa aturannya menjadi TEPAT WAKTU atau TERLAMBAT
+                                            if (String(log.tipe_scan).toUpperCase() === 'RETURN' && log.waktu) {
+                                                const timeParts = String(log.waktu).split(':');
+                                                if (timeParts.length >= 2) {
+                                                    const jam = parseInt(timeParts[0], 10);
+                                                    const menit = parseInt(timeParts[1], 10);
+                                                    if (!isNaN(jam) && !isNaN(menit)) {
+                                                        const totalMenit = (jam * 60) + menit;
+                                                        const batasMenit = (16 * 60) + 30; // 990 menit (16:30)
+
+                                                        if (totalMenit > batasMenit) {
+                                                            // Kalau di atas 16:30
+                                                            displayKeterangan = 'TERLAMBAT';
+                                                        } else {
+                                                            // Kalau jam 16:30 ke bawah
+                                                            displayKeterangan = 'TEPAT WAKTU';
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            // ------------------------------------------------------------------
 
                                             return (
                                                 <tr key={idx} className="hover:bg-gray-50">
                                                     <td className="p-4 font-medium text-gray-800">
-                                                        {/* Menampilkan Tanggal + Jam */}
                                                         <span className="block text-[11px] text-gray-500">{tglTampil.replace(', ', '')}</span>
                                                         {log.waktu} WIB
                                                     </td>
@@ -3723,7 +3746,13 @@
                                                         </span>
                                                     </td>
                                                     <td className="p-4 font-bold text-gray-900">{log.nama_santri || log.santri_id}</td>
-                                                    <td className="p-4 text-gray-600 max-w-[250px] whitespace-normal break-words">{log.keterangan || '-'}</td>
+
+                                                    {/* Menampilkan keterangan yang sudah dipaksa sederhana */}
+                                                    <td className="p-4 text-gray-600 max-w-[250px] whitespace-normal break-words font-medium">
+                                                        <span className={displayKeterangan === 'TERLAMBAT' ? 'text-red-600 font-bold' : ''}>
+                                                            {displayKeterangan}
+                                                        </span>
+                                                    </td>
                                                 </tr>
                                             )
                                         })}
