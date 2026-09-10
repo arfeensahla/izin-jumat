@@ -3024,6 +3024,13 @@
                     }
                 }
             });
+            // Fungsi pembantu untuk memoles tampilan tanggal
+            const formatTanggalIndo = (dateString) => {
+                if (!dateString) return '';
+                const d = new Date(dateString);
+                if (isNaN(d.getTime())) return dateString;
+                return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+            };
 
             return (
                 <div className="space-y-6 animate-fade-in-down">
@@ -3096,7 +3103,7 @@
                                             {periodeRekap === 'pekan_ini' ? 'Pekan Berjalan' :
                                                 periodeRekap === 'bulan_ini' ? 'Bulan Berjalan' :
                                                     periodeRekap === 'semua' ? 'Semua Riwayat (All Time)' :
-                                                        (startDate && endDate) ? `${startDate} s/d ${endDate}` : 'Pilih Tanggal'}
+                                                        (startDate && endDate) ? `${formatTanggalIndo(startDate)} s/d ${formatTanggalIndo(endDate)}` : 'Pilih Tanggal'
                                         </td>
                                         <td className="p-4 text-blue-600 font-bold">{statsRekap.ajuan} Santri</td>
                                         <td className="p-4 text-emerald-600 font-bold">{statsRekap.tepatWaktu} Santri</td>
