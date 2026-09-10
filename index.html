@@ -3084,102 +3084,6 @@
             );
         };
 
-        // --- DASHBOARD WALI KELAS ---
-        const DashboardWaliKelas = ({ setCurrentRoute }) => {
-            const { user } = useContext(AuthContext);
-            const { showToast } = useContext(ToastContext);
-
-            const [statsPekan, setStatsPekan] = useState({ ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0 });
-            const [loading, setLoading] = useState(true);
-
-            useEffect(() => {
-                const fetchData = async () => {
-                    try {
-                        const [resPermits, resLogs] = await Promise.all([apiService.request('getPermits'), apiService.request('getScanLogs')]);
-
-                        let finalPermits = [];
-                        if (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) finalPermits = resPermits.data.data;
-                        else if (resPermits && Array.isArray(resPermits.data)) finalPermits = resPermits.data;
-                        else if (Array.isArray(resPermits)) finalPermits = resPermits;
-
-                        let finalLogs = [];
-                        if (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) finalLogs = resLogs.data.data;
-                        else if (resLogs && Array.isArray(resLogs.data)) finalLogs = resLogs.data;
-                        else if (Array.isArray(resLogs)) finalLogs = resLogs;
-
-                        const myPermits = finalPermits.filter(p => p.kelas === user.kelas_id);
-                        let sPekan = { ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0 };
-
-                        // --- RUMUS WAKTU: Kalender Pondok (Sabtu - Jumat) ---
-                        const now = new Date();
-                        const jsDay = now.getDay();
-                        const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
-
-                        const startOfWeek = new Date(now);
-                        startOfWeek.setHours(0, 0, 0, 0);
-                        startOfWeek.setDate(now.getDate() - diffToSaturday);
-
-                        const endOfWeek = new Date(startOfWeek);
-                        endOfWeek.setDate(startOfWeek.getDate() + 6);
-                        endOfWeek.setHours(23, 59, 59, 999);
-                        // ----------------------------------------------------
-
-                        myPermits.forEach(p => {
-                            const permitDateStr = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
-
-                            // --- TRIK KEBAL FORMAT TANGGAL ---
-                            let pDate = new Date(permitDateStr);
-                            if (isNaN(pDate) && typeof permitDateStr === 'string' && permitDateStr.includes('/')) {
-                                const parts = permitDateStr.split('/');
-                                if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                            }
-                            // ---------------------------------
-
-                            if (!isNaN(pDate) && pDate >= startOfWeek && pDate <= endOfWeek) {
-                                sPekan.ajuan++;
-                                if (p.status_pengajuan === 'DISETUJUI') sPekan.disetujui++;
-                                if (p.status_pengajuan === 'DITOLAK') sPekan.ditolak++;
-
-                                const pLogs = finalLogs.filter(l => l.permit_id === p.permit_id);
-                                const hasExit = pLogs.some(l => l.tipe_scan === 'EXIT');
-                                const returnLog = pLogs.find(l => l.tipe_scan === 'RETURN');
-
-                                if (hasExit && !returnLog) sPekan.diluar++;
-                                if (returnLog) {
-                                    sPekan.kembali++;
-                                    if (returnLog.keterangan && returnLog.keterangan.includes('TERLAMBAT')) sPekan.terlambat++;
-                                }
-                            }
-                        });
-
-                        setStatsPekan(sPekan);
-                    } catch (e) { console.error(e); } finally { setLoading(false); }
-                };
-                if (user.kelas_id) fetchData(); else setLoading(false);
-            }, [user.kelas_id]);
-
-            return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-800">Dashboard Wali Kelas</h2>
-                            <p className="text-gray-500">Statistik Pekan Ini untuk Kelas <strong className="text-emerald-700">{user.kelas_id || 'Belum Diatur'}</strong></p>
-                        </div>
-                        <Button onClick={() => setCurrentRoute('pengajuan')} icon={<Icons.Plus />}>Ajukan Izin Baru</Button>
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        <StatCard title="Total Ajuan" value={loading ? "..." : statsPekan.ajuan} icon={<Icons.FileText />} color="bg-blue-50 text-blue-600" />
-                        <StatCard title="Disetujui" value={loading ? "..." : statsPekan.disetujui} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
-                        <StatCard title="Ditolak" value={loading ? "..." : statsPekan.ditolak} icon={<Icons.XCircle />} color="bg-gray-100 text-gray-600" />
-                        <StatCard title="Masih Di Luar" value={loading ? "..." : statsPekan.diluar} icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600" />
-                        <StatCard title="Sudah Kembali" value={loading ? "..." : statsPekan.kembali} icon={<Icons.Home />} color="bg-teal-50 text-teal-600" />
-                        <StatCard title="Terlambat" value={loading ? "..." : statsPekan.terlambat} icon={<Icons.Clock />} color="bg-red-50 text-red-600" />
-                    </div>
-                </div>
-            );
-        };
-
         // --- DASHBOARD SECURITY ---
         const DashboardSecurity = ({ setCurrentRoute }) => {
             const { showToast } = useContext(ToastContext);
@@ -4101,7 +4005,7 @@
             if (currentRoute === 'dashboard') {
                 if (user.role === ROLES.ADMIN) return <DashboardManajemen title="Dashboard Admin" subtitle="Ringkasan perizinan pondok secara keseluruhan." />;
                 if (user.role === ROLES.SEKRETARIS_MUDIR) return <DashboardManajemen title="Dashboard Sekretaris" subtitle="Rekapitulasi perizinan dan approval santri." />;
-                if (user.role === ROLES.WALI_KELAS) return <DashboardWaliKelas setCurrentRoute={setCurrentRoute} />;
+                if (user.role === ROLES.WALI_KELAS) return <DashboardManajemen title="Dashboard Wali Kelas" subtitle="Pantauan perizinan khusus santri perwalian Anda." userClass={user.kelas_id} />;
                 if (user.role === ROLES.SECURITY) return <DashboardSecurity setCurrentRoute={setCurrentRoute} />;
             }
 
