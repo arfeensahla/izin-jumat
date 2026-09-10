@@ -2845,6 +2845,7 @@
 
 
         // --- DASHBOARD ADMIN & SEKRETARIS MUDIR ---
+        // --- DASHBOARD ADMIN & SEKRETARIS MUDIR ---
         const DashboardManajemen = ({ title, subtitle, userClass }) => {
             const { showToast } = useContext(ToastContext);
 
@@ -2993,7 +2994,6 @@
                 return { statsPekan: sPekan, statsRekap: sRekap };
             }, [allPermits, allLogs, periodeRekap, startDate, endDate, userClass]);
 
-            // --- FUNGSI PEMBANTU FORMAT TANGGAL ---
             const formatTanggalIndo = (dateString) => {
                 if (!dateString) return '';
                 const d = new Date(dateString);
@@ -3055,10 +3055,10 @@
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-gray-100 text-gray-700 border-b">
-                                    <th className="p-4 font-semibold text-sm">Periode Terpilih</th>
-                                    <th className="p-4 font-semibold text-sm">Total Ajuan Izin</th>
-                                    <th className="p-4 font-semibold text-sm">Kembali Tepat Waktu</th>
-                                    <th className="p-4 font-semibold text-sm">Total Terlambat</th>
+                                    <th className="p-4 font-semibold text-sm align-middle">Periode Terpilih</th>
+                                    <th className="p-4 font-semibold text-sm text-center align-middle">Total Ajuan Izin</th>
+                                    <th className="p-4 font-semibold text-sm text-center align-middle">Kembali Tepat Waktu</th>
+                                    <th className="p-4 font-semibold text-sm text-center align-middle">Total Terlambat</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -3066,16 +3066,32 @@
                                     <tr><td colSpan="4" className="p-8 text-center text-gray-500 text-sm">Mengkalkulasi data...</td></tr>
                                 ) : (
                                     <tr className="hover:bg-gray-50 transition-colors">
-                                        <td className="p-4 font-bold text-gray-800">
-                                            {/* --- PERUBAHAN ADA DI BARIS INI --- */}
-                                            {periodeRekap === 'pekan_ini' ? 'Pekan Berjalan' :
-                                                periodeRekap === 'bulan_ini' ? 'Bulan Berjalan' :
-                                                    periodeRekap === 'semua' ? 'Semua Riwayat (All Time)' :
-                                                        (startDate && endDate) ? `${formatTanggalIndo(startDate)} s/d ${formatTanggalIndo(endDate)}` : 'Pilih Tanggal'}
+                                        <td className="p-4 align-middle">
+                                            {/* --- DESAIN PERIODE LEBIH ELEGAN --- */}
+                                            <div className="font-bold text-gray-800 text-lg border-l-4 border-emerald-500 pl-3 py-1">
+                                                {periodeRekap === 'pekan_ini' ? 'Pekan Berjalan' :
+                                                    periodeRekap === 'bulan_ini' ? 'Bulan Berjalan' :
+                                                        periodeRekap === 'semua' ? 'Semua Riwayat (All Time)' :
+                                                            (startDate && endDate) ? `${formatTanggalIndo(startDate)} s/d ${formatTanggalIndo(endDate)}` : 'Pilih Tanggal'}
+                                            </div>
                                         </td>
-                                        <td className="p-4 text-blue-600 font-bold">{statsRekap.ajuan} Santri</td>
-                                        <td className="p-4 text-emerald-600 font-bold">{statsRekap.tepatWaktu} Santri</td>
-                                        <td className="p-4 text-red-600 font-bold">{statsRekap.terlambat} Santri</td>
+
+                                        {/* --- DESAIN ANGKA RAKSASA (BIG METRICS) --- */}
+                                        <td className="p-4 text-center align-middle">
+                                            <div className="inline-flex flex-col items-center justify-center bg-blue-50/50 border border-blue-100 rounded-xl px-6 py-2 min-w-[100px]">
+                                                <span className="text-3xl md:text-4xl font-black text-blue-600 tracking-tighter">{statsRekap.ajuan}</span>
+                                            </div>
+                                        </td>
+                                        <td className="p-4 text-center align-middle">
+                                            <div className="inline-flex flex-col items-center justify-center bg-emerald-50/50 border border-emerald-100 rounded-xl px-6 py-2 min-w-[100px]">
+                                                <span className="text-3xl md:text-4xl font-black text-emerald-600 tracking-tighter">{statsRekap.tepatWaktu}</span>
+                                            </div>
+                                        </td>
+                                        <td className="p-4 text-center align-middle">
+                                            <div className="inline-flex flex-col items-center justify-center bg-red-50/50 border border-red-100 rounded-xl px-6 py-2 min-w-[100px]">
+                                                <span className="text-3xl md:text-4xl font-black text-red-600 tracking-tighter">{statsRekap.terlambat}</span>
+                                            </div>
+                                        </td>
                                     </tr>
                                 )}
                             </tbody>
