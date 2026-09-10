@@ -2153,58 +2153,6 @@
             );
         };
 
-        // --- PHASE 6 COMPONENTS ---
-        // --- DASHBOARD SEKRETARIS MUDIR ---
-        const DashboardSecretary = () => {
-            const { showToast } = useContext(ToastContext);
-            const [stats, setStats] = useState({ total_pekan: 0, disetujui_pekan: 0, ditolak_pekan: 0, menunggu_pekan: 0, sudah_keluar: 0, sudah_kembali: 0, masih_di_luar: 0, terlambat: 0, total_bulan: 0 });
-            const [loading, setLoading] = useState(true);
-            const [lastUpdate, setLastUpdate] = useState(new Date());
-
-            const fetchStats = async () => {
-                try {
-                    const res = await apiService.request('getDashboardStats');
-                    // Pengaman jika data dibungkus objek res.data.data
-                    const finalData = (res && res.data && res.data.data) ? res.data.data : (res.data || {});
-                    setStats(finalData);
-                    setLastUpdate(new Date());
-                } catch (e) { console.error(e); } finally { setLoading(false); }
-            };
-
-            // Polling every 30 seconds
-            useEffect(() => {
-                fetchStats();
-                const interval = setInterval(fetchStats, 30000);
-                return () => clearInterval(interval);
-            }, []);
-
-            return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-800">Dashboard Sekretaris</h2>
-                            <p className="text-sm text-gray-500 mt-1">Update terakhir: {lastUpdate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
-                        </div>
-                        <Button variant="secondary" onClick={() => { setLoading(true); fetchStats(); }} icon={<Icons.Clock />}>{loading ? 'Menyinkronkan...' : 'Refresh Manual'}</Button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <StatCard title="Total Izin (Bulan Ini)" value={stats.total_bulan || 0} icon={<Icons.Calendar />} color="bg-blue-50 text-blue-600" />
-                        <StatCard title="Menunggu Approval" value={stats.menunggu_pekan || 0} icon={<Icons.FileText />} color="bg-yellow-50 text-yellow-600" />
-                        <StatCard title="Disetujui (Pekan Ini)" value={stats.disetujui_pekan || 0} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600" />
-                        <StatCard title="Ditolak (Pekan Ini)" value={stats.ditolak_pekan || 0} icon={<Icons.XCircle />} color="bg-red-50 text-red-600" />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6 border-t pt-6">
-                        <StatCard title="Sudah Keluar" value={stats.sudah_keluar || 0} icon={<Icons.Scan />} color="bg-gray-100 text-gray-600" />
-                        <StatCard title="Sudah Kembali" value={stats.sudah_kembali || 0} icon={<Icons.Home />} color="bg-emerald-100 text-emerald-700" />
-                        <StatCard title="Masih Di Luar" value={stats.masih_di_luar || 0} icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600" />
-                        <StatCard title="Terlambat (Bulan Ini)" value={stats.terlambat || 0} icon={<Icons.Clock />} color="bg-red-100 text-red-700" />
-                    </div>
-                </div>
-            );
-        };
-
         // --- SCREENING IZIN ---
         const ScreeningIzinPage = () => {
             const { user } = useContext(AuthContext);
