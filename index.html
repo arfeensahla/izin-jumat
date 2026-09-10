@@ -2896,23 +2896,22 @@
         );
 
         // --- DASHBOARD ADMIN & SEKRETARIS MUDIR ---
-        import React, { useState, useEffect, useContext, useMemo } from 'react';
-        // Pastikan import Context, Icons, StatCard, Card, dll di bagian atas sesuai struktur Bapak
-
         const DashboardManajemen = ({ title, subtitle, userClass }) => {
+            // INFO: Jika props 'userClass' diisi (misal: "VII-A"), 
+            // dashboard otomatis berubah mode menjadi dashboard Wali Kelas.
+
             const { showToast } = useContext(ToastContext);
 
             const [allPermits, setAllPermits] = useState([]);
             const [allLogs, setAllLogs] = useState([]);
             const [loading, setLoading] = useState(true);
 
+            // --- STATE FILTER REKAPITULASI (DROPDOWN) ---
             const [periodeRekap, setPeriodeRekap] = useState('bulan_ini');
             const [startDate, setStartDate] = useState('');
             const [endDate, setEndDate] = useState('');
 
-            // --- PROSES PENGAMBILAN DATA (FETCHING) ---
             useEffect(() => {
-                let isMounted = true;
                 const fetchData = async () => {
                     setLoading(true);
                     try {
@@ -2921,12 +2920,11 @@
                             apiService.request('getScanLogs')
                         ]);
 
-                        if (!isMounted) return;
-
                         let pData = (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) ? resPermits.data.data : (Array.isArray(resPermits.data) ? resPermits.data : (Array.isArray(resPermits) ? resPermits : []));
                         let lData = (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) ? resLogs.data.data : (Array.isArray(resLogs.data) ? resLogs.data : (Array.isArray(resLogs) ? resLogs : []));
 
-                        // Jika props userClass diisi, ini jadi Dashboard Wali Kelas
+                        // --- FILTER KHUSUS WALI KELAS ---
+                        // Jika userClass dikirim dari parent, potong data khusus kelas itu saja
                         if (userClass) {
                             pData = pData.filter(p => String(p.kelas).toUpperCase() === String(userClass).toUpperCase());
                         }
@@ -2934,121 +2932,99 @@
                         setAllPermits(pData);
                         setAllLogs(lData);
                     } catch (e) {
-                        console.error("Fetch error:", e);
-                        if (isMounted) showToast('Gagal memuat data dashboard, periksa koneksi Anda.', 'error');
+                        console.error(e);
+                        showToast('Gagal memuat data dashboard', 'error');
                     } finally {
-                        if (isMounted) setLoading(false);
+                        setLoading(false);
                     }
                 };
                 fetchData();
-                return () => { isMounted = false; };
             }, [userClass]);
 
-            // --- MESIN KALKULASI SUPER CEPAT (USE-MEMO & HASH MAP) ---
-            const { statsPekan, statsRekap } = useMemo(() => {
-                let sPekan = { ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0 };
-                let sRekap = { ajuan: 0, tepatWaktu: 0, terlambat: 0 };
+            // --- RUMUS WAKTU ---
+            const now = new Date();
+            const jsDay = now.getDay();
+            const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
 
-                if (allPermits.length === 0) return { statsPekan: sPekan, statsRekap: sRekap };
+            const startOfWeek = new Date(now);
+            startOfWeek.setHours(0, 0, 0, 0);
+            startOfWeek.setDate(now.getDate() - diffToSaturday);
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+            endOfWeek.setHours(23, 59, 59, 999);
 
-                // 1. Membuat Hash Map agar pencarian Log instan (Tidak menyebabkan HP nge-hang)
-                const logsMap = {};
-                allLogs.forEach(l => {
-                    const id = l.permit_id || l.id_perizinan;
-                    if (id) {
-                        if (!logsMap[id]) logsMap[id] = [];
-                        logsMap[id].push(l);
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+            // --- PROSES PERHITUNGAN REAL-TIME ---
+            let statsPekan = { ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0 };
+            let statsRekap = { ajuan: 0, tepatWaktu: 0, terlambat: 0 };
+
+            allPermits.forEach(p => {
+                const pId = p.permit_id || p.id_perizinan;
+                const pLogs = allLogs.filter(l => l.permit_id === pId || l.id_perizinan === pId);
+                const hasExit = pLogs.some(l => String(l.tipe_scan).toUpperCase() === 'EXIT');
+                const returnLog = pLogs.find(l => String(l.tipe_scan).toUpperCase() === 'RETURN');
+
+                let isTerlambat = false;
+                let isTepatWaktu = false;
+
+                // LOGIKA BAKU TERLAMBAT (Lewat 16:30)
+                if (returnLog && returnLog.waktu) {
+                    const timeParts = String(returnLog.waktu).split(':');
+                    if (timeParts.length >= 2) {
+                        const jam = parseInt(timeParts[0], 10);
+                        const menit = parseInt(timeParts[1], 10);
+                        if (!isNaN(jam) && !isNaN(menit)) {
+                            if ((jam * 60) + menit > 990) isTerlambat = true;
+                            else isTepatWaktu = true;
+                        }
                     }
-                });
+                }
 
-                // 2. Setup Rumus Tanggal
-                const now = new Date();
-                const jsDay = now.getDay();
-                const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
+                const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
+                let pDate = new Date(rawDate);
+                if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
+                    const parts = rawDate.split('/');
+                    if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                }
 
-                const startOfWeek = new Date(now);
-                startOfWeek.setHours(0, 0, 0, 0);
-                startOfWeek.setDate(now.getDate() - diffToSaturday);
+                if (!isNaN(pDate.getTime())) {
+                    // 1. MENGISI STATISTIK KARTU ATAS (SELALU PEKAN INI)
+                    if (pDate >= startOfWeek && pDate <= endOfWeek) {
+                        statsPekan.ajuan++;
+                        if (p.status_pengajuan === 'DISETUJUI') statsPekan.disetujui++;
+                        if (p.status_pengajuan === 'DITOLAK') statsPekan.ditolak++;
 
-                const endOfWeek = new Date(startOfWeek);
-                endOfWeek.setDate(startOfWeek.getDate() + 6);
-                endOfWeek.setHours(23, 59, 59, 999);
-
-                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-
-                // 3. Eksekusi Perhitungan
-                allPermits.forEach(p => {
-                    const pId = p.permit_id || p.id_perizinan;
-                    const pLogs = logsMap[pId] || [];
-
-                    const hasExit = pLogs.some(l => String(l.tipe_scan).toUpperCase() === 'EXIT');
-                    const returnLog = pLogs.find(l => String(l.tipe_scan).toUpperCase() === 'RETURN');
-
-                    let isTerlambat = false;
-                    let isTepatWaktu = false;
-
-                    // Kunci Logika Terlambat (Lewat 16:30)
-                    if (returnLog && returnLog.waktu) {
-                        const timeParts = String(returnLog.waktu).split(':');
-                        if (timeParts.length >= 2) {
-                            const jam = parseInt(timeParts[0], 10);
-                            const menit = parseInt(timeParts[1], 10);
-                            if (!isNaN(jam) && !isNaN(menit)) {
-                                if ((jam * 60) + menit > 990) isTerlambat = true;
-                                else isTepatWaktu = true;
-                            }
+                        if (hasExit && !returnLog) statsPekan.diluar++;
+                        if (returnLog) {
+                            statsPekan.kembali++;
+                            if (isTerlambat) statsPekan.terlambat++;
                         }
                     }
 
-                    // Parsing Tanggal Anti Gagal
-                    const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
-                    let pDate = new Date(rawDate);
-                    if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
-                        const parts = rawDate.split('/');
-                        if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                    // 2. MENGISI TABEL REKAPITULASI BAWAH (DINAMIS SESUAI DROPDOWN)
+                    let masukRekap = false;
+                    if (periodeRekap === 'pekan_ini') {
+                        masukRekap = (pDate >= startOfWeek && pDate <= endOfWeek);
+                    } else if (periodeRekap === 'bulan_ini') {
+                        masukRekap = (pDate >= startOfMonth && pDate <= endOfMonth);
+                    } else if (periodeRekap === 'semua') {
+                        masukRekap = true;
+                    } else if (periodeRekap === 'custom' && startDate && endDate) {
+                        const s = new Date(startDate); s.setHours(0, 0, 0, 0);
+                        const e = new Date(endDate); e.setHours(23, 59, 59, 999);
+                        masukRekap = (pDate >= s && pDate <= e);
                     }
 
-                    if (!isNaN(pDate.getTime())) {
-                        // UPDATE KARTU ATAS (Hanya Pekan Ini)
-                        if (pDate >= startOfWeek && pDate <= endOfWeek) {
-                            sPekan.ajuan++;
-                            if (p.status_pengajuan === 'DISETUJUI') sPekan.disetujui++;
-                            if (p.status_pengajuan === 'DITOLAK') sPekan.ditolak++;
-
-                            if (hasExit && !returnLog) sPekan.diluar++;
-                            if (returnLog) {
-                                sPekan.kembali++;
-                                if (isTerlambat) sPekan.terlambat++;
-                            }
-                        }
-
-                        // UPDATE TABEL BAWAH (Dinamis Sesuai Filter)
-                        let masukRekap = false;
-                        if (periodeRekap === 'pekan_ini') {
-                            masukRekap = (pDate >= startOfWeek && pDate <= endOfWeek);
-                        } else if (periodeRekap === 'bulan_ini') {
-                            masukRekap = (pDate >= startOfMonth && pDate <= endOfMonth);
-                        } else if (periodeRekap === 'semua') {
-                            masukRekap = true;
-                        } else if (periodeRekap === 'custom' && startDate && endDate) {
-                            const s = new Date(startDate); s.setHours(0, 0, 0, 0);
-                            const e = new Date(endDate); e.setHours(23, 59, 59, 999);
-                            masukRekap = (pDate >= s && pDate <= e);
-                        }
-
-                        if (masukRekap) {
-                            sRekap.ajuan++;
-                            if (isTerlambat) sRekap.terlambat++;
-                            if (isTepatWaktu) sRekap.tepatWaktu++;
-                        }
+                    if (masukRekap) {
+                        statsRekap.ajuan++;
+                        if (isTerlambat) statsRekap.terlambat++;
+                        if (isTepatWaktu) statsRekap.tepatWaktu++;
                     }
-                });
-
-                return { statsPekan: sPekan, statsRekap: sRekap };
-            }, [allPermits, allLogs, periodeRekap, startDate, endDate]); // Hanya menghitung ulang jika salah satu dari ini berubah
-
-            // --- FUNGSI FORMAT TANGGAL CANTIK ---
+                }
+            });
+            // Fungsi pembantu untuk memoles tampilan tanggal
             const formatTanggalIndo = (dateString) => {
                 if (!dateString) return '';
                 const d = new Date(dateString);
@@ -3063,6 +3039,7 @@
                             <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
                             <p className="text-gray-500">{subtitle}</p>
                         </div>
+                        {/* Lencana Muncul Jika Mode Wali Kelas */}
                         {userClass && (
                             <div className="bg-blue-50 border border-blue-200 px-4 py-2 rounded-lg text-right">
                                 <span className="text-sm text-blue-600 block leading-tight">Data Kelas</span>
@@ -3084,9 +3061,10 @@
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-end mt-8 mb-2 gap-4">
                         <h3 className="text-lg font-bold text-emerald-800 border-b pb-2 w-full md:w-auto">Rekapitulasi Histori</h3>
 
+                        {/* FILTER DROPDOWN PERIODE DI DASHBOARD */}
                         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                             <select
-                                className="p-2 border rounded-lg outline-none text-sm font-medium bg-white focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                                className="p-2 border rounded-lg outline-none text-sm font-medium bg-white focus:ring-2 focus:ring-emerald-500"
                                 value={periodeRekap}
                                 onChange={(e) => setPeriodeRekap(e.target.value)}
                             >
@@ -3097,10 +3075,10 @@
                             </select>
 
                             {periodeRekap === 'custom' && (
-                                <div className="flex items-center gap-2 animate-fade-in-down">
-                                    <input type="date" className="p-2 border rounded-md text-sm outline-none cursor-pointer" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                                <div className="flex items-center gap-2">
+                                    <input type="date" className="p-2 border rounded-md text-sm outline-none" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                                     <span className="text-gray-500 text-sm font-bold">s/d</span>
-                                    <input type="date" className="p-2 border rounded-md text-sm outline-none cursor-pointer" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                                    <input type="date" className="p-2 border rounded-md text-sm outline-none" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                                 </div>
                             )}
                         </div>
@@ -3118,7 +3096,7 @@
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan="4" className="p-8 text-center text-gray-500 text-sm">Menyinkronkan data...</td></tr>
+                                    <tr><td colSpan="4" className="p-6 text-center text-gray-500 text-sm">Menghitung rekapitulasi...</td></tr>
                                 ) : (
                                     <tr className="hover:bg-gray-50 transition-colors">
                                         <td className="p-4 font-bold text-gray-800">
