@@ -2896,88 +2896,150 @@
         );
 
         // --- DASHBOARD ADMIN & SEKRETARIS MUDIR ---
-        const DashboardManajemen = ({ title, subtitle }) => {
+        const DashboardManajemen = ({ title, subtitle, userClass }) => {
+            // INFO: Jika props 'userClass' diisi (misal: "VII-A"), 
+            // dashboard otomatis berubah mode menjadi dashboard Wali Kelas.
+
             const { showToast } = useContext(ToastContext);
 
-            const [statsPekan, setStatsPekan] = useState({ ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0 });
-            const [statsTotal, setStatsTotal] = useState({ ajuan: 0, rekapTepat: 0, terlambat: 0 });
+            const [allPermits, setAllPermits] = useState([]);
+            const [allLogs, setAllLogs] = useState([]);
             const [loading, setLoading] = useState(true);
+
+            // --- STATE FILTER REKAPITULASI (DROPDOWN) ---
+            const [periodeRekap, setPeriodeRekap] = useState('bulan_ini');
+            const [startDate, setStartDate] = useState('');
+            const [endDate, setEndDate] = useState('');
 
             useEffect(() => {
                 const fetchData = async () => {
+                    setLoading(true);
                     try {
-                        const [resPermits, resLogs] = await Promise.all([apiService.request('getPermits'), apiService.request('getScanLogs')]);
+                        const [resPermits, resLogs] = await Promise.all([
+                            apiService.request('getPermits'),
+                            apiService.request('getScanLogs')
+                        ]);
 
-                        let allPermits = [];
-                        if (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) allPermits = resPermits.data.data;
-                        else if (resPermits && Array.isArray(resPermits.data)) allPermits = resPermits.data;
-                        else if (Array.isArray(resPermits)) allPermits = resPermits;
+                        let pData = (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) ? resPermits.data.data : (Array.isArray(resPermits.data) ? resPermits.data : (Array.isArray(resPermits) ? resPermits : []));
+                        let lData = (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) ? resLogs.data.data : (Array.isArray(resLogs.data) ? resLogs.data : (Array.isArray(resLogs) ? resLogs : []));
 
-                        let allLogs = [];
-                        if (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) allLogs = resLogs.data.data;
-                        else if (resLogs && Array.isArray(resLogs.data)) allLogs = resLogs.data;
-                        else if (Array.isArray(resLogs)) allLogs = resLogs;
+                        // --- FILTER KHUSUS WALI KELAS ---
+                        // Jika userClass dikirim dari parent, potong data khusus kelas itu saja
+                        if (userClass) {
+                            pData = pData.filter(p => String(p.kelas).toUpperCase() === String(userClass).toUpperCase());
+                        }
 
-                        let sPekan = { ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0 };
-                        let sTotal = { ajuan: allPermits.length, rekapTepat: 0, terlambat: 0 };
-
-                        // --- RUMUS WAKTU: Kalender Pondok (Sabtu - Jumat) ---
-                        const now = new Date();
-                        const jsDay = now.getDay();
-                        const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
-
-                        const startOfWeek = new Date(now);
-                        startOfWeek.setHours(0, 0, 0, 0);
-                        startOfWeek.setDate(now.getDate() - diffToSaturday);
-
-                        const endOfWeek = new Date(startOfWeek);
-                        endOfWeek.setDate(startOfWeek.getDate() + 6);
-                        endOfWeek.setHours(23, 59, 59, 999);
-                        // ----------------------------------------------------
-
-                        allPermits.forEach(p => {
-                            const pLogs = allLogs.filter(l => l.permit_id === p.permit_id || l.permit_id === p.id_perizinan);
-                            const hasExit = pLogs.some(l => l.tipe_scan === 'EXIT');
-                            const returnLog = pLogs.find(l => l.tipe_scan === 'RETURN');
-
-                            if (returnLog) {
-                                if (returnLog.keterangan && returnLog.keterangan.includes('TERLAMBAT')) sTotal.terlambat++;
-                                else sTotal.rekapTepat++;
-                            }
-
-                            const permitDateStr = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
-
-                            // --- TRIK KEBAL FORMAT TANGGAL ---
-                            let pDate = new Date(permitDateStr);
-                            if (isNaN(pDate) && typeof permitDateStr === 'string' && permitDateStr.includes('/')) {
-                                const parts = permitDateStr.split('/');
-                                if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                            }
-                            // ---------------------------------
-
-                            if (!isNaN(pDate) && pDate >= startOfWeek && pDate <= endOfWeek) {
-                                sPekan.ajuan++;
-                                if (p.status_pengajuan === 'DISETUJUI') sPekan.disetujui++;
-                                if (p.status_pengajuan === 'DITOLAK') sPekan.ditolak++;
-
-                                if (hasExit && !returnLog) sPekan.diluar++;
-                                if (returnLog) {
-                                    sPekan.kembali++;
-                                    if (returnLog.keterangan && returnLog.keterangan.includes('TERLAMBAT')) sPekan.terlambat++;
-                                }
-                            }
-                        });
-
-                        setStatsPekan(sPekan);
-                        setStatsTotal(sTotal);
-                    } catch (e) { console.error(e); } finally { setLoading(false); }
+                        setAllPermits(pData);
+                        setAllLogs(lData);
+                    } catch (e) {
+                        console.error(e);
+                        showToast('Gagal memuat data dashboard', 'error');
+                    } finally {
+                        setLoading(false);
+                    }
                 };
                 fetchData();
-            }, []);
+            }, [userClass]);
+
+            // --- RUMUS WAKTU ---
+            const now = new Date();
+            const jsDay = now.getDay();
+            const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
+
+            const startOfWeek = new Date(now);
+            startOfWeek.setHours(0, 0, 0, 0);
+            startOfWeek.setDate(now.getDate() - diffToSaturday);
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+            endOfWeek.setHours(23, 59, 59, 999);
+
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+            // --- PROSES PERHITUNGAN REAL-TIME ---
+            let statsPekan = { ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0 };
+            let statsRekap = { ajuan: 0, tepatWaktu: 0, terlambat: 0 };
+
+            allPermits.forEach(p => {
+                const pId = p.permit_id || p.id_perizinan;
+                const pLogs = allLogs.filter(l => l.permit_id === pId || l.id_perizinan === pId);
+                const hasExit = pLogs.some(l => String(l.tipe_scan).toUpperCase() === 'EXIT');
+                const returnLog = pLogs.find(l => String(l.tipe_scan).toUpperCase() === 'RETURN');
+
+                let isTerlambat = false;
+                let isTepatWaktu = false;
+
+                // LOGIKA BAKU TERLAMBAT (Lewat 16:30)
+                if (returnLog && returnLog.waktu) {
+                    const timeParts = String(returnLog.waktu).split(':');
+                    if (timeParts.length >= 2) {
+                        const jam = parseInt(timeParts[0], 10);
+                        const menit = parseInt(timeParts[1], 10);
+                        if (!isNaN(jam) && !isNaN(menit)) {
+                            if ((jam * 60) + menit > 990) isTerlambat = true;
+                            else isTepatWaktu = true;
+                        }
+                    }
+                }
+
+                const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
+                let pDate = new Date(rawDate);
+                if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
+                    const parts = rawDate.split('/');
+                    if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                }
+
+                if (!isNaN(pDate.getTime())) {
+                    // 1. MENGISI STATISTIK KARTU ATAS (SELALU PEKAN INI)
+                    if (pDate >= startOfWeek && pDate <= endOfWeek) {
+                        statsPekan.ajuan++;
+                        if (p.status_pengajuan === 'DISETUJUI') statsPekan.disetujui++;
+                        if (p.status_pengajuan === 'DITOLAK') statsPekan.ditolak++;
+
+                        if (hasExit && !returnLog) statsPekan.diluar++;
+                        if (returnLog) {
+                            statsPekan.kembali++;
+                            if (isTerlambat) statsPekan.terlambat++;
+                        }
+                    }
+
+                    // 2. MENGISI TABEL REKAPITULASI BAWAH (DINAMIS SESUAI DROPDOWN)
+                    let masukRekap = false;
+                    if (periodeRekap === 'pekan_ini') {
+                        masukRekap = (pDate >= startOfWeek && pDate <= endOfWeek);
+                    } else if (periodeRekap === 'bulan_ini') {
+                        masukRekap = (pDate >= startOfMonth && pDate <= endOfMonth);
+                    } else if (periodeRekap === 'semua') {
+                        masukRekap = true;
+                    } else if (periodeRekap === 'custom' && startDate && endDate) {
+                        const s = new Date(startDate); s.setHours(0, 0, 0, 0);
+                        const e = new Date(endDate); e.setHours(23, 59, 59, 999);
+                        masukRekap = (pDate >= s && pDate <= e);
+                    }
+
+                    if (masukRekap) {
+                        statsRekap.ajuan++;
+                        if (isTerlambat) statsRekap.terlambat++;
+                        if (isTepatWaktu) statsRekap.tepatWaktu++;
+                    }
+                }
+            });
 
             return (
                 <div className="space-y-6 animate-fade-in-down">
-                    <div><h2 className="text-2xl font-bold text-gray-800">{title}</h2><p className="text-gray-500">{subtitle}</p></div>
+                    <div className="flex justify-between items-end border-b pb-4">
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
+                            <p className="text-gray-500">{subtitle}</p>
+                        </div>
+                        {/* Lencana Muncul Jika Mode Wali Kelas */}
+                        {userClass && (
+                            <div className="bg-blue-50 border border-blue-200 px-4 py-2 rounded-lg text-right">
+                                <span className="text-sm text-blue-600 block leading-tight">Data Kelas</span>
+                                <span className="font-bold text-blue-900 text-lg">{userClass}</span>
+                            </div>
+                        )}
+                    </div>
 
                     <h3 className="text-lg font-bold text-emerald-800 border-b pb-2 mt-4">Statistik Pekan Ini</h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -2989,21 +3051,58 @@
                         <StatCard title="Terlambat" value={loading ? "..." : statsPekan.terlambat} icon={<Icons.Clock />} color="bg-rose-50 text-rose-600" />
                     </div>
 
-                    <h3 className="text-lg font-bold text-emerald-800 border-b pb-2 mt-8">Rekapitulasi Histori</h3>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end mt-8 mb-2 gap-4">
+                        <h3 className="text-lg font-bold text-emerald-800 border-b pb-2 w-full md:w-auto">Rekapitulasi Histori</h3>
+
+                        {/* FILTER DROPDOWN PERIODE DI DASHBOARD */}
+                        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                            <select
+                                className="p-2 border rounded-lg outline-none text-sm font-medium bg-white focus:ring-2 focus:ring-emerald-500"
+                                value={periodeRekap}
+                                onChange={(e) => setPeriodeRekap(e.target.value)}
+                            >
+                                <option value="pekan_ini">Pekan Ini</option>
+                                <option value="bulan_ini">Bulan Ini</option>
+                                <option value="semua">Semua Waktu</option>
+                                <option value="custom">📅 Custom Tanggal...</option>
+                            </select>
+
+                            {periodeRekap === 'custom' && (
+                                <div className="flex items-center gap-2">
+                                    <input type="date" className="p-2 border rounded-md text-sm outline-none" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                                    <span className="text-gray-500 text-sm font-bold">s/d</span>
+                                    <input type="date" className="p-2 border rounded-md text-sm outline-none" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     <Card className="overflow-x-auto p-0">
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-gray-100 text-gray-700 border-b">
-                                    <th className="p-3">Periode Waktu</th>
-                                    <th className="p-3">Total Ajuan Izin</th>
-                                    <th className="p-3">Kembali Tepat Waktu</th>
-                                    <th className="p-3">Total Terlambat</th>
+                                    <th className="p-4 font-semibold text-sm">Periode Terpilih</th>
+                                    <th className="p-4 font-semibold text-sm">Total Ajuan Izin</th>
+                                    <th className="p-4 font-semibold text-sm">Kembali Tepat Waktu</th>
+                                    <th className="p-4 font-semibold text-sm">Total Terlambat</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <RekapRow periode="Bulan Ini" ajuan={loading ? "..." : statsTotal.ajuan} tepatWaktu={loading ? "..." : statsTotal.rekapTepat} terlambat={loading ? "..." : statsTotal.terlambat} />
-                                <RekapRow periode="Semester Ini" ajuan={loading ? "..." : statsTotal.ajuan} tepatWaktu={loading ? "..." : statsTotal.rekapTepat} terlambat={loading ? "..." : statsTotal.terlambat} />
-                                <RekapRow periode="Tahun Pelajaran Ini" ajuan={loading ? "..." : statsTotal.ajuan} tepatWaktu={loading ? "..." : statsTotal.rekapTepat} terlambat={loading ? "..." : statsTotal.terlambat} />
+                                {loading ? (
+                                    <tr><td colSpan="4" className="p-6 text-center text-gray-500 text-sm">Menghitung rekapitulasi...</td></tr>
+                                ) : (
+                                    <tr className="hover:bg-gray-50 transition-colors">
+                                        <td className="p-4 font-bold text-gray-800">
+                                            {periodeRekap === 'pekan_ini' ? 'Pekan Berjalan' :
+                                                periodeRekap === 'bulan_ini' ? 'Bulan Berjalan' :
+                                                    periodeRekap === 'semua' ? 'Semua Riwayat (All Time)' :
+                                                        (startDate && endDate) ? `${startDate} s/d ${endDate}` : 'Pilih Tanggal'}
+                                        </td>
+                                        <td className="p-4 text-blue-600 font-bold">{statsRekap.ajuan} Santri</td>
+                                        <td className="p-4 text-emerald-600 font-bold">{statsRekap.tepatWaktu} Santri</td>
+                                        <td className="p-4 text-red-600 font-bold">{statsRekap.terlambat} Santri</td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </Card>
