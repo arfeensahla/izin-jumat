@@ -1591,6 +1591,7 @@
         };
 
         // --- AJUAN IZIN PAGE ---
+        // --- COMPONENT: AJUKAN IZIN KELUAR ---
         const AjukanIzinPage = ({ setCurrentRoute }) => {
             const { user } = useContext(AuthContext);
             const { showToast } = useContext(ToastContext);
@@ -1598,6 +1599,8 @@
             const [allSantriData, setAllSantriData] = useState([]);
             const [jadwalData, setJadwalData] = useState([]);
             const [loading, setLoading] = useState(true);
+            
+            // --- GEMBOK ANTI DOUBLE-CLICK & LOCK FORM ---
             const [submitting, setSubmitting] = useState(false);
 
             const [searchSaudaraTerm, setSearchSaudaraTerm] = useState('');
@@ -1613,6 +1616,7 @@
                 return helper.getNextFriday();
             }, []);
             // ----------------------------------------------
+            
             const weekNumber = useMemo(() => {
                 let week = helper.getWeekOfMonth(nextFriday);
                 return week > 4 ? '4' : week.toString();
@@ -1674,12 +1678,8 @@
 
             // --- 2. MENGHITUNG STATUS JADWAL FINAL (DENGAN EFEK KAKAK/ADIK) ---
             const statusJadwal = useMemo(() => {
-                // Jika aslinya sudah Sesuai Jadwal, hiraukan apapun inputan kakaknya
                 if (statusJadwalAsli === 'Sesuai Jadwal') return 'Sesuai Jadwal';
-                // Jika tidak menceklis ikut kakak/adik, kembalikan status asli (Di Luar Jadwal)
                 if (!form.ikut_jadwal_saudara) return statusJadwalAsli;
-
-                // --- Pengecekan Jadwal Kakak/Adik ---
                 if (!selectedSaudara || jadwalData.length === 0) return 'Di Luar Jadwal';
 
                 const currentPekanNum = String(weekNumber).replace(/\D/g, '');
@@ -1700,10 +1700,11 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
+                if (submitting) return; // Mencegah form ganda terkirim
+                
                 if (statusJadwal === 'Di Luar Jadwal' && !form.keterangan_luar_jadwal) return showToast("Keterangan Di Luar Jadwal wajib diisi!", "error");
                 if (form.hubungan_wali === 'Lainnya' && !form.hubungan_lainnya) return showToast("Detail hubungan Lainnya wajib diisi!", "error");
 
-                // Cegah error jika checkbox tidak sengaja kecentang tapi status asli sudah sesuai
                 if (statusJadwalAsli === 'Di Luar Jadwal' && form.ikut_jadwal_saudara && !form.saudara_santri_id) {
                     return showToast("Pilih santri saudara yang diikuti jadwalnya!", "error");
                 }
@@ -1713,7 +1714,6 @@
                     const payload = {
                         ...form,
                         hubungan_wali: form.hubungan_wali === 'Lainnya' ? form.hubungan_lainnya : form.hubungan_wali,
-                        // Bersihkan data sampah saudara jika ternyata dia lolos secara mandiri
                         ikut_jadwal_saudara: statusJadwalAsli === 'Sesuai Jadwal' ? false : form.ikut_jadwal_saudara,
                         saudara_santri_id: statusJadwalAsli === 'Sesuai Jadwal' ? '' : form.saudara_santri_id,
                         nama_santri: selectedSantri.nama || selectedSantri.nama_santri,
@@ -1742,7 +1742,7 @@
             const santriOptions = santriData.map(s => ({ value: (s.santri_id || s.nis || s.id), label: `${s.nama || s.nama_santri} (${s.kelas})` }));
             const hubunganOptions = ['Ayah', 'Ibu', 'Kakak Kandung', 'Adik Kandung', 'Kakek', 'Nenek', 'Paman', 'Bibi', 'Lainnya'];
 
-            if (loading) return <div className="p-8 text-center text-gray-500 animate-pulse">Menyiapkan Form (Membaca data dari Google Sheets)...</div>;
+            if (loading) return <div className="p-8 text-center text-gray-500 animate-pulse">Menyiapkan Form (Membaca data dari Database)...</div>;
 
             return (
                 <div className="space-y-6 animate-fade-in-down max-w-4xl">
@@ -1750,7 +1750,7 @@
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <Card>
                             <h3 className="text-lg font-bold text-gray-700 border-b pb-2 mb-4">1. Identitas Santri</h3>
-                            <Select name="santri_id" label={<>Pilih Santri di Kelas {user.kelas_id} <span className="text-red-500">*</span></>} required options={santriOptions} value={form.santri_id} onChange={(e) => setForm({ ...form, santri_id: e.target.value })} />
+                            <Select name="santri_id" disabled={submitting} label={<>Pilih Santri di Kelas {user.kelas_id} <span className="text-red-500">*</span></>} required options={santriOptions} value={form.santri_id} onChange={(e) => setForm({ ...form, santri_id: e.target.value })} />
                             {selectedSantri && (<div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4 grid grid-cols-3 gap-4 text-sm mt-4"><div><p className="text-gray-500">Jenjang</p><p className="font-bold text-emerald-800">{selectedSantri.jenjang || '-'}</p></div><div><p className="text-gray-500">Kelas</p><p className="font-bold text-emerald-800">{selectedSantri.kelas || '-'}</p></div><div><p className="text-gray-500">Gender</p><p className="font-bold text-emerald-800">{selectedSantri.gender || selectedSantri.jk || '-'}</p></div></div>)}
                         </Card>
 
@@ -1759,15 +1759,15 @@
                                 <h3 className="text-lg font-bold text-gray-700 border-b pb-2 mb-4">2. Detail Perizinan</h3>
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Keperluan Izin <span className="text-red-500">*</span></label>
-                                    <textarea required rows="2" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none" value={form.keperluan} onChange={(e) => setForm({ ...form, keperluan: e.target.value })} placeholder="Contoh: Membeli Kebutuhan Santri"></textarea>
+                                    <textarea disabled={submitting} required rows="2" className={`w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none ${submitting ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`} value={form.keperluan} onChange={(e) => setForm({ ...form, keperluan: e.target.value })} placeholder="Contoh: Membeli Kebutuhan Santri"></textarea>
                                 </div>
-                                <Input label={<>Tujuan Keluar (Tempat/Kota) <span className="text-red-500">*</span></>} required value={form.tujuan} onChange={(e) => setForm({ ...form, tujuan: e.target.value })} placeholder="Contoh: Bandung" />
+                                <Input disabled={submitting} label={<>Tujuan Keluar (Tempat/Kota) <span className="text-red-500">*</span></>} required value={form.tujuan} onChange={(e) => setForm({ ...form, tujuan: e.target.value })} placeholder="Contoh: Bandung" />
                             </Card>
                             <Card>
                                 <h3 className="text-lg font-bold text-gray-700 border-b pb-2 mb-4">3. Wali Safar (Penjemput)</h3>
-                                <Input label={<>Nama Wali Safar <span className="text-red-500">*</span></>} required value={form.wali_safar} onChange={(e) => setForm({ ...form, wali_safar: e.target.value })} placeholder="Nama penjemput" />
-                                <Select label={<>Hubungan Wali Safar <span className="text-red-500">*</span></>} required options={hubunganOptions} value={form.hubungan_wali} onChange={(e) => setForm({ ...form, hubungan_wali: e.target.value })} />
-                                {form.hubungan_wali === 'Lainnya' && (<Input label={<>Detail Hubungan Lainnya <span className="text-red-500">*</span></>} required value={form.hubungan_lainnya} onChange={(e) => setForm({ ...form, hubungan_lainnya: e.target.value })} placeholder="Sebutkan hubungannya..." />)}
+                                <Input disabled={submitting} label={<>Nama Wali Safar <span className="text-red-500">*</span></>} required value={form.wali_safar} onChange={(e) => setForm({ ...form, wali_safar: e.target.value })} placeholder="Nama penjemput" />
+                                <Select disabled={submitting} label={<>Hubungan Wali Safar <span className="text-red-500">*</span></>} required options={hubunganOptions} value={form.hubungan_wali} onChange={(e) => setForm({ ...form, hubungan_wali: e.target.value })} />
+                                {form.hubungan_wali === 'Lainnya' && (<Input disabled={submitting} label={<>Detail Hubungan Lainnya <span className="text-red-500">*</span></>} required value={form.hubungan_lainnya} onChange={(e) => setForm({ ...form, hubungan_lainnya: e.target.value })} placeholder="Sebutkan hubungannya..." />)}
                             </Card>
                         </div>
 
@@ -1782,8 +1782,8 @@
                                     {/* CEK STATUS ASLI: Jika Sesuai Jadwal, Sembunyikan Checkbox Kakak/Adik! */}
                                     {statusJadwalAsli === 'Di Luar Jadwal' && (
                                         <>
-                                            <label className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors">
-                                                <input type="checkbox" className="w-5 h-5 text-emerald-600 rounded" checked={form.ikut_jadwal_saudara} onChange={(e) => { setForm({ ...form, ikut_jadwal_saudara: e.target.checked, saudara_santri_id: '' }); setSearchSaudaraTerm(''); }} />
+                                            <label className={`flex items-center gap-3 p-3 border rounded-lg bg-gray-50 transition-colors ${submitting ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:bg-gray-100'}`}>
+                                                <input disabled={submitting} type="checkbox" className="w-5 h-5 text-emerald-600 rounded" checked={form.ikut_jadwal_saudara} onChange={(e) => { setForm({ ...form, ikut_jadwal_saudara: e.target.checked, saudara_santri_id: '' }); setSearchSaudaraTerm(''); }} />
                                                 <span className="font-medium text-gray-700">Mengikuti Jadwal Kakak / Adik Lintas Kelas</span>
                                             </label>
 
@@ -1791,16 +1791,11 @@
                                                 <div className="pl-8 p-4 bg-blue-50 border border-blue-100 rounded-lg animate-fade-in-down space-y-3">
                                                     <label className="block text-sm font-medium text-blue-900">Cari Nama Saudara <span className="text-red-500">*</span></label>
                                                     <input
-                                                        type="text"
-                                                        placeholder="Ketik nama saudara..."
-                                                        className="w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                                        type="text" disabled={submitting} placeholder="Ketik nama saudara..." className={`w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm ${submitting ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
                                                         value={searchSaudaraTerm}
-                                                        onChange={(e) => {
-                                                            setSearchSaudaraTerm(e.target.value);
-                                                            setForm({ ...form, saudara_santri_id: '' });
-                                                        }}
+                                                        onChange={(e) => { setSearchSaudaraTerm(e.target.value); setForm({ ...form, saudara_santri_id: '' }); }}
                                                     />
-                                                    {searchSaudaraTerm && !form.saudara_santri_id && (
+                                                    {searchSaudaraTerm && !form.saudara_santri_id && !submitting && (
                                                         <div className="max-h-40 overflow-y-auto border border-blue-200 rounded-lg bg-white shadow-sm mt-1">
                                                             {allSantriData
                                                                 .filter(s => (s.santri_id || s.nis || s.id) !== form.santri_id)
@@ -1809,14 +1804,11 @@
                                                                 .map(s => {
                                                                     const id = s.santri_id || s.nis || s.id;
                                                                     return (
-                                                                        <div
-                                                                            key={id}
-                                                                            className="p-3 cursor-pointer hover:bg-blue-50 text-sm border-b last:border-0"
+                                                                        <div key={id} className="p-3 cursor-pointer hover:bg-blue-50 text-sm border-b last:border-0"
                                                                             onClick={() => {
                                                                                 setForm({ ...form, saudara_santri_id: id });
                                                                                 setSearchSaudaraTerm(`${s.nama || s.nama_santri} (Kelas: ${s.kelas})`);
-                                                                            }}
-                                                                        >
+                                                                            }}>
                                                                             <span className="font-bold text-gray-800">{s.nama || s.nama_santri}</span>
                                                                             <span className="text-gray-500 text-xs ml-1">({s.kelas} - {s.gender || s.jk})</span>
                                                                         </div>
@@ -1834,13 +1826,15 @@
                                     {statusJadwal === 'Di Luar Jadwal' && (
                                         <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                                             <label className="block text-sm font-bold text-yellow-800 mb-2">Karena izin di luar jadwal, wajib mengisi alasan berikut: <span className="text-red-500">*</span></label>
-                                            <textarea required rows="2" className="w-full px-4 py-2 rounded-lg border border-yellow-300 focus:ring-2 focus:ring-yellow-500 outline-none" value={form.keterangan_luar_jadwal} onChange={(e) => setForm({ ...form, keterangan_luar_jadwal: e.target.value })} placeholder="Alasan izin di luar pekan yang ditentukan..."></textarea>
+                                            <textarea disabled={submitting} required rows="2" className={`w-full px-4 py-2 rounded-lg border border-yellow-300 focus:ring-2 focus:ring-yellow-500 outline-none ${submitting ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`} value={form.keterangan_luar_jadwal} onChange={(e) => setForm({ ...form, keterangan_luar_jadwal: e.target.value })} placeholder="Alasan izin di luar pekan yang ditentukan..."></textarea>
                                         </div>
                                     )}
                                 </div>
                             </Card>
                         )}
-                        <Button type="submit" disabled={!selectedSantri || submitting} fullWidth className="py-4 text-lg shadow-lg">{submitting ? 'Memproses ke Database...' : 'Kirim Pengajuan Izin'}</Button>
+                        <Button type="submit" disabled={!selectedSantri || submitting} fullWidth className="py-4 text-lg shadow-lg">
+                            {submitting ? 'Mengirim ke Server...' : 'Kirim Pengajuan Izin'}
+                        </Button>
                     </form>
                 </div>
             );
