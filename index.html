@@ -2942,7 +2942,7 @@
         };
 
         // --- DASHBOARD ADMIN & SEKRETARIS MUDIR ---
-        const DashboardManajemen = ({ title, subtitle, userClass }) => {
+        const DashboardManajemen = ({ title, subtitle, userClass, setCurrentRoute }) => {
     const { showToast } = useContext(ToastContext);
 
     const [allPermits, setAllPermits] = useState([]);
@@ -3125,7 +3125,7 @@
             {/* --- BANNER ALERT DINAMIS MENUNGGU ACC (MOBILE FRIENDLY) --- */}
             {!loading && totalMenunggu > 0 && (
                 <div 
-                    onClick={() => navigate('/screening')} 
+                    onClick={() => setCurrentRoute ? setCurrentRoute('screening') : null} 
                     className="mt-6 bg-yellow-50 border border-yellow-200 border-l-4 border-l-yellow-500 p-3 rounded-r-lg shadow-sm flex items-center justify-between gap-2 animate-fade-in-down active:bg-yellow-200 transition-colors cursor-pointer"
                 >
                     <div className="flex items-center gap-3">
@@ -4241,9 +4241,9 @@
             const { user } = useContext(AuthContext);
 
             if (currentRoute === 'dashboard') {
-                if (user.role === ROLES.ADMIN) return <DashboardManajemen title="Dashboard Admin" subtitle="Ringkasan perizinan pondok secara keseluruhan." />;
-                if (user.role === ROLES.SEKRETARIS_MUDIR) return <DashboardManajemen title="Dashboard Sekretaris" subtitle="Rekapitulasi perizinan dan approval santri." />;
-                if (user.role === ROLES.WALI_KELAS) return <DashboardManajemen title="Dashboard Wali Kelas" subtitle="Pantauan perizinan khusus santri perwalian Anda." userClass={user.kelas_id} />;
+                if (user.role === ROLES.ADMIN) return <DashboardManajemen title="Dashboard Admin" subtitle="Ringkasan perizinan pondok secara keseluruhan." setCurrentRoute={setCurrentRoute} />;
+                if (user.role === ROLES.SEKRETARIS_MUDIR) return <DashboardManajemen title="Dashboard Sekretaris" subtitle="Rekapitulasi perizinan dan approval santri." setCurrentRoute={setCurrentRoute} />;
+                if (user.role === ROLES.WALI_KELAS) return <DashboardManajemen title="Dashboard Wali Kelas" subtitle="Pantauan perizinan khusus santri perwalian Anda." userClass={user.kelas_id} setCurrentRoute={setCurrentRoute} />;
                 if (user.role === ROLES.SECURITY) return <DashboardSecurity setCurrentRoute={setCurrentRoute} />;
             }
 
