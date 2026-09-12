@@ -1150,7 +1150,7 @@
                             apiService.request('getKelas')
                         ]);
 
-                        // 1. Ekstrak Data Santri (Aman dari bungkus ganda)
+                        // 1. Ekstrak Data Santri
                         let finalSantri = [];
                         if (resSantri && resSantri.data && Array.isArray(resSantri.data.data)) finalSantri = resSantri.data.data;
                         else if (resSantri && Array.isArray(resSantri.data)) finalSantri = resSantri.data;
@@ -1169,7 +1169,6 @@
                         else if (Array.isArray(resKelas)) finalKelas = resKelas;
 
                         // --- PENYARINGAN AMAN ---
-                        // Mencari status aktif tanpa peduli huruf besar/kecil
                         const aktifSantri = finalSantri.filter(s => String(s.status || s.Status || '').toLowerCase() === 'aktif');
                         const aktifTp = finalTp.filter(t => String(t.status || t.Status || '').toLowerCase() === 'aktif');
 
@@ -1177,7 +1176,7 @@
                         setTpData(aktifTp);
                         setKelasData(finalKelas);
 
-                        // Set TP default ke yang aktif (Sapu Jagat untuk nama ID)
+                        // Set TP default
                         if (aktifTp.length > 0) {
                             setSelectedTp(aktifTp[0].tp_id || aktifTp[0].id_tp || aktifTp[0].id || aktifTp[0].tahun_pelajaran);
                         } else if (finalTp.length > 0) {
@@ -1196,10 +1195,8 @@
             const handlePreview = () => {
                 if (!selectedTp || !fromKelas || !toKelas) return showToast('Pilih TP, Kelas Asal, dan Kelas Tujuan', 'error');
 
-                // Menarik santri sesuai kelas asalnya
                 const targetSantri = santriData.filter(s => (s.kelas || s.Kelas) === fromKelas);
 
-                // Menyiapkan draft (Dilengkapi Sapu Jagat untuk mengatasi perbedaan nama kolom NIS/Nama)
                 const draft = targetSantri.map(s => ({
                     santri_id: s.santri_id || s.nis || s.NIS || s.id,
                     nama: s.nama || s.nama_santri || s.Nama,
@@ -1220,7 +1217,10 @@
 
             const handleSubmit = async () => {
                 if (previewData.length === 0) return;
+                if (processing) return; // GEMBOK ANTI DOUBLE-CLICK
+                
                 if (!confirm("Apakah Anda yakin memproses kenaikan kelas ini? Proses ini akan mencatat histori di database.")) return;
+                
                 setProcessing(true);
                 try {
                     const payload = { mutations: previewData.map(d => ({ santri_id: d.santri_id, tp_id: selectedTp, kelas_baru: d.kelas_baru, status_baru: d.status_baru })) };
@@ -1229,10 +1229,13 @@
                     setPreviewData([]);
                     setFromKelas('');
                     setToKelas('');
-                } catch (e) { showToast(e.message, 'error'); } finally { setProcessing(false); }
+                } catch (e) { 
+                    showToast(e.message, 'error'); 
+                } finally { 
+                    setProcessing(false); 
+                }
             };
 
-            // Mengambil daftar nama kelas secara unik & aman
             const listNamaKelas = [...new Set(kelasData.map(k => k.nama_kelas || k.kelas || k.nama).filter(Boolean))].sort();
 
             return (
@@ -1248,24 +1251,24 @@
                                 options={tpData.map(t => ({ value: t.tp_id || t.id_tp || t.id || t.tahun_pelajaran, label: t.nama_periode || t.tahun_pelajaran || t.nama }))}
                                 value={selectedTp}
                                 onChange={(e) => setSelectedTp(e.target.value)}
-                                disabled={loading}
+                                disabled={loading || processing}
                             />
                             <Select
                                 label="Dari Kelas (Lama)"
                                 options={listNamaKelas}
                                 value={fromKelas}
                                 onChange={(e) => setFromKelas(e.target.value)}
-                                disabled={loading}
+                                disabled={loading || processing}
                             />
                             <Select
                                 label="Ke Kelas (Baru)"
                                 options={[...listNamaKelas, 'LULUS', 'TIDAK NAIK']}
                                 value={toKelas}
                                 onChange={(e) => setToKelas(e.target.value)}
-                                disabled={loading}
+                                disabled={loading || processing}
                             />
                             <div className="flex items-end">
-                                <Button fullWidth onClick={handlePreview} disabled={loading || !selectedTp || !fromKelas || !toKelas}>Tampilkan Preview</Button>
+                                <Button fullWidth onClick={handlePreview} disabled={loading || processing || !selectedTp || !fromKelas || !toKelas}>Tampilkan Preview</Button>
                             </div>
                         </div>
 
@@ -1273,7 +1276,9 @@
                             <div className="mt-8 border-t pt-4 animate-fade-in-down">
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="font-bold text-emerald-800">Preview Pemindahan ({previewData.length} Santri)</h3>
-                                    <Button onClick={handleSubmit} disabled={processing}>{processing ? 'Memproses...' : 'Simpan Perubahan Permanen'}</Button>
+                                    <Button onClick={handleSubmit} disabled={processing}>
+                                        {processing ? 'Memproses ke Server...' : 'Simpan Perubahan Permanen'}
+                                    </Button>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left text-sm border-collapse">
@@ -1291,14 +1296,14 @@
                                                     <td className="p-3 font-medium">{d.nama}</td>
                                                     <td className="p-3">{d.kelas_lama}</td>
                                                     <td className="p-3">
-                                                        <select className="w-full p-2 border rounded outline-none" value={d.kelas_baru} onChange={(e) => handleIndividualChange(idx, 'kelas_baru', e.target.value)}>
+                                                        <select disabled={processing} className="w-full p-2 border rounded outline-none" value={d.kelas_baru} onChange={(e) => handleIndividualChange(idx, 'kelas_baru', e.target.value)}>
                                                             <option value="LULUS">LULUS</option>
                                                             <option value="TIDAK NAIK">TIDAK NAIK</option>
                                                             {listNamaKelas.map(k => <option key={k} value={k}>{k}</option>)}
                                                         </select>
                                                     </td>
                                                     <td className="p-3">
-                                                        <select className="w-full p-2 border rounded outline-none" value={d.status_baru} onChange={(e) => handleIndividualChange(idx, 'status_baru', e.target.value)}>
+                                                        <select disabled={processing} className="w-full p-2 border rounded outline-none" value={d.status_baru} onChange={(e) => handleIndividualChange(idx, 'status_baru', e.target.value)}>
                                                             <option value="Aktif">Aktif</option>
                                                             <option value="Lulus">Lulus</option>
                                                             <option value="Nonaktif">Nonaktif</option>
