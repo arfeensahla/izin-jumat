@@ -3828,13 +3828,19 @@
             const [loading, setLoading] = useState(false);
 
             const handleSubmit = async (e) => {
-                e.preventDefault(); setLoading(true);
+                e.preventDefault();
+                if (loading) return; // Pengaman ekstra anti double-click
+
+                setLoading(true);
                 try {
                     const res = await apiService.request('login', { username, password });
-                    if (!res.data || !res.data.role) throw new Error("Login gagal. Periksa kembali backend/role.");
-                    login(res.data);
+                    if (!res.data || !res.data.role) throw new Error("Login gagal. Periksa kembali username dan password Anda.");
+                    
+                    // --- PERBAIKAN: Eksekusi login cukup 1 kali saja ---
                     const sessionData = { ...res.data, username: username };
                     login(sessionData);
+                    // ---------------------------------------------------
+
                     showToast(`Selamat datang, ${res.data.nama}`, 'success');
 
                     // --- KAMERA PENGINTAI: LOG LOGIN ---
@@ -3846,22 +3852,45 @@
                     }).catch(e => console.log("Log error:", e));
                     // -----------------------------------
 
-                } catch (err) { showToast(err.message, 'error'); } finally { setLoading(false); }
+                } catch (err) { 
+                    showToast(err.message, 'error'); 
+                } finally { 
+                    setLoading(false); 
+                }
             };
 
             return (
                 <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
                     <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-                        <div className="mx-auto w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center text-white mb-4 shadow-lg shadow-emerald-200"><Icons.FileText /></div>
+                        <div className="mx-auto w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center text-white mb-4 shadow-lg shadow-emerald-200">
+                            <Icons.FileText />
+                        </div>
                         <h2 className="text-3xl font-extrabold text-gray-900">PPM Al-Islam</h2>
                         <p className="mt-2 text-sm text-gray-600">Sistem Management Perizinan Keluar Santri v2</p>
                     </div>
                     <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
                         <Card className="py-8 px-4 sm:px-10">
                             <form className="space-y-6" onSubmit={handleSubmit}>
-                                <Input name="username" label="Username" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="Misal: admin, walikelas, sekretaris" />
-                                <Input name="password" label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="123" />
-                                <Button type="submit" fullWidth disabled={loading}>{loading ? 'Memverifikasi...' : 'Masuk ke Sistem'}</Button>
+                                <Input 
+                                    name="username" 
+                                    label="Username" 
+                                    value={username} 
+                                    onChange={(e) => setUsername(e.target.value)} 
+                                    required 
+                                    placeholder="Misal: admin, walikelas, sekretaris" 
+                                />
+                                <Input 
+                                    name="password" 
+                                    label="Password" 
+                                    type="password" 
+                                    value={password} 
+                                    onChange={(e) => setPassword(e.target.value)} 
+                                    required 
+                                    placeholder="Masukkan password..." 
+                                />
+                                <Button type="submit" fullWidth disabled={loading}>
+                                    {loading ? 'Memverifikasi...' : 'Masuk ke Sistem'}
+                                </Button>
                             </form>
                         </Card>
                     </div>
