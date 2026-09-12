@@ -3715,25 +3715,6 @@ setPermits(dataWithMobility);
                                 _jamBaku: jamBaku
                             };
                         });
-                        // -----------------------------------------------------------------------------
-
-                        // --- URUTKAN RIWAYAT SCAN DARI TERBARU KE TERLAMA ---
-mappedLogs.sort((a, b) => {
-    // Ambil nilai waktu mentah untuk dibandingkan secara string atau angka
-    const rawA = a.created_at || a.waktu_scan || a.waktu || '';
-    const rawB = b.created_at || b.waktu_scan || b.waktu || '';
-    
-    // Jika ada _parsedDate yang sah, gunakan milidetiknya
-    const timeA = a._parsedDate ? a._parsedDate.getTime() : 0;
-    const timeB = b._parsedDate ? b._parsedDate.getTime() : 0;
-
-    if (timeA !== timeB) {
-        return timeB - timeA; // Urutan descending (terbesar/terbaru di atas)
-    }
-    
-    // Fallback bandingkan string waktu jika timestamp-nya sama
-    return rawB.localeCompare(rawA);
-});
 
                         setLogs(mappedLogs);
                     } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
@@ -3753,6 +3734,7 @@ mappedLogs.sort((a, b) => {
             endOfWeek.setHours(23, 59, 59, 999);
             // -------------------------------------------
 
+            // --- FILTER DAN URUTKAN (SORTING) LANGSUNG DI SINI ---
             const filteredLogs = logs.filter(log => {
                 if (!log) return false;
 
@@ -3771,6 +3753,21 @@ mappedLogs.sort((a, b) => {
 
                 return isTabMatch && (nama.includes(search) || ket.includes(search));
             });
+
+            // Urutkan hasil filter secara mutlak dari yang terbaru (jam terbesar di atas)
+            filteredLogs.sort((a, b) => {
+                const timeA = a._parsedDate ? a._parsedDate.getTime() : new Date(a.created_at || 0).getTime();
+                const timeB = b._parsedDate ? b._parsedDate.getTime() : new Date(b.created_at || 0).getTime();
+                
+                if (timeA !== timeB) {
+                    return timeB - timeA; // Terbaru di atas
+                }
+                
+                const rawA = a.created_at || a.waktu_scan || a.waktu || '';
+                const rawB = b.created_at || b.waktu_scan || b.waktu || '';
+                return rawB.localeCompare(rawA);
+            });
+            // ----------------------------------------------------
 
             return (
                 <div className="space-y-6 animate-fade-in-down">
