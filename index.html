@@ -2890,16 +2890,6 @@
             );
         };
 
-        // --- KOMPONEN BANTUAN UNTUK TABEL REKAP ---
-        const RekapRow = ({ periode, ajuan, tepatWaktu, terlambat }) => (
-            <tr className="border-b hover:bg-gray-50 text-sm">
-                <td className="p-3 font-bold text-gray-800">{periode}</td>
-                <td className="p-3 text-blue-600 font-medium">{ajuan}</td>
-                <td className="p-3 text-emerald-600 font-medium">{tepatWaktu}</td>
-                <td className="p-3 text-red-600 font-medium">{terlambat}</td>
-            </tr>
-        );
-
         // --- DASHBOARD ADMIN & SEKRETARIS MUDIR ---
         const DashboardManajemen = ({ title, subtitle, userClass }) => {
             const { showToast } = useContext(ToastContext);
@@ -3159,6 +3149,7 @@
         };
 
         // --- DASHBOARD SECURITY ---
+        // --- DASHBOARD SECURITY ---
         const DashboardSecurity = ({ setCurrentRoute }) => {
             const { showToast } = useContext(ToastContext);
 
@@ -3166,21 +3157,31 @@
             const [loading, setLoading] = useState(true);
 
             useEffect(() => {
+                let isMounted = true;
                 const fetchData = async () => {
                     try {
-                        const [resPermits, resLogs] = await Promise.all([apiService.request('getPermits'), apiService.request('getScanLogs')]);
+                        const [resPermits, resLogs] = await Promise.all([
+                            apiService.request('getPermits'), 
+                            apiService.request('getScanLogs')
+                        ]);
 
-                        let allPermits = [];
-                        if (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) allPermits = resPermits.data.data;
-                        else if (resPermits && Array.isArray(resPermits.data)) allPermits = resPermits.data;
-                        else if (Array.isArray(resPermits)) allPermits = resPermits;
+                        if (!isMounted) return;
 
-                        let allLogs = [];
-                        if (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) allLogs = resLogs.data.data;
-                        else if (resLogs && Array.isArray(resLogs.data)) allLogs = resLogs.data;
-                        else if (Array.isArray(resLogs)) allLogs = resLogs;
+                        let allPermits = (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) ? resPermits.data.data : (Array.isArray(resPermits?.data) ? resPermits.data : (Array.isArray(resPermits) ? resPermits : []));
+                        let allLogs = (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) ? resLogs.data.data : (Array.isArray(resLogs?.data) ? resLogs.data : (Array.isArray(resLogs) ? resLogs : []));
 
                         let s = { disetujui: 0, keluar: 0, diluar: 0, kembali: 0, terlambat: 0 };
+
+                        // --- MESIN PENCARI CEPAT HASH-MAP (ANTI HP PANAS) ---
+                        const logsMap = {};
+                        allLogs.forEach(l => {
+                            const id = l.permit_id || l.id_perizinan;
+                            if (id) {
+                                if (!logsMap[id]) logsMap[id] = [];
+                                logsMap[id].push(l);
+                            }
+                        });
+                        // ----------------------------------------------------
 
                         // --- RUMUS WAKTU: Kalender Pondok (Sabtu - Jumat) ---
                         const now = new Date();
@@ -3201,19 +3202,19 @@
 
                             // --- TRIK KEBAL FORMAT TANGGAL ---
                             let pDate = new Date(permitDateStr);
-                            if (isNaN(pDate) && typeof permitDateStr === 'string' && permitDateStr.includes('/')) {
+                            if (isNaN(pDate.getTime()) && typeof permitDateStr === 'string' && permitDateStr.includes('/')) {
                                 const parts = permitDateStr.split('/');
                                 if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
                             }
                             // ---------------------------------
 
-                            if (!isNaN(pDate) && pDate >= startOfWeek && pDate <= endOfWeek) {
-
+                            if (!isNaN(pDate.getTime()) && pDate >= startOfWeek && pDate <= endOfWeek) {
                                 const pId = p.permit_id || p.id || p.id_perizinan;
 
                                 if (String(p.status_pengajuan || '').toUpperCase() === 'DISETUJUI') s.disetujui++;
 
-                                const pLogs = allLogs.filter(l => l.permit_id === pId || l.id_perizinan === pId);
+                                // Mengambil data log langsung dari Hash-Map (Instan!)
+                                const pLogs = logsMap[pId] || [];
                                 const hasExit = pLogs.some(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
                                 const returnLog = pLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'RETURN');
 
@@ -3229,13 +3230,14 @@
 
                         setStats(s);
                     } catch (e) {
-                        console.error(e);
-                        showToast("Gagal memuat statistik pos security", "error");
+                        console.error("Dashboard Security Error:", e);
+                        if (isMounted) showToast("Gagal memuat statistik pos security", "error");
                     } finally {
-                        setLoading(false);
+                        if (isMounted) setLoading(false);
                     }
                 };
                 fetchData();
+                return () => { isMounted = false; };
             }, []);
 
             return (
