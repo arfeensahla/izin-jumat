@@ -3627,37 +3627,34 @@
                         else if (res && Array.isArray(res.data)) finalLogs = res.data;
                         else if (Array.isArray(res)) finalLogs = res;
 
-                        // --- OPTIMASI: Kalkulasi Tanggal & Keterangan dilakukan SEKALI SAJA di awal ---
+                        // --- OPTIMASI: Kalkulasi Tanggal & Keterangan ---
                         const mappedLogs = finalLogs.map(log => {
-                            let logDate = null;
-                            let tglTampil = '';
-                            // Amankan format kolom dari Supabase / Sheets
-                            const rawDate = log.tanggal || log.tanggal_scan || log.waktu_scan || log.created_at;
+                            let logDate = new Date(0); // Set ke 0 sebagai default aman
+                            let tglTampil = '-';
+                            
+                            // PERBAIKAN: Prioritaskan created_at (Supabase) atau tanggal (Sheets)
+                            // JANGAN sertakan waktu_scan di sini agar tidak ganda
+                            const rawDate = log.created_at || log.tanggal || log.tanggal_scan;
+
                             if (rawDate) {
-                                logDate = new Date(rawDate);
-                                if (isNaN(logDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
-                                    const parts = rawDate.split('/');
-                                    if (parts.length === 3) logDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                                }
-                                if (logDate && !isNaN(logDate.getTime())) {
+                                const tempDate = new Date(rawDate);
+                                if (!isNaN(tempDate.getTime())) {
+                                    logDate = tempDate;
                                     tglTampil = logDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-                                } else {
-                                    tglTampil = rawDate; // Fallback jika format tetap gagal
-                                }
-                            } else {
-                                // Ekstrak dari ID (SCN-1725...)
-                                const scanId = log.id || log.scan_id || log.id_scan || log[0] || '';
-                                if (typeof scanId === 'string' && scanId.startsWith('SCN-')) {
-                                    const timestamp = parseInt(scanId.replace('SCN-', ''), 10);
-                                    if (!isNaN(timestamp)) {
-                                        logDate = new Date(timestamp);
+                                } else if (typeof rawDate === 'string' && rawDate.includes('/')) {
+                                    const parts = rawDate.split('/');
+                                    if (parts.length === 3) {
+                                        logDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
                                         tglTampil = logDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
                                     }
                                 }
                             }
+
                             let displayKeterangan = log.keterangan || '-';
-                            const jamBaku = log.waktu_scan || log.waktu; // Antisipasi kolom waktu dari Supabase
-                            if (String(log.tipe_scan).toUpperCase() === 'RETURN' && jamBaku) {
+                            // Ambil jam khusus dari kolom waktu
+                            const jamBaku = log.waktu_scan || log.waktu || '-'; 
+
+                            if (String(log.tipe_scan).toUpperCase() === 'RETURN' && jamBaku && jamBaku !== '-') {
                                 const timeParts = String(jamBaku).split(':');
                                 if (timeParts.length >= 2) {
                                     const jam = parseInt(timeParts[0], 10);
@@ -3665,14 +3662,11 @@
                                     if (!isNaN(jam) && !isNaN(menit)) {
                                         const totalMenit = (jam * 60) + menit;
                                         const batasMenit = (16 * 60) + 30; // 990 menit (16:30)
-                                        if (totalMenit > batasMenit) {
-                                            displayKeterangan = 'TERLAMBAT';
-                                        } else {
-                                            displayKeterangan = 'TEPAT WAKTU';
-                                        }
+                                        displayKeterangan = totalMenit > batasMenit ? 'TERLAMBAT' : 'TEPAT WAKTU';
                                     }
                                 }
                             }
+
                             return {
                                 ...log,
                                 _parsedDate: logDate,
@@ -3720,21 +3714,8 @@
                 return isTabMatch && (nama.includes(search) || ket.includes(search));
             });
 
-            // Urutkan hasil filter secara mutlak dari yang terbaru (jam terbesar di atas)
-            filteredLogs.sort((a, b) => {
-                const timeA = a._parsedDate ? a._parsedDate.getTime() : 0;
-                const timeB = b._parsedDate ? b._parsedDate.getTime() : 0;
-
-                if (timeA !== timeB) {
-                    return timeB - timeA; // Terbaru di atas jika tanggal valid
-                }
-                
-                // Fallback mutlak jika tanggal sama atau kosong: Urutkan berdasarkan string jam/waktu terbesar
-                const rawA = String(a._jamBaku || a.waktu_scan || a.waktu || a.created_at || '');
-                const rawB = String(b._jamBaku || b.waktu_scan || b.waktu || b.created_at || '');
-                
-                return rawB.localeCompare(rawA); // Jam 10:18 akan otomatis menang dan berada di atas jam 08:46
-            });
+            // Urutkan mutlak dari yang terbaru (descending)
+            filteredLogs.sort((a, b) => b._parsedDate.getTime() - a._parsedDate.getTime());
             // ----------------------------------------------------
 
             return (
