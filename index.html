@@ -68,6 +68,10 @@
 
         const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbyddspvXA3vpGmDpHYjm5-uOlbEdSbDTYygeHsNv192SokqVrEKwBxiZAkYXVscTomM/exec';
 
+        const SUPABASE_URL = 'https://kkebdnmiazuojcqqgtkz.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrZWJkbm1pYXp1b2pjcXFndGt6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxNjAzMjYsImV4cCI6MjEwNDczNjMyNn0.PoXahui6RKkeUUp_ZkGKxEim1EmHmDugVe1nggQaVPQ';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
         const ROLES = {
             ADMIN: 'ADMIN',
             WALI_KELAS: 'WALI_KELAS',
