@@ -3756,16 +3756,18 @@ setPermits(dataWithMobility);
 
             // Urutkan hasil filter secara mutlak dari yang terbaru (jam terbesar di atas)
             filteredLogs.sort((a, b) => {
-                const timeA = a._parsedDate ? a._parsedDate.getTime() : new Date(a.created_at || 0).getTime();
-                const timeB = b._parsedDate ? b._parsedDate.getTime() : new Date(b.created_at || 0).getTime();
-                
+                const timeA = a._parsedDate ? a._parsedDate.getTime() : 0;
+                const timeB = b._parsedDate ? b._parsedDate.getTime() : 0;
+
                 if (timeA !== timeB) {
-                    return timeB - timeA; // Terbaru di atas
+                    return timeB - timeA; // Terbaru di atas jika tanggal valid
                 }
                 
-                const rawA = a.created_at || a.waktu_scan || a.waktu || '';
-                const rawB = b.created_at || b.waktu_scan || b.waktu || '';
-                return rawB.localeCompare(rawA);
+                // Fallback mutlak jika tanggal sama atau kosong: Urutkan berdasarkan string jam/waktu terbesar
+                const rawA = String(a._jamBaku || a.waktu_scan || a.waktu || a.created_at || '');
+                const rawB = String(b._jamBaku || b.waktu_scan || b.waktu || b.created_at || '');
+                
+                return rawB.localeCompare(rawA); // Jam 10:18 akan otomatis menang dan berada di atas jam 08:46
             });
             // ----------------------------------------------------
 
