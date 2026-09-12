@@ -3717,13 +3717,23 @@ setPermits(dataWithMobility);
                         });
                         // -----------------------------------------------------------------------------
 
-                        // --- URUTKAN RIWAYAT SCAN DARI TERBARU ---
-                        mappedLogs.sort((a, b) => {
-                            const timeA = a._parsedDate ? a._parsedDate.getTime() : new Date(a.created_at || 0).getTime();
-                            const timeB = b._parsedDate ? b._parsedDate.getTime() : new Date(b.created_at || 0).getTime();
-                            return timeB - timeA;
-                        });
-                        // -----------------------------------------
+                        // --- URUTKAN RIWAYAT SCAN DARI TERBARU KE TERLAMA ---
+mappedLogs.sort((a, b) => {
+    // Ambil nilai waktu mentah untuk dibandingkan secara string atau angka
+    const rawA = a.created_at || a.waktu_scan || a.waktu || '';
+    const rawB = b.created_at || b.waktu_scan || b.waktu || '';
+    
+    // Jika ada _parsedDate yang sah, gunakan milidetiknya
+    const timeA = a._parsedDate ? a._parsedDate.getTime() : 0;
+    const timeB = b._parsedDate ? b._parsedDate.getTime() : 0;
+
+    if (timeA !== timeB) {
+        return timeB - timeA; // Urutan descending (terbesar/terbaru di atas)
+    }
+    
+    // Fallback bandingkan string waktu jika timestamp-nya sama
+    return rawB.localeCompare(rawA);
+});
 
                         setLogs(mappedLogs);
                     } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
