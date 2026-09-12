@@ -3631,10 +3631,8 @@
                         const mappedLogs = finalLogs.map(log => {
                             let logDate = null;
                             let tglTampil = '';
-                            
                             // Amankan format kolom dari Supabase / Sheets
                             const rawDate = log.tanggal || log.tanggal_scan || log.waktu_scan || log.created_at;
-
                             if (rawDate) {
                                 logDate = new Date(rawDate);
                                 if (isNaN(logDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
@@ -3657,10 +3655,8 @@
                                     }
                                 }
                             }
-
                             let displayKeterangan = log.keterangan || '-';
                             const jamBaku = log.waktu_scan || log.waktu; // Antisipasi kolom waktu dari Supabase
-
                             if (String(log.tipe_scan).toUpperCase() === 'RETURN' && jamBaku) {
                                 const timeParts = String(jamBaku).split(':');
                                 if (timeParts.length >= 2) {
@@ -3669,7 +3665,6 @@
                                     if (!isNaN(jam) && !isNaN(menit)) {
                                         const totalMenit = (jam * 60) + menit;
                                         const batasMenit = (16 * 60) + 30; // 990 menit (16:30)
-
                                         if (totalMenit > batasMenit) {
                                             displayKeterangan = 'TERLAMBAT';
                                         } else {
@@ -3678,7 +3673,6 @@
                                     }
                                 }
                             }
-
                             return {
                                 ...log,
                                 _parsedDate: logDate,
@@ -3687,8 +3681,8 @@
                                 _jamBaku: jamBaku
                             };
                         });
-
                         setLogs(mappedLogs);
+                        
                     } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
                 };
                 fetchLogs();
