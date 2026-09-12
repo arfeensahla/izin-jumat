@@ -102,87 +102,220 @@
         const AuthContext = createContext(null);
         const ToastContext = createContext(null);
 
+        // ==========================================
+        // MESIN API BARU: SUPABASE POSTGRESQL ⚡
+        // ==========================================
         const apiService = {
             request: async (action, payload) => {
-                // --- AWAL LOGIKA CACHING ---
-                // Tentukan data master mana saja yang aman disimpan ke memori (jarang berubah)
+                // --- AWAL LOGIKA CACHING (TETAP DIPERTAHANKAN) ---
                 const cacheableActions = ['getSantri', 'getKelas', 'getJadwal', 'getTahunPelajaran'];
                 const cacheKey = `cache_${action}`;
 
                 if (cacheableActions.includes(action)) {
                     const cachedData = sessionStorage.getItem(cacheKey);
                     const cacheTimestamp = sessionStorage.getItem(`${cacheKey}_time`);
-
-                    // Cek masa kadaluarsa (Durasi: 15 Menit = 15 * 60 * 1000 milidetik)
                     const isExpired = !cacheTimestamp || (Date.now() - parseInt(cacheTimestamp)) > 15 * 60 * 1000;
-
                     if (cachedData && !isExpired) {
                         console.log(`⚡ Mengambil data ${action} dari Cache Lokal (Super Cepat!)`);
-                        return JSON.parse(cachedData); // Langsung kembalikan, tidak perlu loading ke Google!
+                        return JSON.parse(cachedData);
                     }
                 }
                 // --- AKHIR LOGIKA CACHING ---
 
                 try {
-                    console.log(`🌐 Meminta data ${action} dari Server Google...`);
-                    const response = await fetch(API_BASE_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                        body: JSON.stringify({ action, ...payload })
-                    });
+                    console.log(`🌐 Meminta data ${action} dari Server Supabase...`);
+                    let resultData;
 
-                    const text = await response.text();
-                    let data;
-                    try {
-                        data = JSON.parse(text);
-                    } catch (e) {
-                        throw new Error("Gagal membaca respon server. Hubungi Admin.");
+                    switch (action) {
+                        // 1. SISTEM LOGIN
+                        case 'login':
+                            const { data: user, error: loginErr } = await supabase
+                                .from('users')
+                                .select('*')
+                                .eq('username', payload.username)
+                                .eq('password', payload.password)
+                                .single();
+                            if (loginErr || !user) throw new Error('Username atau Password salah!');
+                            resultData = { success: true, data: user };
+                            break;
+
+                        // 2. PENARIKAN DATA MASTER (GET)
+                        case 'getSantri':
+                            const { data: dSantri, error: eSantri } = await supabase.from('santri').select('*');
+                            if (eSantri) throw eSantri;
+                            resultData = { success: true, data: dSantri };
+                            break;
+                        case 'getKelas':
+                            const { data: dKelas, error: eKelas } = await supabase.from('kelas').select('*');
+                            if (eKelas) throw eKelas;
+                            resultData = { success: true, data: dKelas };
+                            break;
+                        case 'getJadwal':
+                            const { data: dJadwal, error: eJadwal } = await supabase.from('jadwal').select('*');
+                            if (eJadwal) throw eJadwal;
+                            resultData = { success: true, data: dJadwal };
+                            break;
+                        case 'getTahunPelajaran':
+                            const { data: dTp, error: eTp } = await supabase.from('tahun_pelajaran').select('*');
+                            if (eTp) throw eTp;
+                            resultData = { success: true, data: dTp };
+                            break;
+                        case 'getPermits':
+                            const { data: dPermit, error: ePermit } = await supabase.from('perizinan').select('*');
+                            if (ePermit) throw ePermit;
+                            resultData = { success: true, data: dPermit };
+                            break;
+                        case 'getScanLogs':
+                            const { data: dLog, error: eLog } = await supabase.from('scan_log').select('*');
+                            if (eLog) throw eLog;
+                            resultData = { success: true, data: dLog };
+                            break;
+
+                        // 3. SIMPAN DATA UMUM
+                        case 'saveData':
+                            const tableMap = {
+                                'KELAS': 'kelas', 'SANTRI': 'santri', 'JADWAL': 'jadwal',
+                                'TAHUN_PELAJARAN': 'tahun_pelajaran', 'PERIZINAN': 'perizinan', 'SCAN_LOG': 'scan_log'
+                            };
+                            const tableName = tableMap[payload.sheetName];
+                            const { error: eSave } = await supabase.from(tableName).insert(payload.data);
+                            if (eSave) throw eSave;
+                            resultData = { success: true, message: 'Data berhasil disimpan.' };
+                            break;
+
+                        // 4. HAPUS DATA UMUM
+                        case 'deleteData':
+                            const tMap = {
+                                'KELAS': { name: 'kelas', pk: 'id_kelas' },
+                                'SANTRI': { name: 'santri', pk: 'nis' },
+                                'JADWAL': { name: 'jadwal', pk: 'id_jadwal' },
+                                'TAHUN_PELAJARAN': { name: 'tahun_pelajaran', pk: 'tp_id' },
+                                'PERIZINAN': { name: 'perizinan', pk: 'permit_id' },
+                                'SCAN_LOG': { name: 'scan_log', pk: 'scan_id' }
+                            };
+                            const tInfo = tMap[payload.sheetName];
+                            const { error: eDel } = await supabase.from(tInfo.name).delete().eq(tInfo.pk, payload.rowId);
+                            if (eDel) throw eDel;
+                            resultData = { success: true, message: 'Data berhasil dihapus.' };
+                            break;
+
+                        // 5. AJUKAN IZIN KELUAR
+                        case 'savePermit':
+                            const newPermitId = 'PRM-' + Date.now();
+                            const { error: ePermitSave } = await supabase.from('perizinan').insert({
+                                ...payload,
+                                permit_id: newPermitId,
+                                qr_token: newPermitId
+                            });
+                            if (ePermitSave) throw ePermitSave;
+                            resultData = { success: true, message: 'Izin berhasil diajukan.' };
+                            break;
+
+                        // 6. SCREENING / APPROVAL
+                        case 'processApproval':
+                            const updateData = {
+                                status_pengajuan: payload.aksi_approval === 'APPROVE' ? 'DISETUJUI' : 'DITOLAK',
+                                approved_by: payload.username,
+                                approved_at: new Date().toISOString(),
+                                alasan_penolakan: payload.alasan || ''
+                            };
+                            const { error: eApprove } = await supabase.from('perizinan').update(updateData).eq('permit_id', payload.permit_id);
+                            if (eApprove) throw eApprove;
+                            resultData = { success: true, message: 'Approval berhasil diproses.' };
+                            break;
+
+                        // 7. SYSTEM LOG
+                        case 'saveLog':
+                            const { error: eSysLog } = await supabase.from('system_log').insert({
+                                log_id: 'LOG-' + Date.now(),
+                                waktu: new Date().toISOString(),
+                                role: payload.role,
+                                nama_pengguna: payload.nama,
+                                aksi: payload.aksi,
+                                detail_keterangan: payload.keterangan
+                            });
+                            if (eSysLog) throw eSysLog;
+                            resultData = { success: true };
+                            break;
+
+                        // 8. LOGIKA SCAN QR CODE SECURITY (DIPINDAH KE FRONTEND & LEBIH CEPAT)
+                        case 'scanQR':
+                            const { data: pData, error: pErr } = await supabase.from('perizinan').select('*').eq('qr_token', payload.qr_token).single();
+                            if (pErr || !pData) throw new Error("QR Code tidak valid atau kedaluwarsa.");
+                            if (pData.status_pengajuan !== 'DISETUJUI') throw new Error("Izin ini belum disetujui atau ditolak.");
+
+                            const todayStr = new Date().toLocaleDateString('id-ID', { weekday: 'short', year: 'numeric', month: 'short', day: '2-digit' });
+                            if (pData.tanggal_izin !== todayStr) {
+                                throw new Error("TETOT! QR Code ini bukan untuk hari ini (" + pData.tanggal_izin + ").");
+                            }
+
+                            const { data: scanHistory, error: sErr } = await supabase.from('scan_log').select('*').eq('permit_id', pData.permit_id).order('waktu_scan', { ascending: true });
+                            
+                            const exitLogs = scanHistory.filter(l => l.tipe_scan === 'EXIT' && l.status === 'SUCCESS');
+                            const returnLogs = scanHistory.filter(l => l.tipe_scan === 'RETURN' && l.status === 'SUCCESS');
+
+                            const nowTime = new Date();
+                            const timeStr = nowTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                            const scanId = 'SCN-' + Date.now();
+
+                            if (exitLogs.length === 0) {
+                                await supabase.from('scan_log').insert({
+                                    scan_id: scanId, permit_id: pData.permit_id, santri_id: pData.santri_id,
+                                    tipe_scan: 'EXIT', waktu_scan: timeStr, status: 'SUCCESS', keterangan: '',
+                                    petugas: payload.security_name, nama_santri: pData.nama_santri
+                                });
+                                resultData = { success: true, data: { type: 'EXIT', nama: pData.nama_santri, kelas: pData.kelas, waktu: timeStr, pesan: "Scan EXIT Berhasil! Santri dipersilakan keluar gerbang." } };
+                            } else if (returnLogs.length === 0) {
+                                const totalMinutes = (nowTime.getHours() * 60) + nowTime.getMinutes();
+                                let statusKembali = "TEPAT WAKTU";
+                                if (totalMinutes > 990) statusKembali = "TERLAMBAT"; // > 16:30
+
+                                await supabase.from('scan_log').insert({
+                                    scan_id: scanId, permit_id: pData.permit_id, santri_id: pData.santri_id,
+                                    tipe_scan: 'RETURN', waktu_scan: timeStr, status: 'SUCCESS', keterangan: statusKembali,
+                                    petugas: payload.security_name, nama_santri: pData.nama_santri
+                                });
+                                resultData = { success: true, data: { type: 'RETURN', nama: pData.nama_santri, kelas: pData.kelas, waktu: timeStr, status_kembali: statusKembali, pesan: "Scan RETURN Berhasil! Santri telah kembali ke pondok." } };
+                            } else {
+                                throw new Error("QR Code sudah selesai dipakai 2x (Keluar & Kembali).");
+                            }
+                            break;
+
+                        // 9. GANTI PASSWORD MANDIRI
+                        case 'changePassword':
+                            const { data: userCheck, error: passErr } = await supabase.from('users').select('*').eq('username', payload.username).eq('password', payload.old_password).single();
+                            if (passErr || !userCheck) throw new Error("Password lama yang Anda masukkan salah.");
+
+                            const { error: updateErr } = await supabase.from('users').update({ password: payload.new_password }).eq('username', payload.username);
+                            if (updateErr) throw updateErr;
+                            resultData = { success: true, message: 'Password berhasil diubah.' };
+                            break;
+
+                        default:
+                            throw new Error(`Perintah aksi '${action}' belum terdaftar di API Supabase.`);
                     }
 
-                    if (!data.success) throw new Error(data.message || 'Terjadi kesalahan dari server.');
-
-                    // --- AWAL SARINGAN TANGGAL OTOMATIS (Kode Asli Anda) ---
-                    const formatDates = (obj) => {
-                        for (let key in obj) {
-                            if (typeof obj[key] === 'string' && obj[key].includes('T') && obj[key].endsWith('Z')) {
-                                const d = new Date(obj[key]);
-                                if (!isNaN(d.getTime())) {
-                                    obj[key] = d.toLocaleDateString('id-ID', {
-                                        weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
-                                    });
-                                }
-                            } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-                                formatDates(obj[key]);
-                            }
-                        }
-                    };
-                    formatDates(data);
-                    // --- AKHIR SARINGAN TANGGAL OTOMATIS ---
-
-                    // Simpan hasil (yang sudah diformat tanggalnya) ke dalam memori Cache
-                    if (cacheableActions.includes(action) && data) {
-                        sessionStorage.setItem(cacheKey, JSON.stringify(data));
+                    // --- SIMPAN HASIL KE CACHE LOKAL ---
+                    if (cacheableActions.includes(action) && resultData) {
+                        sessionStorage.setItem(cacheKey, JSON.stringify(resultData));
                         sessionStorage.setItem(`${cacheKey}_time`, Date.now().toString());
                         console.log(`💾 Menyimpan data master ${action} ke Cache.`);
                     }
 
-                    return data;
+                    return resultData;
                 } catch (error) {
-                    console.error('API Error:', error);
-                    // Cegatan khusus jika terjadi error "Failed to fetch" akibat limit Google
-                    if (error.message === 'Failed to fetch' || String(error).includes('NetworkError')) {
-                        throw new Error('Gagal terhubung ke server. Sistem sedang sibuk, silakan Refresh halaman.');
-                    }
-                    throw error;
+                    console.error('Supabase API Error:', error);
+                    throw new Error(error.message || 'Terjadi kesalahan pada server Supabase.');
                 }
             },
-
-            // Fitur tambahan opsional jika suatu saat butuh tombol "Refresh Data Total"
             clearCache: () => {
                 sessionStorage.clear();
-                console.log('🧹 Cache memori berhasil dibersihkan.');
+                console.log('🧹 Cache memori browser berhasil dibersihkan.');
             }
         };
+        // ==========================================
+        // AKHIR MESIN SUPABASE
+        // ==========================================
 
         const Card = ({ children, className = "" }) => <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 ${className}`}>{children}</div>;
 
