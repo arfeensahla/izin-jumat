@@ -2944,6 +2944,7 @@
         // --- DASHBOARD ADMIN & SEKRETARIS MUDIR ---
         const DashboardManajemen = ({ title, subtitle, userClass, setCurrentRoute }) => {
     const { showToast } = useContext(ToastContext);
+    const { user } = useContext(AuthContext);
 
     const [allPermits, setAllPermits] = useState([]);
     const [allLogs, setAllLogs] = useState([]);
@@ -3123,7 +3124,7 @@
             </div>
             
             {/* --- BANNER ALERT DINAMIS MENUNGGU ACC (MOBILE FRIENDLY) --- */}
-            {!loading && totalMenunggu > 0 && (
+            {!loading && totalMenunggu > 0 && user?.role === 'SEKRETARIS_MUDIR' && (
                 <div 
                     onClick={() => setCurrentRoute ? setCurrentRoute('screening') : null} 
                     className="mt-6 bg-yellow-50 border border-yellow-200 border-l-4 border-l-yellow-500 p-3 rounded-r-lg shadow-sm flex items-center justify-between gap-2 animate-fade-in-down active:bg-yellow-200 transition-colors cursor-pointer"
