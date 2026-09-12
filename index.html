@@ -4165,24 +4165,16 @@
 
             return (
                 <ToastContext.Provider value={{ showToast }}>
-                    {/* 4. Tautkan fungsi baru ke Context */}
                     <AuthContext.Provider value={{ user, login: handleLogin, logout: handleLogout }}>
                         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-                        {!user ? <LoginPage /> : <Layout><MainRouter currentRoute={currentRoute} setCurrentRoute={setCurrentRoute} /></Layout>}
+                        
+                        {/* Mengembalikan ke Layout asli Bapak yang menangani router secara mandiri */}
+                        {!user ? <LoginPage /> : <Layout><MainRouter /></Layout>}
+
                     </AuthContext.Provider>
                 </ToastContext.Provider>
             );
         }
-
-        // Catatan: Anda perlu menambahkan state currentRoute di App, 
-        // tapi di struktur Layout Anda sudah menanganinya dengan baik.
-        // Kode di bawah ini saya sesuaikan persis dengan gaya Anda:
-
-        const AppWrapper = () => {
-             const [currentRoute, setCurrentRoute] = useState('dashboard');
-             return <App currentRoute={currentRoute} setCurrentRoute={setCurrentRoute} />
-        };
-        // (Tapi di Layout Anda sudah ada state currentRoute, jadi struktur asli Anda sudah berjalan!)
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
