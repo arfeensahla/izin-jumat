@@ -2623,41 +2623,48 @@
                         // -----------------------------------------------------------
 
                         const dataWithMobilitas = finalPermits.map(p => {
-                            let mobilitas = '-';
-                            let wKeluar = null;
-                            let wKembali = null;
+    let mobilitas = '-';
+    let wKeluar = null;
+    let wKembali = null;
 
-                            if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
-                                const pId = p.permit_id || p.id || p.id_perizinan;
-                                
-                                // Tarik log langsung dari Hash-Map (Instan!)
-                                const myLogs = logsMap[pId] || [];
+    if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
+        const pId = p.permit_id || p.id || p.id_perizinan;
+        
+        // Tarik log langsung dari Hash-Map (Instan!)
+        const myLogs = logsMap[pId] || [];
 
-                                const exitLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
-                                const returnLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'RETURN');
+        const exitLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
+        const returnLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'RETURN');
 
-                                // Sinkronisasi nama kolom waktu
-                                if (exitLog) wKeluar = exitLog.waktu_scan || exitLog.waktu;
-                                if (returnLog) wKembali = returnLog.waktu_scan || returnLog.waktu;
+        // Sinkronisasi nama kolom waktu
+        if (exitLog) wKeluar = exitLog.waktu_scan || exitLog.waktu;
+        if (returnLog) wKembali = returnLog.waktu_scan || returnLog.waktu;
 
-                                if (!exitLog) mobilitas = 'Belum Keluar';
-                                else if (exitLog && !returnLog) mobilitas = 'Masih Di Luar';
-                                else if (returnLog) {
-                                    if (String(returnLog.keterangan || '').toUpperCase().includes('TERLAMBAT')) mobilitas = 'Terlambat';
-                                    else mobilitas = 'Tepat Waktu';
-                                }
-                            }
+        if (!exitLog) mobilitas = 'Belum Keluar';
+        else if (exitLog && !returnLog) mobilitas = 'Masih Di Luar';
+        else if (returnLog) {
+            if (String(returnLog.keterangan || '').toUpperCase().includes('TERLAMBAT')) mobilitas = 'Terlambat';
+            else mobilitas = 'Tepat Waktu';
+        }
+    }
 
-                            return {
-                                ...p,
-                                _bulan_filter: getBulanTahun(p.tanggal_izin),
-                                _status_mobilitas: mobilitas,
-                                _waktu_keluar: wKeluar,
-                                _waktu_kembali: wKembali
-                            };
-                        });
+    return {
+        ...p,
+        _bulan_filter: getBulanTahun(p.tanggal_izin),
+        _status_mobilitas: mobilitas,
+        _waktu_keluar: wKeluar,
+        _waktu_kembali: wKembali
+    };
+});
 
-                        setPermits(dataWithMobilitas);
+// URUTKAN DARI TERBARU (TIMESTAMP TERBESAR DI ATAS)
+dataWithMobilitas.sort((a, b) => {
+    const timeA = new Date(a.created_at || a.tanggal_izin || 0).getTime();
+    const timeB = new Date(b.created_at || b.tanggal_izin || 0).getTime();
+    return timeB - timeA;
+});
+
+setPermits(dataWithMobilitas);
                     } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
                 };
                 fetchPermits();
@@ -3332,40 +3339,48 @@
                         // -----------------------------------------------------------
 
                         const dataWithMobility = finalData.map(p => {
-                            let mobilitas = '-';
-                            let wKeluar = null;
-                            let wKembali = null;
+    let mobilitas = '-';
+    let wKeluar = null;
+    let wKembali = null;
 
-                            if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
-                                const pId = p.permit_id || p.id || p.id_perizinan;
-                                
-                                // Tarik log langsung dari Hash-Map (Instan!)
-                                const myLogs = logsMap[pId] || [];
+    if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
+        const pId = p.permit_id || p.id || p.id_perizinan;
+        
+        // Tarik log langsung dari Hash-Map (Instan!)
+        const myLogs = logsMap[pId] || [];
 
-                                const exitLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
-                                const returnLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'RETURN');
+        const exitLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
+        const returnLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'RETURN');
 
-                                // Sinkronisasi nama kolom waktu
-                                if (exitLog) wKeluar = exitLog.waktu_scan || exitLog.waktu;
-                                if (returnLog) wKembali = returnLog.waktu_scan || returnLog.waktu;
+        // Sinkronisasi nama kolom waktu
+        if (exitLog) wKeluar = exitLog.waktu_scan || exitLog.waktu;
+        if (returnLog) wKembali = returnLog.waktu_scan || returnLog.waktu;
 
-                                if (!exitLog) mobilitas = 'Belum Keluar';
-                                else if (exitLog && !returnLog) mobilitas = 'Masih Di Luar';
-                                else if (returnLog) {
-                                    if (String(returnLog.keterangan || '').toUpperCase().includes('TERLAMBAT')) mobilitas = 'Terlambat';
-                                    else mobilitas = 'Tepat Waktu';
-                                }
-                            }
+        if (!exitLog) mobilitas = 'Belum Keluar';
+        else if (exitLog && !returnLog) mobilitas = 'Masih Di Luar';
+        else if (returnLog) {
+            if (String(returnLog.keterangan || '').toUpperCase().includes('TERLAMBAT')) mobilitas = 'Terlambat';
+            else mobilitas = 'Tepat Waktu';
+        }
+    }
 
-                            return {
-                                ...p,
-                                _bulan_filter: getBulanTahun(p.tanggal_izin),
-                                _status_mobilitas: mobilitas,
-                                _waktu_keluar: wKeluar,
-                                _waktu_kembali: wKembali
-                            };
-                        });
-                        setPermits(dataWithMobility);
+    return {
+        ...p,
+        _bulan_filter: getBulanTahun(p.tanggal_izin),
+        _status_mobilitas: mobilitas,
+        _waktu_keluar: wKeluar,
+        _waktu_kembali: wKembali
+    };
+});
+
+// URUTKAN DARI TERBARU
+dataWithMobility.sort((a, b) => {
+    const timeA = new Date(a.created_at || a.tanggal_izin || 0).getTime();
+    const timeB = new Date(b.created_at || b.tanggal_izin || 0).getTime();
+    return timeB - timeA;
+});
+
+setPermits(dataWithMobility);
                     } catch (e) { showToast(e.message, 'error'); }
                     finally { setLoading(false); }
                 };
@@ -3701,6 +3716,14 @@
                             };
                         });
                         // -----------------------------------------------------------------------------
+
+                        // --- URUTKAN RIWAYAT SCAN DARI TERBARU ---
+                        mappedLogs.sort((a, b) => {
+                            const timeA = a._parsedDate ? a._parsedDate.getTime() : new Date(a.created_at || 0).getTime();
+                            const timeB = b._parsedDate ? b._parsedDate.getTime() : new Date(b.created_at || 0).getTime();
+                            return timeB - timeA;
+                        });
+                        // -----------------------------------------
 
                         setLogs(mappedLogs);
                     } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
