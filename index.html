@@ -3629,11 +3629,10 @@
 
                         // --- OPTIMASI: Kalkulasi Tanggal & Keterangan ---
                         const mappedLogs = finalLogs.map(log => {
-                            let logDate = new Date(0); // Set ke 0 sebagai default aman
+                            let logDate = new Date(0);
                             let tglTampil = '-';
                             
-                            // PERBAIKAN: Prioritaskan created_at (Supabase) atau tanggal (Sheets)
-                            // JANGAN sertakan waktu_scan di sini agar tidak ganda
+                            // Coba ambil dari kolom tanggal/created_at
                             const rawDate = log.created_at || log.tanggal || log.tanggal_scan;
 
                             if (rawDate) {
@@ -3649,9 +3648,20 @@
                                     }
                                 }
                             }
+                            
+                            // JIKA TANGGAL GAGAL/KOSONG, AMBIL DARI ID SCN (Fungsi Asli Anda)
+                            if (tglTampil === '-') {
+                                const scanId = log.id || log.scan_id || log.id_scan || log[0] || '';
+                                if (typeof scanId === 'string' && scanId.startsWith('SCN-')) {
+                                    const timestamp = parseInt(scanId.replace('SCN-', ''), 10);
+                                    if (!isNaN(timestamp)) {
+                                        logDate = new Date(timestamp);
+                                        tglTampil = logDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+                                    }
+                                }
+                            }
 
                             let displayKeterangan = log.keterangan || '-';
-                            // Ambil jam khusus dari kolom waktu
                             const jamBaku = log.waktu_scan || log.waktu || '-'; 
 
                             if (String(log.tipe_scan).toUpperCase() === 'RETURN' && jamBaku && jamBaku !== '-') {
@@ -3661,7 +3671,7 @@
                                     const menit = parseInt(timeParts[1], 10);
                                     if (!isNaN(jam) && !isNaN(menit)) {
                                         const totalMenit = (jam * 60) + menit;
-                                        const batasMenit = (16 * 60) + 30; // 990 menit (16:30)
+                                        const batasMenit = (16 * 60) + 30; // 16:30
                                         displayKeterangan = totalMenit > batasMenit ? 'TERLAMBAT' : 'TEPAT WAKTU';
                                     }
                                 }
@@ -3714,9 +3724,23 @@
                 return isTabMatch && (nama.includes(search) || ket.includes(search));
             });
 
-            // Urutkan mutlak dari yang terbaru (descending)
-            filteredLogs.sort((a, b) => b._parsedDate.getTime() - a._parsedDate.getTime());
-            // ----------------------------------------------------
+            // --- URUTKAN RIWAYAT SCAN DARI TERBARU KE TERLAMA ---
+            filteredLogs.sort((a, b) => {
+                // 1. Bandingkan tanggalnya terlebih dahulu
+                const timeA = a._parsedDate.getTime();
+                const timeB = b._parsedDate.getTime();
+                
+                if (timeA !== timeB) {
+                    return timeB - timeA; // Descending tanggal
+                }
+                
+                // 2. Jika tanggalnya sama (atau sama-sama strip), bandingkan teks jamnya!
+                const jamA = a._jamBaku || '';
+                const jamB = b._jamBaku || '';
+                
+                // localeCompare membalik urutan agar jam terbesar (misal 10:18) ada di atas jam kecil (08:39)
+                return jamB.localeCompare(jamA);
+            });
 
             return (
                 <div className="space-y-6 animate-fade-in-down">
