@@ -2250,12 +2250,27 @@
                     else if (resSantri && Array.isArray(resSantri.data)) finalSantri = resSantri.data;
                     else if (Array.isArray(resSantri)) finalSantri = resSantri;
 
+                    // Menggunakan HASH-MAP untuk mencocokkan data santri dengan sangat cepat
+                    const santriMap = {};
+                    finalSantri.forEach(s => {
+                        const sId = s.santri_id || s.nis || s.id;
+                        if (sId) santriMap[sId] = s;
+                    });
+
                     const pendingPermits = finalPermits
                         .filter(p => p.status_pengajuan === 'MENUNGGU_APPROVAL' || p.status_pengajuan === 'MENUNGGU')
-                        .reverse();
+                        .map(p => {
+                            // Mencocokkan data saudara (jika ikut saudara) langsung dari Hash-Map
+                            let saudaraInfo = null;
+                            if (p.ikut_jadwal_saudara && p.saudara_santri_id) {
+                                saudaraInfo = santriMap[p.saudara_santri_id];
+                            }
+                            return { ...p, _saudaraInfo: saudaraInfo };
+                        })
+                        .reverse(); // Menampilkan yang terbaru di atas
 
                     setPermits(pendingPermits);
-                    setSantriList(finalSantri);
+                    setSantriList(finalSantri); // Disimpan untuk referensi lain jika perlu
                 } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
             };
 
@@ -2359,16 +2374,13 @@
                     {!loading && permits.length > 0 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <input
-                                type="text"
-                                placeholder="Cari Nama Santri di Antrean..."
+                                type="text" placeholder="Cari Nama Santri di Antrean..."
                                 className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
                             />
                             <select
                                 className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium"
-                                value={filterKelas}
-                                onChange={(e) => setFilterKelas(e.target.value)}
+                                value={filterKelas} onChange={(e) => setFilterKelas(e.target.value)}
                             >
                                 <option value="">Semua Kelas</option>
                                 {kelasOptions.map((k, idx) => (
@@ -2389,9 +2401,7 @@
                                     onClick={() => setSelectedApproveIds([])}
                                     disabled={isApproving || processing}
                                     className="flex-1 sm:flex-none px-4 py-2 bg-white text-gray-600 rounded-lg shadow-sm text-sm font-bold hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                                >
-                                    Batal
-                                </button>
+                                >Batal</button>
                                 <button
                                     onClick={handleBulkApprove}
                                     disabled={isApproving || processing}
@@ -2407,8 +2417,7 @@
                     {!loading && filteredPermits.length > 0 && (
                         <div className="flex items-center gap-2 mt-2">
                             <input
-                                type="checkbox"
-                                id="selectAll"
+                                type="checkbox" id="selectAll"
                                 className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500 cursor-pointer"
                                 onChange={(e) => {
                                     if (e.target.checked) setSelectedApproveIds(filteredPermits.map(p => p.permit_id || p.id_perizinan));
@@ -2471,12 +2480,10 @@
                                                         )}
                                                         {(p.ikut_jadwal_saudara === 'Ya' || p.ikut_jadwal_saudara === true || p.ikut_jadwal_saudara === 'TRUE') && (
                                                             <div className="mt-2 p-2 bg-blue-50 text-blue-800 rounded-lg text-xs font-medium">
-                                                                {(() => {
-                                                                    const saudara = santriList.find(s => (s.santri_id || s.nis || s.id) === p.saudara_santri_id);
-                                                                    return saudara
-                                                                        ? `Ikut jadwal saudara: ${saudara.nama || saudara.nama_santri} (${saudara.kelas})`
-                                                                        : `Ikut jadwal saudara (ID: ${p.saudara_santri_id})`;
-                                                                })()}
+                                                                {p._saudaraInfo 
+                                                                    ? `Ikut jadwal saudara: ${p._saudaraInfo.nama || p._saudaraInfo.nama_santri} (${p._saudaraInfo.kelas})` 
+                                                                    : `Ikut jadwal saudara (ID: ${p.saudara_santri_id})`
+                                                                }
                                                             </div>
                                                         )}
                                                     </div>
@@ -2487,9 +2494,7 @@
                                                         onClick={() => setSelectedPermit(p)}
                                                         disabled={processing || isApproving}
                                                         className="py-2.5 px-4 bg-red-50 text-red-700 hover:bg-red-100 font-bold rounded-lg transition-colors border border-red-200"
-                                                    >
-                                                        Tolak Izin
-                                                    </button>
+                                                    >Tolak Izin</button>
                                                     <button
                                                         onClick={() => handleApprove(p)}
                                                         disabled={processing || isApproving}
@@ -2521,6 +2526,7 @@
                                         placeholder="Contoh: Kuota izin bulan ini sudah habis, alasan kurang mendesak..."
                                         value={rejectReason}
                                         onChange={(e) => setRejectReason(e.target.value)}
+                                        disabled={processing}
                                     ></textarea>
                                 </div>
 
@@ -2529,9 +2535,7 @@
                                         className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-bold hover:bg-gray-200 transition-colors"
                                         onClick={() => { setSelectedPermit(null); setRejectReason(''); }}
                                         disabled={processing}
-                                    >
-                                        Batal
-                                    </button>
+                                    >Batal</button>
                                     <button
                                         className="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors shadow-sm"
                                         onClick={handleProcessReject}
