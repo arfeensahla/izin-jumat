@@ -3663,8 +3663,19 @@
 
                             let displayKeterangan = log.keterangan || '-';
                             const jamBaku = log.waktu_scan || log.waktu || '-'; 
+                            let waktuKeluarTerkait = null; // --- VARIABEL BARU UNTUK MENYIMPAN WAKTU EXIT ---
 
                             if (String(log.tipe_scan).toUpperCase() === 'RETURN' && jamBaku && jamBaku !== '-') {
+                                // --- LOGIKA BARU: Cari waktu EXIT santri ini ---
+                                const exitLog = finalLogs.find(x => 
+                                    String(x.tipe_scan).toUpperCase() === 'EXIT' && 
+                                    (x.nama_santri === log.nama_santri || (x.santri_id && x.santri_id === log.santri_id))
+                                );
+                                if (exitLog) {
+                                    waktuKeluarTerkait = exitLog.waktu_scan || exitLog.waktu || null;
+                                }
+                                // ------------------------------------------------
+
                                 const timeParts = String(jamBaku).split(':');
                                 if (timeParts.length >= 2) {
                                     const jam = parseInt(timeParts[0], 10);
@@ -3682,7 +3693,8 @@
                                 _parsedDate: logDate,
                                 _tglTampil: tglTampil,
                                 _displayKeterangan: displayKeterangan,
-                                _jamBaku: jamBaku
+                                _jamBaku: jamBaku,
+                                _waktuKeluar: waktuKeluarTerkait // --- SIMPAN KE STATE ---
                             };
                         });
                         setLogs(mappedLogs);
@@ -3820,6 +3832,14 @@
                                                     ) : (
                                                         <span className="text-gray-600">{log._displayKeterangan}</span>
                                                     )}
+
+                                                    {/* --- TAMBAHAN INFO WAKTU KELUAR --- */}
+                                                    {log._waktuKeluar && (
+                                                        <div className="text-[11px] text-gray-500 mt-1.5 font-medium">
+                                                            Keluar: {log._waktuKeluar} WIB
+                                                        </div>
+                                                    )}
+                                                    {/* ---------------------------------- */}
                                                 </td>
                                             </tr>
                                         ))
