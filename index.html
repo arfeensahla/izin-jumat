@@ -2025,17 +2025,26 @@
             const sortedPermits = [...filteredPermits].sort((a, b) => {
                 if (!sortConfig.key) return 0;
                 
-                // --- LOGIKA KHUSUS JIKA YANG DIURUTKAN ADALAH TANGGAL ---
-                if (sortConfig.key === 'tanggal_izin') {
-                    // Ambil format mentah dan ubah ke objek waktu
-                    const dateA = new Date(a.tanggal_izin || a.created_at || 0).getTime();
-                    const dateB = new Date(b.tanggal_izin || b.created_at || 0).getTime();
-                    
-                    // Bandingkan secara kronologis (waktu)
-                    return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
-                }
-                // --------------------------------------------------------
+                // --- AMBIL JAM & TANGGAL INPUT ASLI (DARI DATABASE SUPABASE) ---
+                const waktuInputA = new Date(a.created_at || a.waktu_pengajuan || a.timestamp || a.waktu || 0).getTime();
+                const waktuInputB = new Date(b.created_at || b.waktu_pengajuan || b.timestamp || b.waktu || 0).getTime();
+                // ---------------------------------------------------------------
 
+                // 1. JIKA MENGURUTKAN BERDASARKAN TANGGAL IZIN
+                if (sortConfig.key === 'tanggal_izin') {
+                    const dateA = new Date(a.tanggal_izin || 0).getTime();
+                    const dateB = new Date(b.tanggal_izin || 0).getTime();
+                    
+                    // Jika tanggal izin berbeda (beda hari), urutkan harinya
+                    if (dateA !== dateB && !isNaN(dateA) && !isNaN(dateB)) {
+                        return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
+                    }
+                    
+                    // JIKA TANGGAL IZIN SAMA (Sama-sama hari ini), PAKSA URUTKAN DARI TERAKHIR DIINPUT!
+                    return waktuInputB - waktuInputA; 
+                }
+
+                // 2. JIKA MENGURUTKAN BERDASARKAN TEKS LAIN (NAMA, KELAS, STATUS)
                 let aValue = a[sortConfig.key] || '';
                 let bValue = b[sortConfig.key] || '';
 
@@ -2044,7 +2053,9 @@
 
                 if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
                 if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-                return 0;
+                
+                // Jika teksnya kebetulan sama (misal nama santri sama), paksa urutkan dari terakhir diinput
+                return waktuInputB - waktuInputA;
             });
 
             const handleSort = (key) => {
@@ -2715,17 +2726,26 @@
             const sortedPermits = [...filteredPermits].sort((a, b) => {
                 if (!sortConfig.key) return 0;
                 
-                // --- LOGIKA KHUSUS JIKA YANG DIURUTKAN ADALAH TANGGAL ---
-                if (sortConfig.key === 'tanggal_izin') {
-                    // Ambil format mentah dan ubah ke objek waktu
-                    const dateA = new Date(a.tanggal_izin || a.created_at || 0).getTime();
-                    const dateB = new Date(b.tanggal_izin || b.created_at || 0).getTime();
-                    
-                    // Bandingkan secara kronologis (waktu)
-                    return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
-                }
-                // --------------------------------------------------------
+                // --- AMBIL JAM & TANGGAL INPUT ASLI (DARI DATABASE SUPABASE) ---
+                const waktuInputA = new Date(a.created_at || a.waktu_pengajuan || a.timestamp || a.waktu || 0).getTime();
+                const waktuInputB = new Date(b.created_at || b.waktu_pengajuan || b.timestamp || b.waktu || 0).getTime();
+                // ---------------------------------------------------------------
 
+                // 1. JIKA MENGURUTKAN BERDASARKAN TANGGAL IZIN
+                if (sortConfig.key === 'tanggal_izin') {
+                    const dateA = new Date(a.tanggal_izin || 0).getTime();
+                    const dateB = new Date(b.tanggal_izin || 0).getTime();
+                    
+                    // Jika tanggal izin berbeda (beda hari), urutkan harinya
+                    if (dateA !== dateB && !isNaN(dateA) && !isNaN(dateB)) {
+                        return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
+                    }
+                    
+                    // JIKA TANGGAL IZIN SAMA (Sama-sama hari ini), PAKSA URUTKAN DARI TERAKHIR DIINPUT!
+                    return waktuInputB - waktuInputA; 
+                }
+
+                // 2. JIKA MENGURUTKAN BERDASARKAN TEKS LAIN (NAMA, KELAS, STATUS)
                 let aValue = a[sortConfig.key] || '';
                 let bValue = b[sortConfig.key] || '';
 
@@ -2734,7 +2754,9 @@
 
                 if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
                 if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-                return 0;
+                
+                // Jika teksnya kebetulan sama (misal nama santri sama), paksa urutkan dari terakhir diinput
+                return waktuInputB - waktuInputA;
             });
 
             const handleSort = (key) => {
@@ -3441,17 +3463,26 @@
             const sortedPermits = [...filteredPermits].sort((a, b) => {
                 if (!sortConfig.key) return 0;
                 
-                // --- LOGIKA KHUSUS JIKA YANG DIURUTKAN ADALAH TANGGAL ---
-                if (sortConfig.key === 'tanggal_izin') {
-                    // Ambil format mentah dan ubah ke objek waktu
-                    const dateA = new Date(a.tanggal_izin || a.created_at || 0).getTime();
-                    const dateB = new Date(b.tanggal_izin || b.created_at || 0).getTime();
-                    
-                    // Bandingkan secara kronologis (waktu)
-                    return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
-                }
-                // --------------------------------------------------------
+                // --- AMBIL JAM & TANGGAL INPUT ASLI (DARI DATABASE SUPABASE) ---
+                const waktuInputA = new Date(a.created_at || a.waktu_pengajuan || a.timestamp || a.waktu || 0).getTime();
+                const waktuInputB = new Date(b.created_at || b.waktu_pengajuan || b.timestamp || b.waktu || 0).getTime();
+                // ---------------------------------------------------------------
 
+                // 1. JIKA MENGURUTKAN BERDASARKAN TANGGAL IZIN
+                if (sortConfig.key === 'tanggal_izin') {
+                    const dateA = new Date(a.tanggal_izin || 0).getTime();
+                    const dateB = new Date(b.tanggal_izin || 0).getTime();
+                    
+                    // Jika tanggal izin berbeda (beda hari), urutkan harinya
+                    if (dateA !== dateB && !isNaN(dateA) && !isNaN(dateB)) {
+                        return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
+                    }
+                    
+                    // JIKA TANGGAL IZIN SAMA (Sama-sama hari ini), PAKSA URUTKAN DARI TERAKHIR DIINPUT!
+                    return waktuInputB - waktuInputA; 
+                }
+
+                // 2. JIKA MENGURUTKAN BERDASARKAN TEKS LAIN (NAMA, KELAS, STATUS)
                 let aValue = a[sortConfig.key] || '';
                 let bValue = b[sortConfig.key] || '';
 
@@ -3460,7 +3491,9 @@
 
                 if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
                 if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-                return 0;
+                
+                // Jika teksnya kebetulan sama (misal nama santri sama), paksa urutkan dari terakhir diinput
+                return waktuInputB - waktuInputA;
             });
 
             const handleSort = (key) => {
