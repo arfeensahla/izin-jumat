@@ -422,6 +422,50 @@
             </button>
         );
 
+        // --- KOMPONEN PAGINATION UNIVERSAL ---
+        const Pagination = ({ currentPage, totalPages, onPageChange, itemsPerPage, setItemsPerPage, totalItems }) => {
+            if (totalItems === 0) return null;
+
+            return (
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 p-4 bg-white border border-gray-200 rounded-xl shadow-sm animate-fade-in-down">
+                    <div className="flex items-center gap-2 text-sm text-gray-600 font-medium">
+                        <span>Tampilkan</span>
+                        <select
+                            value={itemsPerPage}
+                            onChange={(e) => { setItemsPerPage(Number(e.target.value)); onPageChange(1); }}
+                            className="border border-gray-300 rounded-lg p-1.5 outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50 cursor-pointer"
+                        >
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                        </select>
+                        <span>dari <strong className="text-gray-900">{totalItems}</strong> data</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => onPageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            className="px-4 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold transition-colors"
+                        >
+                            &laquo; Prev
+                        </button>
+                        <span className="text-sm font-bold text-emerald-800 bg-emerald-100 px-4 py-1.5 rounded-lg border border-emerald-200 shadow-sm">
+                            Hal {currentPage} / {totalPages || 1}
+                        </span>
+                        <button
+                            onClick={() => onPageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages || totalPages === 0}
+                            className="px-4 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold transition-colors"
+                        >
+                            Next &raquo;
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
         // --- LAYOUT UTAMA ---
         const Layout = ({ children }) => {
             const { user, logout } = useContext(AuthContext);
@@ -3417,6 +3461,7 @@
         };
 
         // --- SEMUA PERIZINAN PAGE (ADMIN) ---
+        // --- SEMUA PERIZINAN PAGE (ADMIN) DENGAN PAGINATION ---
         const SemuaPerizinanPage = () => {
             const { showToast } = useContext(ToastContext);
             const [permits, setPermits] = useState([]);
@@ -3430,6 +3475,15 @@
             const [filterStatus, setFilterStatus] = useState('');
             const [filterMobilitas, setFilterMobilitas] = useState('');
             const [sortConfig, setSortConfig] = useState({ key: 'tanggal_izin', direction: 'desc' });
+
+            // --- STATE PAGINATION BARU ---
+            const [currentPage, setCurrentPage] = useState(1);
+            const [itemsPerPage, setItemsPerPage] = useState(10);
+
+            // Kembali ke halaman 1 jika user melakukan pencarian / ganti filter
+            useEffect(() => {
+                setCurrentPage(1);
+            }, [searchTerm, filterBulan, filterKelas, filterStatus, filterMobilitas, activeTab]);
 
             const getBulanTahun = (tgl) => {
                 if (!tgl) return '-';
@@ -3449,7 +3503,6 @@
             useEffect(() => {
                 const fetchPermits = async () => {
                     try {
-                        // --- PERBAIKAN: Tambah penarikan getSantri ---
                         const [resPermits, resLogs, resSantri] = await Promise.all([
                             apiService.request('getPermits'),
                             apiService.request('getScanLogs'),
@@ -3471,7 +3524,6 @@
                         else if (resSantri && Array.isArray(resSantri.data)) finalSantri = resSantri.data;
                         else if (Array.isArray(resSantri)) finalSantri = resSantri;
 
-                        // --- KAMUS SANTRI ---
                         const santriMap = {};
                         finalSantri.forEach(s => {
                             const sId = s.santri_id || s.nis || s.id;
@@ -3506,7 +3558,6 @@
                                 }
                             }
 
-                            // --- TANGKAP INFO SAUDARA ---
                             let saudaraInfo = null;
                             if (p.saudara_santri_id) saudaraInfo = santriMap[p.saudara_santri_id];
 
@@ -3591,6 +3642,10 @@
                 return waktuInputB - waktuInputA;
             });
 
+            // --- PEMOTONGAN DATA (PAGINATION) ---
+            const totalPages = Math.ceil(sortedPermits.length / itemsPerPage);
+            const paginatedPermits = sortedPermits.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
             const handleSort = (key) => {
                 let direction = 'asc';
                 if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
@@ -3642,7 +3697,7 @@
                             {kelasOptions.map((k, idx) => <option key={idx} value={k}>{k}</option>)}
                         </select>
                         <select className="w-full p-2.5 border rounded-lg bg-white outline-none text-sm font-medium" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                            <option value="">Semua Status Approval</option>
+                            <option value="">Semua Status</option>
                             <option value="MENUNGGU_APPROVAL">Menunggu</option>
                             <option value="DISETUJUI">Disetujui</option>
                             <option value="DITOLAK">Ditolak</option>
@@ -3655,11 +3710,6 @@
                             <option value="Terlambat">Terlambat</option>
                             <option value="Belum Keluar">Belum Keluar</option>
                         </select>
-                    </div>
-
-                    <div className="text-sm text-gray-500">
-                        Menampilkan <span className="font-bold text-emerald-600">{sortedPermits.length}</span> data riwayat perizinan
-                        {activeTab === 'pekan_ini' ? ' untuk pekan berjalan.' : ' dari total keseluruhan.'}
                     </div>
 
                     <Card className="overflow-x-auto p-0">
@@ -3677,8 +3727,9 @@
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Memuat data arsip...</td></tr> :
-                                    sortedPermits.length === 0 ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Tidak ada data yang sesuai pencarian.</td></tr> :
-                                        sortedPermits.map((p, idx) => {
+                                    paginatedPermits.length === 0 ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Tidak ada data yang sesuai pencarian.</td></tr> :
+                                        /* PERBAIKAN: Gunakan paginatedPermits bukan sortedPermits */
+                                        paginatedPermits.map((p, idx) => {
                                             let isKadaluarsa = false;
                                             const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
                                             let pDate = new Date(rawDate);
@@ -3703,7 +3754,6 @@
                                                         <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
                                                             {p.status_jadwal ? p.status_jadwal.toUpperCase() : 'TIDAK DIKETAHUI'}
                                                         </span>
-                                                        {/* --- BADGE NAMA SAUDARA --- */}
                                                         {(String(p.ikut_jadwal_saudara).toLowerCase() === 'true' || String(p.ikut_jadwal_saudara).toLowerCase() === 'ya' || p.ikut_jadwal_saudara === '1') && (
                                                             <div className="mt-2">
                                                                 <span className="inline-block bg-orange-50 text-orange-800 px-2 py-1.5 rounded text-[10.5px] border border-orange-200 leading-snug shadow-sm">
@@ -3740,6 +3790,19 @@
                             </tbody>
                         </table>
                     </Card>
+
+                    {/* KOMPONEN PAGINATION DITAMBAHKAN DI SINI */}
+                    {!loading && sortedPermits.length > 0 && (
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={setCurrentPage}
+                            itemsPerPage={itemsPerPage}
+                            setItemsPerPage={setItemsPerPage}
+                            totalItems={sortedPermits.length}
+                        />
+                    )}
+
                     <QrCardModal isOpen={!!selectedQrPermit} onClose={() => setSelectedQrPermit(null)} permit={selectedQrPermit} />
                 </div>
             );
