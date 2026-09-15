@@ -1849,6 +1849,7 @@
         };
 
         // --- HISTORI KELAS PAGE ---
+        // --- HISTORI KELAS PAGE ---
         const HistoriKelasPage = () => {
             const { user } = useContext(AuthContext);
             const { showToast } = useContext(ToastContext);
@@ -1885,9 +1886,11 @@
             const fetchData = async () => {
                 setLoading(true);
                 try {
-                    const [resPermits, resLogs] = await Promise.all([
+                    // --- PERBAIKAN 1: Tambahkan API getSantri di sini ---
+                    const [resPermits, resLogs, resSantri] = await Promise.all([
                         apiService.request('getPermits'),
-                        apiService.request('getScanLogs')
+                        apiService.request('getScanLogs'),
+                        apiService.request('getSantri') // <--- Data Buku Induk ditarik
                     ]);
 
                     let finalPermits = [];
@@ -1900,10 +1903,21 @@
                     else if (resLogs && Array.isArray(resLogs.data)) finalLogs = resLogs.data;
                     else if (Array.isArray(resLogs)) finalLogs = resLogs;
 
+                    let finalSantri = [];
+                    if (resSantri && resSantri.data && Array.isArray(resSantri.data.data)) finalSantri = resSantri.data.data;
+                    else if (resSantri && Array.isArray(resSantri.data)) finalSantri = resSantri.data;
+                    else if (Array.isArray(resSantri)) finalSantri = resSantri;
+
                     let myPermits = finalPermits.filter(p => p.kelas === user.kelas_id);
 
-                    // --- SUNTIKAN MESIN HASH-MAP (ANTI LAG) ---
-                    // Mengubah array log menjadi kamus agar tidak perlu loop jutaan kali
+                    // --- PERBAIKAN 2: Bikin Kamus Data Santri ---
+                    const santriMap = {};
+                    finalSantri.forEach(s => {
+                        const sId = s.santri_id || s.nis || s.id;
+                        if (sId) santriMap[sId] = s;
+                    });
+                    // ----------------------------------------------
+
                     const logsMap = {};
                     finalLogs.forEach(l => {
                         const id = l.permit_id || l.id_perizinan;
@@ -1912,7 +1926,6 @@
                             logsMap[id].push(l);
                         }
                     });
-                    // ------------------------------------------
 
                     const dataWithMobility = myPermits.map(p => {
                         let mobilitas = '-';
@@ -1922,13 +1935,11 @@
                         if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
                             const pId = p.permit_id || p.id || p.id_perizinan;
 
-                            // Ambil log langsung dari kamus (O(1) Super Cepat!)
                             const myLogs = logsMap[pId] || [];
 
                             const exitLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
                             const returnLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'RETURN');
 
-                            // SINKRONISASI KOLOM: Baca waktu_scan (Supabase) atau waktu (Sheets)
                             if (exitLog) wKeluar = exitLog.waktu_scan || exitLog.waktu;
                             if (returnLog) wKembali = returnLog.waktu_scan || returnLog.waktu;
 
@@ -1940,12 +1951,20 @@
                             }
                         }
 
+                        // --- PERBAIKAN 3: Cari informasi saudara dari kamus ---
+                        let saudaraInfo = null;
+                        if (p.saudara_santri_id) {
+                            saudaraInfo = santriMap[p.saudara_santri_id];
+                        }
+                        // -------------------------------------------------------
+
                         return {
                             ...p,
                             _bulan_filter: getBulanTahun(p.tanggal_izin),
                             _status_mobilitas: mobilitas,
                             _waktu_keluar: wKeluar,
-                            _waktu_kembali: wKembali
+                            _waktu_kembali: wKembali,
+                            _saudaraInfo: saudaraInfo // <--- Simpan info saudara di sini
                         };
                     });
                     setPermits(dataWithMobility);
@@ -1976,7 +1995,6 @@
 
             const bulanOptions = [...new Set(permits.map(p => p._bulan_filter).filter(b => b && b !== '-'))];
 
-            // --- RUMUS KALENDER PONDOK (Sabtu-Jumat) ---
             const now = new Date();
             const jsDay = now.getDay();
             const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
@@ -1986,7 +2004,6 @@
             const endOfWeek = new Date(startOfWeek);
             endOfWeek.setDate(startOfWeek.getDate() + 6);
             endOfWeek.setHours(23, 59, 59, 999);
-            // -------------------------------------------
 
             const filteredPermits = permits.filter(p => {
                 const nama = String(p.nama_santri || '').toLowerCase();
@@ -1994,7 +2011,6 @@
                 const bulan = String(p._bulan_filter || '');
                 const mobilitas = String(p._status_mobilitas || '');
 
-                // --- LOGIKA FILTER TAB ---
                 let isTabMatch = true;
                 if (activeTab === 'pekan_ini') {
                     const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
@@ -2011,7 +2027,6 @@
                         isTabMatch = false;
                     }
                 }
-                // -------------------------
 
                 return (
                     isTabMatch &&
@@ -2025,26 +2040,20 @@
             const sortedPermits = [...filteredPermits].sort((a, b) => {
                 if (!sortConfig.key) return 0;
 
-                // --- AMBIL JAM & TANGGAL INPUT ASLI (DARI DATABASE SUPABASE) ---
                 const waktuInputA = new Date(a.created_at || a.waktu_pengajuan || a.timestamp || a.waktu || 0).getTime();
                 const waktuInputB = new Date(b.created_at || b.waktu_pengajuan || b.timestamp || b.waktu || 0).getTime();
-                // ---------------------------------------------------------------
 
-                // 1. JIKA MENGURUTKAN BERDASARKAN TANGGAL IZIN
                 if (sortConfig.key === 'tanggal_izin') {
                     const dateA = new Date(a.tanggal_izin || 0).getTime();
                     const dateB = new Date(b.tanggal_izin || 0).getTime();
 
-                    // Jika tanggal izin berbeda (beda hari), urutkan harinya
                     if (dateA !== dateB && !isNaN(dateA) && !isNaN(dateB)) {
                         return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
                     }
 
-                    // JIKA TANGGAL IZIN SAMA (Sama-sama hari ini), PAKSA URUTKAN DARI TERAKHIR DIINPUT!
                     return waktuInputB - waktuInputA;
                 }
 
-                // 2. JIKA MENGURUTKAN BERDASARKAN TEKS LAIN (NAMA, KELAS, STATUS)
                 let aValue = a[sortConfig.key] || '';
                 let bValue = b[sortConfig.key] || '';
 
@@ -2054,7 +2063,6 @@
                 if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
                 if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
 
-                // Jika teksnya kebetulan sama (misal nama santri sama), paksa urutkan dari terakhir diinput
                 return waktuInputB - waktuInputA;
             });
 
@@ -2093,7 +2101,6 @@
                             <p className="text-gray-500">Pantau status approval perizinan yang telah diajukan khusus untuk kelas Anda.</p>
                         </div>
 
-                        {/* --- UI SWITCH TAB --- */}
                         <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 shadow-inner w-full md:w-auto">
                             <button
                                 onClick={() => setActiveTab('pekan_ini')}
@@ -2171,7 +2178,6 @@
                                     sortedPermits.length === 0 ? <tr><td colSpan="7" className="p-8 text-center text-gray-500">Tidak ada pengajuan yang sesuai pencarian.</td></tr> :
 
                                         sortedPermits.map((p, idx) => {
-                                            // --- LOGIKA CEK KADALUARSA ---
                                             let isKadaluarsa = false;
                                             const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
                                             let pDate = new Date(rawDate);
@@ -2181,11 +2187,9 @@
                                                 if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
                                             }
 
-                                            // Jika tanggal izin sebelum hari Sabtu pekan ini, anggap kadaluarsa
                                             if (!isNaN(pDate.getTime()) && pDate < startOfWeek) {
                                                 isKadaluarsa = true;
                                             }
-                                            // -----------------------------
 
                                             return (
                                                 <tr key={idx} className="hover:bg-gray-50">
@@ -2205,20 +2209,22 @@
                                                             {p.status_jadwal ? p.status_jadwal.toUpperCase() : 'TIDAK DIKETAHUI'}
                                                         </span>
 
-                                                        {/* PERBAIKAN BUG: Menangkap semua format boolean/teks "true" dari Supabase */}
+                                                        {/* --- PERBAIKAN 4: BADGE LINTAS JADWAL --- */}
                                                         {(String(p.ikut_jadwal_saudara).toLowerCase() === 'true' || String(p.ikut_jadwal_saudara).toLowerCase() === 'ya' || p.ikut_jadwal_saudara === '1') && (
                                                             <div className="mt-2">
-                                                                <span className="inline-block bg-orange-50 text-orange-700 px-2 py-1 rounded shadow-sm text-[10px] font-bold border border-orange-200 leading-tight">
-                                                                    🤝 Lintas Jadwal<br />(Ikut Saudara)
+                                                                <span className="inline-block bg-orange-50 text-orange-800 px-2 py-1.5 rounded text-[10.5px] border border-orange-200 leading-snug shadow-sm">
+                                                                    <span className="font-semibold text-orange-600">Ikut Jadwal Kakak/Adik:</span><br />
+                                                                    <strong className="font-bold text-orange-900">
+                                                                        {p._saudaraInfo ? `${p._saudaraInfo.nama || p._saudaraInfo.nama_santri} (${p._saudaraInfo.kelas})` : `(ID: ${p.saudara_santri_id})`}
+                                                                    </strong>
                                                                 </span>
                                                             </div>
                                                         )}
+                                                        {/* ---------------------------------------- */}
                                                     </td>
                                                     <td className="p-4">{getStatusBadge(p.status_pengajuan)}</td>
                                                     <td className="p-4 bg-emerald-50/20">
                                                         <div>{getMobilityBadge(p._status_mobilitas)}</div>
-
-                                                        {/* --- Menampilkan Jam Keluar & Kembali --- */}
                                                         {(p._waktu_keluar || p._waktu_kembali) && (
                                                             <div className="mt-2 text-[10px] text-gray-500 space-y-0.5 leading-tight">
                                                                 {p._waktu_keluar && <div>Keluar: <span className="font-semibold text-gray-700">{p._waktu_keluar}</span></div>}
