@@ -3770,6 +3770,9 @@
         };
 
         // --- RIWAYAT SCAN PAGE ---
+        // ==========================================
+        // 4. COMPONENT: RIWAYAT SCAN PAGE (PAGINATED)
+        // ==========================================
         const RiwayatScanPage = () => {
             const { showToast } = useContext(ToastContext);
             const [logs, setLogs] = useState([]);
@@ -3778,6 +3781,13 @@
 
             // --- TAB STATE BARU ---
             const [activeTab, setActiveTab] = useState('pekan_ini');
+
+            // --- STATE PAGINATION ---
+            const [currentPage, setCurrentPage] = useState(1);
+            const [itemsPerPage, setItemsPerPage] = useState(10);
+
+            // Reset ke halaman 1 jika filter atau pencarian berubah
+            useEffect(() => { setCurrentPage(1); }, [searchTerm, activeTab]);
 
             useEffect(() => {
                 const fetchLogs = async () => {
@@ -3810,7 +3820,7 @@
                                 }
                             }
 
-                            // JIKA TANGGAL GAGAL/KOSONG, AMBIL DARI ID SCN (Fungsi Asli Anda)
+                            // JIKA TANGGAL GAGAL/KOSONG, AMBIL DARI ID SCN
                             if (tglTampil === '-') {
                                 const scanId = log.id || log.scan_id || log.id_scan || log[0] || '';
                                 if (typeof scanId === 'string' && scanId.startsWith('SCN-')) {
@@ -3824,10 +3834,10 @@
 
                             let displayKeterangan = log.keterangan || '-';
                             const jamBaku = log.waktu_scan || log.waktu || '-';
-                            let waktuKeluarTerkait = null; // --- VARIABEL BARU UNTUK MENYIMPAN WAKTU EXIT ---
+                            let waktuKeluarTerkait = null;
 
                             if (String(log.tipe_scan).toUpperCase() === 'RETURN' && jamBaku && jamBaku !== '-') {
-                                // --- LOGIKA BARU: Cari waktu EXIT santri ini ---
+                                // Cari waktu EXIT santri ini
                                 const exitLog = finalLogs.find(x =>
                                     String(x.tipe_scan).toUpperCase() === 'EXIT' &&
                                     (x.nama_santri === log.nama_santri || (x.santri_id && x.santri_id === log.santri_id))
@@ -3835,7 +3845,6 @@
                                 if (exitLog) {
                                     waktuKeluarTerkait = exitLog.waktu_scan || exitLog.waktu || null;
                                 }
-                                // ------------------------------------------------
 
                                 const timeParts = String(jamBaku).split(':');
                                 if (timeParts.length >= 2) {
@@ -3855,7 +3864,7 @@
                                 _tglTampil: tglTampil,
                                 _displayKeterangan: displayKeterangan,
                                 _jamBaku: jamBaku,
-                                _waktuKeluar: waktuKeluarTerkait // --- SIMPAN KE STATE ---
+                                _waktuKeluar: waktuKeluarTerkait
                             };
                         });
                         setLogs(mappedLogs);
@@ -3875,9 +3884,8 @@
             const endOfWeek = new Date(startOfWeek);
             endOfWeek.setDate(startOfWeek.getDate() + 6);
             endOfWeek.setHours(23, 59, 59, 999);
-            // -------------------------------------------
 
-            // --- FILTER DAN URUTKAN (SORTING) LANGSUNG DI SINI ---
+            // --- FILTER DAN URUTKAN (SORTING) ---
             const filteredLogs = logs.filter(log => {
                 if (!log) return false;
 
@@ -3899,21 +3907,22 @@
 
             // --- URUTKAN RIWAYAT SCAN DARI TERBARU KE TERLAMA ---
             filteredLogs.sort((a, b) => {
-                // 1. Bandingkan tanggalnya terlebih dahulu
                 const timeA = a._parsedDate.getTime();
                 const timeB = b._parsedDate.getTime();
 
                 if (timeA !== timeB) {
-                    return timeB - timeA; // Descending tanggal
+                    return timeB - timeA;
                 }
 
-                // 2. Jika tanggalnya sama (atau sama-sama strip), bandingkan teks jamnya!
                 const jamA = a._jamBaku || '';
                 const jamB = b._jamBaku || '';
 
-                // localeCompare membalik urutan agar jam terbesar (misal 10:18) ada di atas jam kecil (08:39)
                 return jamB.localeCompare(jamA);
             });
+
+            // --- PEMOTONGAN DATA (PAGINATION) ---
+            const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+            const paginatedLogs = filteredLogs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
             return (
                 <div className="space-y-6 animate-fade-in-down">
@@ -3923,7 +3932,6 @@
                             <p className="text-gray-500">Log aktivitas santri keluar & masuk gerbang pos keamanan.</p>
                         </div>
 
-                        {/* --- UI SWITCH TAB --- */}
                         <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 shadow-inner w-full md:w-auto">
                             <button
                                 onClick={() => setActiveTab('pekan_ini')}
@@ -3968,8 +3976,8 @@
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? <tr><td colSpan="4" className="p-8 text-center text-gray-500">Memuat log dari server...</td></tr> :
-                                    filteredLogs.length === 0 ? <tr><td colSpan="4" className="p-8 text-center text-gray-500">Belum ada riwayat scan yang sesuai.</td></tr> :
-                                        filteredLogs.map((log, idx) => (
+                                    paginatedLogs.length === 0 ? <tr><td colSpan="4" className="p-8 text-center text-gray-500">Belum ada riwayat scan yang sesuai.</td></tr> :
+                                        paginatedLogs.map((log, idx) => (
                                             <tr key={idx} className="hover:bg-gray-50">
                                                 <td className="p-4 font-medium text-gray-800">
                                                     <span className="block text-[11px] text-gray-500">{log._tglTampil}</span>
@@ -4000,7 +4008,6 @@
                                                             Keluar: {log._waktuKeluar} WIB
                                                         </div>
                                                     )}
-                                                    {/* ---------------------------------- */}
                                                 </td>
                                             </tr>
                                         ))
@@ -4008,6 +4015,15 @@
                             </tbody>
                         </table>
                     </Card>
+
+                    {/* KOMPONEN PAGINATION DITAMBAHKAN DI SINI */}
+                    {!loading && filteredLogs.length > 0 && (
+                        <Pagination
+                            currentPage={currentPage} totalPages={totalPages}
+                            onPageChange={setCurrentPage} itemsPerPage={itemsPerPage}
+                            setItemsPerPage={setItemsPerPage} totalItems={filteredLogs.length}
+                        />
+                    )}
                 </div>
             );
         };
