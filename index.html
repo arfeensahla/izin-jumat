@@ -508,6 +508,7 @@
         };
 
         // --- LAYOUT UTAMA ---
+        // --- LAYOUT UTAMA ---
         const Layout = ({ children }) => {
             const { user, logout } = useContext(AuthContext);
             const { showToast } = useContext(ToastContext);
@@ -639,8 +640,8 @@
 
                     {/* --- AREA KONTEN UTAMA --- */}
                     <div className="flex-1 overflow-y-auto h-screen relative">
-                        {/* Menambahkan pb-28 agar konten paling bawah tidak tertutup Bottom Nav Bar */}
-                        <main className={`p-4 md:p-8 max-w-6xl mx-auto ${!isAdmin ? 'pb-28' : 'pb-8'}`}>
+                        {/* PERBAIKAN PADDING: Memisahkan padding x (px), padding top (pt), dan padding bottom (pb) agar tidak bentrok */}
+                        <main className={`p-4 md:px-8 md:pt-8 max-w-6xl mx-auto ${!isAdmin ? 'pb-32 md:pb-36' : 'pb-8 md:pb-8'}`}>
                             {React.cloneElement(children, { currentRoute, setCurrentRoute })}
                         </main>
                     </div>
