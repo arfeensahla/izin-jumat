@@ -422,19 +422,24 @@
             </button>
         );
 
+        // --- LAYOUT UTAMA ---
         const Layout = ({ children }) => {
             const { user, logout } = useContext(AuthContext);
-            const { showToast } = useContext(ToastContext); // Tambahan untuk notifikasi
+            const { showToast } = useContext(ToastContext);
             const [isSidebarOpen, setSidebarOpen] = useState(false);
             const [currentRoute, setCurrentRoute] = useState('dashboard');
 
-            // --- STATE UNTUK GANTI PASSWORD ---
+            // --- STATE UNTUK GANTI PASSWORD & AKUN ---
             const [isPasswordModalOpen, setPasswordModalOpen] = useState(false);
+            const [isAccountModalOpen, setAccountModalOpen] = useState(false); // Modal baru untuk menu bawah
             const [passForm, setPassForm] = useState({ old_password: '', new_password: '' });
             const [passLoading, setPassLoading] = useState(false);
 
             if (!user) return null;
             const safeRole = user?.role || 'UNKNOWN';
+
+            // --- DETEKSI ADMIN ---
+            const isAdmin = safeRole === ROLES.ADMIN;
 
             const menuItems = {
                 [ROLES.ADMIN]: [
@@ -449,7 +454,7 @@
                 [ROLES.WALI_KELAS]: [
                     { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
                     { id: 'pengajuan', label: 'Ajukan Izin', icon: Icons.Plus },
-                    { id: 'histori', label: 'Histori Kelas', icon: Icons.Users },
+                    { id: 'histori', label: 'Histori Kelas', icon: Icons.FileText },
                 ],
                 [ROLES.SEKRETARIS_MUDIR]: [
                     { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
@@ -458,14 +463,13 @@
                 ],
                 [ROLES.SECURITY]: [
                     { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
-                    { id: 'scanner', label: 'Scan QR Code', icon: Icons.Scan },
-                    { id: 'log', label: 'Riwayat Scan', icon: Icons.FileText },
+                    { id: 'scanner', label: 'Scan QR', icon: Icons.Scan },
+                    { id: 'log', label: 'Riwayat', icon: Icons.FileText },
                 ]
             };
 
             const currentMenu = menuItems[safeRole] || [];
 
-            // --- FUNGSI EKSEKUSI GANTI PASSWORD ---
             const handleGantiPassword = async (e) => {
                 e.preventDefault();
                 setPassLoading(true);
@@ -477,7 +481,6 @@
                     });
                     showToast('Password berhasil diubah!', 'success');
 
-                    // Simpan Log aktivitas
                     apiService.request('saveLog', {
                         role: user.role,
                         nama: user.nama,
@@ -495,48 +498,134 @@
             };
 
             return (
-                <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
-                    <div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center sticky top-0 z-20">
-                        <div className="font-bold text-emerald-700">Al-Islam Permit</div>
-                        <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-600"><Icons.Menu /></button>
-                    </div>
+                <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row relative">
 
-                    <div className={`fixed md:static inset-y-0 left-0 w-64 bg-white border-r transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out z-30 flex flex-col`}>
-                        <div className="p-6 border-b hidden md:block">
-                            <h1 className="font-bold text-xl text-emerald-700 leading-tight">Sistem Perizinan<br /><span className="text-sm text-gray-500 font-normal">PPM Al-Islam</span></h1>
+                    {/* --- HEADER MOBILE (KHUSUS ADMIN) --- */}
+                    {isAdmin && (
+                        <div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center sticky top-0 z-20 shadow-sm">
+                            <div className="font-bold text-emerald-700">Al-Islam Permit</div>
+                            <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-600"><Icons.Menu /></button>
                         </div>
-                        <div className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-                            <div className="mb-6 px-4 py-3 bg-emerald-50 rounded-lg text-sm border border-emerald-100">
-                                <p className="text-gray-500">Masuk sebagai:</p>
-                                <p className="font-semibold text-emerald-800">{user.nama}</p>
-                                <p className="text-xs text-emerald-600 mt-1 uppercase tracking-wider font-bold">{safeRole.replace('_', ' ')}</p>
-                                {user.kelas_id && <p className="text-xs text-gray-500 mt-1">Kelas: {user.kelas_id}</p>}
+                    )}
+
+                    {/* --- HEADER DESKTOP & MOBILE (KHUSUS NON-ADMIN) --- */}
+                    {!isAdmin && (
+                        <div className="bg-white border-b px-4 py-3 flex justify-between items-center sticky top-0 z-20 shadow-sm">
+                            <div className="font-bold text-emerald-700 flex items-center gap-2">
+                                <div className="bg-emerald-100 p-1.5 rounded-lg"><Icons.FileText /></div>
+                                <span>Al-Islam Permit</span>
                             </div>
-                            {currentMenu.length > 0 ? currentMenu.map(item => (
-                                <SidebarItem key={item.id} icon={item.icon} label={item.label} active={currentRoute === item.id} onClick={() => { setCurrentRoute(item.id); setSidebarOpen(false); }} />
-                            )) : <p className="text-red-500 text-sm px-4">Error Role.</p>}
+                            <div className="text-[10px] md:text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full uppercase tracking-wider">
+                                {safeRole.replace('_', ' ')}
+                            </div>
                         </div>
-                        <div className="p-4 border-t space-y-1">
-                            {/* TOMBOL GANTI PASSWORD */}
-                            <button onClick={() => setPasswordModalOpen(true)} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left text-gray-700 hover:bg-gray-100 transition-colors">
-                                <Icons.Settings /> <span className="font-medium text-sm">Ganti Password</span>
-                            </button>
-                            {/* TOMBOL LOGOUT */}
-                            <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left text-red-600 hover:bg-red-50 transition-colors">
-                                <Icons.LogOut /> <span className="font-medium text-sm">Keluar</span>
-                            </button>
+                    )}
+
+                    {/* --- SIDEBAR KIRI (HANYA MUNCUL JIKA ADMIN) --- */}
+                    {isAdmin && (
+                        <div className={`fixed md:static inset-y-0 left-0 w-64 bg-white border-r transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out z-30 flex flex-col`}>
+                            <div className="p-6 border-b hidden md:block">
+                                <h1 className="font-bold text-xl text-emerald-700 leading-tight">Sistem Perizinan<br /><span className="text-sm text-gray-500 font-normal">PPM Al-Islam</span></h1>
+                            </div>
+                            <div className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+                                <div className="mb-6 px-4 py-3 bg-emerald-50 rounded-lg text-sm border border-emerald-100">
+                                    <p className="text-gray-500">Masuk sebagai:</p>
+                                    <p className="font-semibold text-emerald-800">{user.nama}</p>
+                                    <p className="text-xs text-emerald-600 mt-1 uppercase tracking-wider font-bold">{safeRole.replace('_', ' ')}</p>
+                                    {user.kelas_id && <p className="text-xs text-gray-500 mt-1">Kelas: {user.kelas_id}</p>}
+                                </div>
+                                {currentMenu.length > 0 ? currentMenu.map(item => (
+                                    <SidebarItem key={item.id} icon={item.icon} label={item.label} active={currentRoute === item.id} onClick={() => { setCurrentRoute(item.id); setSidebarOpen(false); }} />
+                                )) : <p className="text-red-500 text-sm px-4">Error Role.</p>}
+                            </div>
+                            <div className="p-4 border-t space-y-1">
+                                <button onClick={() => setPasswordModalOpen(true)} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left text-gray-700 hover:bg-gray-100 transition-colors">
+                                    <Icons.Settings /> <span className="font-medium text-sm">Ganti Password</span>
+                                </button>
+                                <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left text-red-600 hover:bg-red-50 transition-colors">
+                                    <Icons.LogOut /> <span className="font-medium text-sm">Keluar</span>
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
-                    {isSidebarOpen && <div className="fixed inset-0 bg-black/20 z-20 md:hidden" onClick={() => setSidebarOpen(false)} />}
+                    {/* Latar Belakang Gelap Sidebar Mobile (Khusus Admin) */}
+                    {isAdmin && isSidebarOpen && <div className="fixed inset-0 bg-black/20 z-20 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
-                    <div className="flex-1 overflow-y-auto h-screen">
-                        <main className="p-4 md:p-8 max-w-6xl mx-auto pb-24 md:pb-8">
+                    {/* --- AREA KONTEN UTAMA --- */}
+                    <div className="flex-1 overflow-y-auto h-screen relative">
+                        {/* Menambahkan pb-28 agar konten paling bawah tidak tertutup Bottom Nav Bar */}
+                        <main className={`p-4 md:p-8 max-w-6xl mx-auto ${!isAdmin ? 'pb-28' : 'pb-8'}`}>
                             {React.cloneElement(children, { currentRoute, setCurrentRoute })}
                         </main>
                     </div>
 
-                    {/* MODAL GANTI PASSWORD */}
+                    {/* --- BOTTOM NAVIGATION BAR (KHUSUS NON-ADMIN) --- */}
+                    {!isAdmin && (
+                        <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 flex justify-around items-center pt-2 pb-3 px-2 shadow-[0_-8px_20px_rgba(0,0,0,0.06)] z-40">
+                            {currentMenu.map(item => {
+                                const Icon = item.icon;
+                                const isActive = currentRoute === item.id;
+                                return (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => setCurrentRoute(item.id)}
+                                        className={`flex flex-col items-center justify-center w-full py-1 transition-colors ${isActive ? 'text-emerald-600' : 'text-gray-400 hover:text-emerald-500'}`}
+                                    >
+                                        <div className={`p-1.5 rounded-xl transition-all ${isActive ? 'bg-emerald-50 text-emerald-600 scale-110' : ''}`}>
+                                            <Icon />
+                                        </div>
+                                        <span className={`text-[10px] mt-1 ${isActive ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
+                                    </button>
+                                )
+                            })}
+
+                            {/* TOMBOL MENU AKUN/PROFIL DI BOTTOM NAV */}
+                            <button
+                                onClick={() => setAccountModalOpen(true)}
+                                className="flex flex-col items-center justify-center w-full py-1 text-gray-400 hover:text-emerald-500 transition-colors"
+                            >
+                                <div className="p-1.5 rounded-xl">
+                                    <Icons.Settings />
+                                </div>
+                                <span className="text-[10px] mt-1 font-medium">Akun</span>
+                            </button>
+                        </div>
+                    )}
+
+                    {/* --- MODAL PROFIL & AKUN (KHUSUS NON-ADMIN) --- */}
+                    <Modal isOpen={isAccountModalOpen} onClose={() => setAccountModalOpen(false)} title="Profil Pengguna">
+                        <div className="space-y-4">
+                            <div className="bg-emerald-50 p-6 rounded-xl border border-emerald-100 text-center shadow-sm">
+                                <div className="w-16 h-16 bg-emerald-600 text-white rounded-full flex items-center justify-center mx-auto mb-3 text-2xl font-bold shadow-md">
+                                    {user.nama.charAt(0).toUpperCase()}
+                                </div>
+                                <h3 className="font-bold text-gray-900 text-lg">{user.nama}</h3>
+                                <p className="text-sm text-emerald-700 font-bold uppercase tracking-wide mt-1">
+                                    {safeRole.replace('_', ' ')} {user.kelas_id ? ` • Kelas ${user.kelas_id}` : ''}
+                                </p>
+                            </div>
+
+                            <div className="space-y-3 pt-2">
+                                <button
+                                    onClick={() => { setAccountModalOpen(false); setPasswordModalOpen(true); }}
+                                    className="w-full flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+                                >
+                                    <div className="flex items-center gap-3 font-bold"><Icons.Settings /> Ganti Password</div>
+                                    <span className="text-gray-400 font-bold">➔</span>
+                                </button>
+                                <button
+                                    onClick={logout}
+                                    className="w-full flex items-center justify-between p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 hover:bg-red-100 transition-colors shadow-sm"
+                                >
+                                    <div className="flex items-center gap-3 font-bold"><Icons.LogOut /> Keluar Sistem</div>
+                                    <span className="text-red-400 font-bold">➔</span>
+                                </button>
+                            </div>
+                        </div>
+                    </Modal>
+
+                    {/* MODAL GANTI PASSWORD (BERLAKU UNTUK SEMUA ROLE) */}
                     <Modal isOpen={isPasswordModalOpen} onClose={() => setPasswordModalOpen(false)} title="Ganti Password">
                         <form onSubmit={handleGantiPassword} className="space-y-4">
                             <Input label="Password Lama" type="password" required value={passForm.old_password} onChange={e => setPassForm({ ...passForm, old_password: e.target.value })} placeholder="Masukkan password saat ini" />
