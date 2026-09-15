@@ -2257,6 +2257,7 @@
         };
 
         // --- SCREENING IZIN ---
+        // --- SCREENING IZIN PAGE ---
         const ScreeningIzinPage = () => {
             const { user } = useContext(AuthContext);
             const { showToast } = useContext(ToastContext);
@@ -2280,7 +2281,7 @@
                 try {
                     const [resPermits, resSantri] = await Promise.all([
                         apiService.request('getPermits'),
-                        apiService.request('getSantri')
+                        apiService.request('getSantri') // Data Induk Santri ditarik di sini
                     ]);
 
                     let finalPermits = [];
@@ -2303,23 +2304,24 @@
                     const pendingPermits = finalPermits
                         .filter(p => p.status_pengajuan === 'MENUNGGU_APPROVAL' || p.status_pengajuan === 'MENUNGGU')
                         .map(p => {
-                            // Mencocokkan data saudara (jika ikut saudara) langsung dari Hash-Map
+                            // LOGIKA AMAN: Deteksi Lintas Jadwal
                             let saudaraInfo = null;
-                            if (p.ikut_jadwal_saudara && p.saudara_santri_id) {
-                                saudaraInfo = santriMap[p.saudara_santri_id];
+                            if (String(p.ikut_jadwal_saudara).toLowerCase() === 'true' || String(p.ikut_jadwal_saudara).toLowerCase() === 'ya' || p.ikut_jadwal_saudara === '1') {
+                                if (p.saudara_santri_id) {
+                                    saudaraInfo = santriMap[p.saudara_santri_id];
+                                }
                             }
                             return { ...p, _saudaraInfo: saudaraInfo };
                         })
                         .reverse(); // Menampilkan yang terbaru di atas
 
                     setPermits(pendingPermits);
-                    setSantriList(finalSantri); // Disimpan untuk referensi lain jika perlu
+                    setSantriList(finalSantri);
                 } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
             };
 
             useEffect(() => { fetchPermits(); }, []);
 
-            // --- FUNGSI 1: Eksekusi Setuju Langsung (Sat-Set Individual) ---
             const handleApprove = async (permit) => {
                 if (!window.confirm(`Yakin menyetujui izin untuk ${permit.nama_santri}? QR Code akan otomatis diterbitkan.`)) return;
 
@@ -2340,20 +2342,17 @@
                 } catch (e) { showToast(e.message, 'error'); } finally { setProcessing(false); }
             };
 
-            // --- FUNGSI BARU: Eksekusi Bulk Approve (Setujui Massal) ---
             const handleBulkApprove = async () => {
                 if (!window.confirm(`Yakin ingin menyetujui ${selectedApproveIds.length} pengajuan secara bersamaan? QR Code akan digenerate otomatis.`)) return;
 
                 setIsApproving(true);
                 try {
-                    // Looping untuk memanggil API processApproval milik Bapak per ID yang dicentang
                     for (const id of selectedApproveIds) {
                         const permitTarget = permits.find(p => (p.permit_id || p.id_perizinan) === id);
                         if (permitTarget) {
                             const payload = { permit_id: id, aksi_approval: 'APPROVE', alasan: '', username: user.nama };
                             await apiService.request('processApproval', payload);
 
-                            // Log per santri agar tetap tercatat di system_log
                             await apiService.request('saveLog', {
                                 role: user.role,
                                 nama: user.nama,
@@ -2364,17 +2363,12 @@
                     }
 
                     showToast(`${selectedApproveIds.length} pengajuan berhasil disetujui!`, 'success');
-                    setSelectedApproveIds([]); // Kosongkan centang setelah sukses
-                    fetchPermits(); // Refresh halaman
-                } catch (error) {
-                    showToast('Gagal menyetujui beberapa pengajuan: ' + error.message, 'error');
-                } finally {
-                    setIsApproving(false);
-                }
+                    setSelectedApproveIds([]);
+                    fetchPermits();
+                } catch (error) { showToast('Gagal menyetujui beberapa pengajuan: ' + error.message, 'error'); }
+                finally { setIsApproving(false); }
             };
-            // -------------------------------------------------------------
 
-            // --- FUNGSI 2: Eksekusi Tolak (Dari dalam Modal) ---
             const handleProcessReject = async () => {
                 if (!rejectReason) return showToast("Alasan penolakan wajib diisi!", "error");
 
@@ -2473,7 +2467,6 @@
                             </label>
                         </div>
                     )}
-                    {/* ------------------------- */}
 
                     {loading ? <div className="p-12 text-center text-gray-500">Membaca antrean izin dari server...</div> :
                         permits.length === 0 ? <div className="p-12 text-center bg-white rounded-xl border border-dashed border-gray-300 text-gray-500">Yeay! Tidak ada antrean perizinan saat ini.</div> :
@@ -2486,7 +2479,7 @@
                                         return (
                                             <Card key={idx} className={`flex flex-col justify-between border-l-4 transition-all relative ${isSelected ? 'border-emerald-500 bg-emerald-50/50 shadow-md' : 'border-yellow-400 hover:shadow-md'}`}>
 
-                                                {/* --- CHECKBOX DI POJOK KANAN KARTU --- */}
+                                                {/* CHECKBOX KARTU */}
                                                 <div className="absolute top-4 right-4 z-10">
                                                     <input
                                                         type="checkbox"
@@ -2498,7 +2491,6 @@
                                                         }}
                                                     />
                                                 </div>
-                                                {/* ------------------------------------ */}
 
                                                 <div>
                                                     <div className="flex justify-between items-start mb-4 border-b pb-4 pr-8">
@@ -2507,7 +2499,7 @@
                                                             <p className="text-sm text-gray-500">{p.kelas} • Tgl Izin: <strong>{p.tanggal_izin}</strong></p>
                                                         </div>
                                                         <span className={`px-3 py-1 text-xs font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                                                            {p.status_jadwal}
+                                                            {p.status_jadwal ? p.status_jadwal.toUpperCase() : 'TIDAK DIKETAHUI'}
                                                         </span>
                                                     </div>
                                                     <div className="space-y-2 text-sm text-gray-700 mb-6">
@@ -2521,12 +2513,16 @@
                                                                 <p className="text-red-700 italic">{p.keterangan_luar_jadwal}</p>
                                                             </div>
                                                         )}
-                                                        {(p.ikut_jadwal_saudara === 'Ya' || p.ikut_jadwal_saudara === true || p.ikut_jadwal_saudara === 'TRUE') && (
-                                                            <div className="mt-2 p-2 bg-blue-50 text-blue-800 rounded-lg text-xs font-medium">
-                                                                {p._saudaraInfo
-                                                                    ? `Ikut jadwal saudara: ${p._saudaraInfo.nama || p._saudaraInfo.nama_santri} (${p._saudaraInfo.kelas})`
-                                                                    : `Ikut jadwal saudara (ID: ${p.saudara_santri_id})`
-                                                                }
+
+                                                        {/* --- BADGE NAMA SAUDARA (SERAGAM DENGAN HISTORI KELAS) --- */}
+                                                        {(String(p.ikut_jadwal_saudara).toLowerCase() === 'true' || String(p.ikut_jadwal_saudara).toLowerCase() === 'ya' || p.ikut_jadwal_saudara === '1') && (
+                                                            <div className="mt-2">
+                                                                <span className="inline-block bg-orange-50 text-orange-800 px-2 py-1.5 rounded text-[10.5px] border border-orange-200 leading-snug shadow-sm">
+                                                                    <span className="font-semibold text-orange-600">Ikut Jadwal Kakak/Adik:</span><br />
+                                                                    <strong className="font-bold text-orange-900">
+                                                                        {p._saudaraInfo ? `${p._saudaraInfo.nama || p._saudaraInfo.nama_santri} (${p._saudaraInfo.kelas})` : `(ID: ${p.saudara_santri_id})`}
+                                                                    </strong>
+                                                                </span>
                                                             </div>
                                                         )}
                                                     </div>
