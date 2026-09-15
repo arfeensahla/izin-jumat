@@ -2547,27 +2547,32 @@
                         </div>
                     )}
 
-                    {/* --- PANEL BULK ACTION (STICKY TOP) --- */}
+                    {/* --- PANEL BULK ACTION (FIXED TOP MURNI) --- */}
                     {selectedApproveIds.length > 0 && (
-                        <div className="sticky top-2 md:top-4 z-[60] mb-6 bg-emerald-100/95 backdrop-blur-sm border-2 border-emerald-400 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center shadow-lg animate-fade-in-down gap-4">
-                            <span className="text-emerald-900 font-black text-center sm:text-left">
-                                {selectedApproveIds.length} pengajuan dipilih.
-                            </span>
-                            <div className="flex gap-3 w-full sm:w-auto">
-                                <button
-                                    onClick={() => setSelectedApproveIds([])}
-                                    disabled={isApproving || processing}
-                                    className="flex-1 sm:flex-none px-4 py-2.5 bg-white text-gray-700 rounded-lg shadow-sm text-sm font-bold hover:bg-gray-100 disabled:opacity-50 transition-colors border border-gray-200"
-                                >
-                                    Batal
-                                </button>
-                                <button
-                                    onClick={handleBulkApprove}
-                                    disabled={isApproving || processing}
-                                    className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 text-white rounded-lg shadow-md text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                                >
-                                    {isApproving ? 'Memproses...' : 'Setujui Terpilih ✓'}
-                                </button>
+                        // Pembungkus tak kasat mata agar posisinya pas di tengah layar (menghindari sidebar di desktop)
+                        <div className="fixed top-[75px] md:top-6 left-0 right-0 md:pl-64 flex justify-center z-[70] pointer-events-none px-4 animate-fade-in-down">
+
+                            // Kotak melayang utamanya
+                            <div className="w-full md:w-[600px] bg-emerald-100/95 backdrop-blur-md border-2 border-emerald-500 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center shadow-[0_10px_30px_rgba(16,185,129,0.25)] pointer-events-auto gap-4">
+                                <span className="text-emerald-900 font-black text-center sm:text-left">
+                                    {selectedApproveIds.length} pengajuan dipilih.
+                                </span>
+                                <div className="flex gap-3 w-full sm:w-auto">
+                                    <button
+                                        onClick={() => setSelectedApproveIds([])}
+                                        disabled={isApproving || processing}
+                                        className="flex-1 sm:flex-none px-4 py-2.5 bg-white text-gray-700 rounded-lg shadow-sm text-sm font-bold hover:bg-gray-100 disabled:opacity-50 transition-colors border border-gray-200"
+                                    >
+                                        Batal
+                                    </button>
+                                    <button
+                                        onClick={handleBulkApprove}
+                                        disabled={isApproving || processing}
+                                        className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 text-white rounded-lg shadow-md text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        {isApproving ? 'Memproses...' : 'Setujui Terpilih ✓'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
