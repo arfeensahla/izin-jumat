@@ -423,7 +423,36 @@
         );
 
         // --- KOMPONEN PAGINATION UNIVERSAL ---
+        // --- KOMPONEN PAGINATION UNIVERSAL (VERSI UPGRADE INPUT JUMP) ---
         const Pagination = ({ currentPage, totalPages, onPageChange, itemsPerPage, setItemsPerPage, totalItems }) => {
+            // Lokal state agar pengguna bebas mengetik angka di kotak sebelum melompat
+            const [inputPage, setInputPage] = useState(currentPage);
+
+            // Sinkronisasi angka di kotak jika halaman berubah karena diklik tombol Prev/Next
+            useEffect(() => {
+                setInputPage(currentPage);
+            }, [currentPage]);
+
+            const handleInputChange = (e) => {
+                setInputPage(e.target.value);
+            };
+
+            // Fungsi eksekusi lompatan (dipicu saat user tekan Enter atau klik di luar kotak)
+            const handleJump = () => {
+                let page = parseInt(inputPage, 10);
+
+                // Mencegah error jika user memasukkan huruf, angka minus, atau angka kebesaran
+                if (isNaN(page) || page < 1) page = 1;
+                if (page > totalPages) page = totalPages;
+
+                setInputPage(page);
+                onPageChange(page);
+            };
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'Enter') handleJump();
+            };
+
             if (totalItems === 0) return null;
 
             return (
@@ -446,18 +475,30 @@
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => onPageChange(currentPage - 1)}
-                            disabled={currentPage === 1}
-                            className="px-4 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold transition-colors"
+                            disabled={currentPage <= 1}
+                            className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold transition-colors"
                         >
                             &laquo; Prev
                         </button>
-                        <span className="text-sm font-bold text-emerald-800 bg-emerald-100 px-4 py-1.5 rounded-lg border border-emerald-200 shadow-sm">
-                            Hal {currentPage} / {totalPages || 1}
-                        </span>
+
+                        {/* KOTAK INPUT JUMP PAGE */}
+                        <div className="flex items-center gap-2 text-sm font-bold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 shadow-sm">
+                            <span>Hal</span>
+                            <input
+                                type="text"
+                                value={inputPage}
+                                onChange={handleInputChange}
+                                onBlur={handleJump}
+                                onKeyDown={handleKeyDown}
+                                className="w-10 text-center border border-emerald-400 rounded bg-white text-emerald-900 focus:ring-2 focus:ring-emerald-600 outline-none shadow-inner"
+                            />
+                            <span>/ {totalPages || 1}</span>
+                        </div>
+
                         <button
                             onClick={() => onPageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages || totalPages === 0}
-                            className="px-4 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold transition-colors"
+                            disabled={currentPage >= totalPages || totalPages === 0}
+                            className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold transition-colors"
                         >
                             Next &raquo;
                         </button>
