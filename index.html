@@ -3075,7 +3075,6 @@
 
             // --- MESIN KALKULASI DINAMIS (Mengikuti Filter) ---
             const { stats, totalMenunggu } = useMemo(() => {
-                // PERBAIKAN: Menambahkan 'tepatWaktu' ke dalam state
                 let sPusat = { ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0, tepatWaktu: 0 };
                 let sMenunggu = 0;
 
@@ -3171,7 +3170,7 @@
                         if (returnLog) {
                             sPusat.kembali++;
                             if (isTerlambat) sPusat.terlambat++;
-                            else sPusat.tepatWaktu++; // PERBAIKAN: Hitung tepat waktu
+                            else sPusat.tepatWaktu++;
                         }
                     }
                 });
@@ -3251,10 +3250,13 @@
                         {/* Kelompok 1: Status Pengajuan */}
                         <div>
                             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">
-                                Kelompok 1 : Ajuan
+                                Ajuan
                             </h4>
-                            <div className="grid grid-cols-3 gap-3 md:gap-4">
-                                <StatCard title="Total Ajuan" value={loading ? "..." : stats.ajuan} icon={<Icons.FileText />} color="bg-blue-50 text-blue-600 border border-blue-100 shadow-sm" />
+                            {/* PERBAIKAN GRID: Total Ajuan mengambil 2 kolom di layar HP agar lebar, lalu disetujui & ditolak ada di bawahnya */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                                <div className="col-span-2 md:col-span-1">
+                                    <StatCard title="Total Ajuan" value={loading ? "..." : stats.ajuan} icon={<Icons.FileText />} color="bg-blue-50 text-blue-600 border border-blue-100 shadow-sm" />
+                                </div>
                                 <StatCard title="Disetujui" value={loading ? "..." : stats.disetujui} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm" />
                                 <StatCard title="Ditolak" value={loading ? "..." : stats.ditolak} icon={<Icons.XCircle />} color="bg-red-50 text-red-600 border border-red-100 shadow-sm" />
                             </div>
@@ -3266,7 +3268,7 @@
                             {/* Kelompok 2: Posisi Santri */}
                             <div>
                                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">
-                                    Kelompok 2 : Posisi Santri
+                                    Posisi Santri
                                 </h4>
                                 <div className="grid grid-cols-2 gap-3 md:gap-4">
                                     <StatCard title="Masih Di Luar" value={loading ? "..." : stats.diluar} icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600 border border-orange-100 shadow-sm" />
@@ -3277,7 +3279,7 @@
                             {/* Kelompok 3: Waktu Kembali */}
                             <div>
                                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">
-                                    Kelompok 3 : Waktu Kembali
+                                    Waktu Kembali
                                 </h4>
                                 <div className="grid grid-cols-2 gap-3 md:gap-4">
                                     <StatCard title="Tepat Waktu" value={loading ? "..." : stats.tepatWaktu} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm" />
