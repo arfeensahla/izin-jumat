@@ -3092,7 +3092,6 @@
                     });
                 }
 
-                // Setup Tanggal Referensi
                 const now = new Date();
                 const jsDay = now.getDay();
                 const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
@@ -3110,13 +3109,8 @@
 
                 allPermits.forEach(p => {
                     const status = String(p.status_pengajuan || '').toUpperCase();
+                    if (status === 'MENUNGGU_APPROVAL' || status === 'MENUNGGU') sMenunggu++;
 
-                    // Notifikasi selalu menghitung ALL TIME yang belum di-ACC
-                    if (status === 'MENUNGGU_APPROVAL' || status === 'MENUNGGU') {
-                        sMenunggu++;
-                    }
-
-                    // Parsing Tanggal Pengajuan
                     const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
                     let pDate = new Date(rawDate);
                     if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
@@ -3124,7 +3118,6 @@
                         if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
                     }
 
-                    // Logika Filter Global
                     let masukFilter = false;
                     if (!isNaN(pDate.getTime())) {
                         if (periodeRekap === 'pekan_ini') {
@@ -3140,7 +3133,6 @@
                         }
                     }
 
-                    // Jika masuk dalam filter waktu, hitung ke dalam kartu statistik
                     if (masukFilter) {
                         sPusat.ajuan++;
                         if (status === 'DISETUJUI') sPusat.disetujui++;
@@ -3152,23 +3144,32 @@
                         const hasExit = pLogs.some(l => String(l.tipe_scan).toUpperCase() === 'EXIT');
                         const returnLog = pLogs.find(l => String(l.tipe_scan).toUpperCase() === 'RETURN');
 
-                        let isTerlambat = false;
-                        const waktuReturn = returnLog ? (returnLog.waktu_scan || returnLog.waktu) : null;
-
-                        if (waktuReturn) {
-                            const timeParts = String(waktuReturn).split(':');
-                            if (timeParts.length >= 2) {
-                                const jam = parseInt(timeParts[0], 10);
-                                const menit = parseInt(timeParts[1], 10);
-                                if (!isNaN(jam) && !isNaN(menit)) {
-                                    if ((jam * 60) + menit > 990) isTerlambat = true; // Lebih dari 16:30
-                                }
-                            }
-                        }
-
                         if (hasExit && !returnLog) sPusat.diluar++;
                         if (returnLog) {
                             sPusat.kembali++;
+
+                            // --- SINKRONISASI LOGIKA TERLAMBAT DENGAN TABEL ---
+                            let isTerlambat = false;
+                            const ketLog = String(returnLog.keterangan || returnLog.status || '').toUpperCase();
+
+                            // 1. Prioritas utama: Baca keterangan dari scanner
+                            if (ketLog.includes('TERLAMBAT')) {
+                                isTerlambat = true;
+                            } else if (!ketLog.includes('TEPAT WAKTU')) {
+                                // 2. Fallback hitungan waktu jika keterangan tidak jelas
+                                const waktuReturn = returnLog.waktu_scan || returnLog.waktu || '';
+                                const timeParts = String(waktuReturn).split(':');
+                                if (timeParts.length >= 2) {
+                                    let jam = parseInt(timeParts[0], 10);
+                                    const menit = parseInt(timeParts[1], 10);
+                                    // Antisipasi jika jam tertulis 05:00 sore tapi format 12-hour tanpa PM
+                                    if (jam > 0 && jam <= 7) jam += 12;
+                                    if (!isNaN(jam) && !isNaN(menit)) {
+                                        if ((jam * 60) + menit > 990) isTerlambat = true; // Lewat 16:30
+                                    }
+                                }
+                            }
+
                             if (isTerlambat) sPusat.terlambat++;
                             else sPusat.tepatWaktu++;
                         }
@@ -3180,8 +3181,6 @@
 
             return (
                 <div className="space-y-6 animate-fade-in-down">
-
-                    {/* --- HEADER DASHBOARD --- */}
                     <div className="flex justify-between items-end border-b pb-4">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
@@ -3195,7 +3194,6 @@
                         )}
                     </div>
 
-                    {/* --- BANNER ALERT NOTIFIKASI --- */}
                     {!loading && totalMenunggu > 0 && user?.role === 'SEKRETARIS_MUDIR' && (
                         <div
                             onClick={() => setCurrentRoute ? setCurrentRoute('screening') : null}
@@ -3216,7 +3214,6 @@
                         </div>
                     )}
 
-                    {/* --- KONTROL FILTER GLOBAL --- */}
                     <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
                             <h3 className="text-lg font-bold text-emerald-800 leading-tight">Statistik Perizinan</h3>
@@ -3244,15 +3241,9 @@
                         </div>
                     </div>
 
-                    {/* --- KARTU METRIK DINAMIS (DIBAGI 3 KELOMPOK) --- */}
                     <div className="space-y-6">
-
-                        {/* Kelompok 1: Status Pengajuan */}
                         <div>
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">
-                                Perizinan
-                            </h4>
-                            {/* PERBAIKAN GRID: Total Ajuan mengambil 2 kolom di layar HP agar lebar, lalu disetujui & ditolak ada di bawahnya */}
+                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">Kelompok 1 : Ajuan</h4>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                                 <div className="col-span-2 md:col-span-1">
                                     <StatCard title="Total Ajuan" value={loading ? "..." : stats.ajuan} icon={<Icons.FileText />} color="bg-blue-50 text-blue-600 border border-blue-100 shadow-sm" />
@@ -3262,35 +3253,23 @@
                             </div>
                         </div>
 
-                        {/* Pembungkus Grid Kelompok 2 & 3 */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-                            {/* Kelompok 2: Posisi Santri */}
                             <div>
-                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">
-                                    Posisi Santri
-                                </h4>
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">Kelompok 2 : Posisi Santri</h4>
                                 <div className="grid grid-cols-2 gap-3 md:gap-4">
                                     <StatCard title="Masih Di Luar" value={loading ? "..." : stats.diluar} icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600 border border-orange-100 shadow-sm" />
                                     <StatCard title="Sudah Kembali" value={loading ? "..." : stats.kembali} icon={<Icons.Home />} color="bg-teal-50 text-teal-600 border border-teal-100 shadow-sm" />
                                 </div>
                             </div>
-
-                            {/* Kelompok 3: Waktu Kembali */}
                             <div>
-                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">
-                                    Waktu Kembali
-                                </h4>
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">Kelompok 3 : Waktu Kembali</h4>
                                 <div className="grid grid-cols-2 gap-3 md:gap-4">
                                     <StatCard title="Tepat Waktu" value={loading ? "..." : stats.tepatWaktu} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm" />
                                     <StatCard title="Terlambat" value={loading ? "..." : stats.terlambat} icon={<Icons.Clock />} color="bg-rose-50 text-rose-600 border border-rose-100 shadow-sm" />
                                 </div>
                             </div>
-
                         </div>
                     </div>
-                    {/* --- AKHIR KARTU METRIK --- */}
-
                 </div>
             );
         };
@@ -3333,13 +3312,12 @@
                 return () => { isMounted = false; };
             }, []);
 
-            // --- MESIN KALKULASI DINAMIS (TERKUNCI HANYA PEKAN INI) ---
+            // --- MESIN KALKULASI DINAMIS ---
             const stats = useMemo(() => {
                 let s = { disetujui: 0, keluar: 0, diluar: 0, kembali: 0, terlambat: 0, tepatWaktu: 0 };
 
                 if (!allPermits || allPermits.length === 0) return s;
 
-                // Bikin Kamus (Hash Map) untuk logs
                 const logsMap = {};
                 if (allLogs && allLogs.length > 0) {
                     allLogs.forEach(l => {
@@ -3351,7 +3329,6 @@
                     });
                 }
 
-                // Setup Tanggal Referensi (Sabtu s/d Jumat pekan ini)
                 const now = new Date();
                 const jsDay = now.getDay();
                 const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
@@ -3373,7 +3350,6 @@
                         if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
                     }
 
-                    // Logika: HANYA HITUNG JIKA DALAM PEKAN INI
                     if (!isNaN(pDate.getTime()) && pDate >= startOfWeek && pDate <= endOfWeek) {
                         const pId = p.permit_id || p.id || p.id_perizinan;
                         const status = String(p.status_pengajuan || '').toUpperCase();
@@ -3390,21 +3366,25 @@
                         if (returnLog) {
                             s.kembali++;
 
-                            // Hitung Tepat Waktu vs Terlambat
+                            // --- SINKRONISASI LOGIKA TERLAMBAT DENGAN TABEL ---
                             let isTerlambat = false;
-                            const waktuReturn = returnLog.waktu_scan || returnLog.waktu || '';
-                            const timeParts = String(waktuReturn).split(':');
+                            const ketLog = String(returnLog.keterangan || returnLog.status || '').toUpperCase();
 
-                            if (timeParts.length >= 2) {
-                                const jam = parseInt(timeParts[0], 10);
-                                const menit = parseInt(timeParts[1], 10);
-                                if (!isNaN(jam) && !isNaN(menit)) {
-                                    if ((jam * 60) + menit > 990) isTerlambat = true; // Lewat 16:30
+                            // 1. Prioritas Utama
+                            if (ketLog.includes('TERLAMBAT')) {
+                                isTerlambat = true;
+                            } else if (!ketLog.includes('TEPAT WAKTU')) {
+                                // 2. Fallback
+                                const waktuReturn = returnLog.waktu_scan || returnLog.waktu || '';
+                                const timeParts = String(waktuReturn).split(':');
+                                if (timeParts.length >= 2) {
+                                    let jam = parseInt(timeParts[0], 10);
+                                    const menit = parseInt(timeParts[1], 10);
+                                    if (jam > 0 && jam <= 7) jam += 12; // Handle format jam tanpa PM
+                                    if (!isNaN(jam) && !isNaN(menit)) {
+                                        if ((jam * 60) + menit > 990) isTerlambat = true;
+                                    }
                                 }
-                            } else {
-                                // Fallback jika format jam tidak jelas
-                                const ketLog = String(returnLog.keterangan || returnLog.status || '').toUpperCase();
-                                if (ketLog.includes('TERLAMBAT')) isTerlambat = true;
                             }
 
                             if (isTerlambat) s.terlambat++;
@@ -3418,8 +3398,6 @@
 
             return (
                 <div className="space-y-6 animate-fade-in-down">
-
-                    {/* --- HEADER --- */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-4">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800">Pos Gerbang Utama</h2>
@@ -3430,42 +3408,30 @@
                         </Button>
                     </div>
 
-                    {/* --- KARTU METRIK DINAMIS (DIBAGI 3 KELOMPOK) --- */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
-
-                        {/* Kelompok 1: Perizinan */}
                         <div>
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">
-                                Perizinan
-                            </h4>
+                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">Kelompok 1 : Perizinan</h4>
                             <div className="grid grid-cols-2 gap-3 md:gap-4">
                                 <StatCard title="Target Keluar" value={loading ? "..." : stats.disetujui} icon={<Icons.FileText />} color="bg-blue-50 text-blue-600 border border-blue-100 shadow-sm" />
                                 <StatCard title="Sudah Keluar" value={loading ? "..." : stats.keluar} icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600 border border-orange-100 shadow-sm" />
                             </div>
                         </div>
 
-                        {/* Kelompok 2: Posisi Santri */}
                         <div>
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">
-                                Posisi Santri
-                            </h4>
+                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">Kelompok 2 : Posisi Santri</h4>
                             <div className="grid grid-cols-2 gap-3 md:gap-4">
                                 <StatCard title="Masih Di Luar" value={loading ? "..." : stats.diluar} icon={<Icons.Clock />} color="bg-yellow-50 text-yellow-600 border border-yellow-100 shadow-sm" />
                                 <StatCard title="Sudah Kembali" value={loading ? "..." : stats.kembali} icon={<Icons.Home />} color="bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm" />
                             </div>
                         </div>
 
-                        {/* Kelompok 3: Waktu Kembali */}
                         <div>
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">
-                                Waktu Kembali
-                            </h4>
+                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">Kelompok 3 : Waktu Kembali</h4>
                             <div className="grid grid-cols-2 gap-3 md:gap-4">
                                 <StatCard title="Tepat Waktu" value={loading ? "..." : stats.tepatWaktu} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm" />
                                 <StatCard title="Terlambat" value={loading ? "..." : stats.terlambat} icon={<Icons.XCircle />} color="bg-red-50 text-red-600 border border-red-100 shadow-sm" />
                             </div>
                         </div>
-
                     </div>
                 </div>
             );
