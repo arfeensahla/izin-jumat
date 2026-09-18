@@ -3785,7 +3785,7 @@
         };
 
         // ==========================================
-        // 4. COMPONENT: RIWAYAT SCAN PAGE (PAGINATED)
+        // 4. COMPONENT: RIWAYAT SCAN PAGE (PAGINATED & PETUGAS)
         // ==========================================
         const RiwayatScanPage = () => {
             const { showToast } = useContext(ToastContext);
@@ -3905,6 +3905,8 @@
 
                 const nama = String(log.nama_santri || log.santri_id || '').toLowerCase();
                 const ket = String(log._displayKeterangan || '').toLowerCase();
+                // Tambahan: Agar bisa mencari berdasarkan nama petugas juga
+                const petugas = String(log.nama_petugas || log.petugas || log.user || '').toLowerCase();
                 const search = String(searchTerm || '').toLowerCase();
 
                 let isTabMatch = true;
@@ -3916,7 +3918,7 @@
                     }
                 }
 
-                return isTabMatch && (nama.includes(search) || ket.includes(search));
+                return isTabMatch && (nama.includes(search) || ket.includes(search) || petugas.includes(search));
             });
 
             // --- URUTKAN RIWAYAT SCAN DARI TERBARU KE TERLAMA ---
@@ -3966,7 +3968,7 @@
                         <div className="w-full md:w-1/3">
                             <input
                                 type="text"
-                                placeholder="Cari Nama Santri / Keterangan..."
+                                placeholder="Cari Santri / Petugas / Keterangan..."
                                 className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -3985,12 +3987,15 @@
                                     <th className="p-4 font-semibold whitespace-nowrap">Waktu Scan</th>
                                     <th className="p-4 font-semibold whitespace-nowrap">Aksi</th>
                                     <th className="p-4 font-semibold min-w-[200px]">Nama Santri</th>
+                                    {/* KOLOM BARU: PETUGAS */}
+                                    <th className="p-4 font-semibold min-w-[150px]">Petugas Scan</th>
                                     <th className="p-4 font-semibold min-w-[250px]">Keterangan</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {loading ? <tr><td colSpan="4" className="p-8 text-center text-gray-500">Memuat log dari server...</td></tr> :
-                                    paginatedLogs.length === 0 ? <tr><td colSpan="4" className="p-8 text-center text-gray-500">Belum ada riwayat scan yang sesuai.</td></tr> :
+                                {/* colSpan diubah dari 4 menjadi 5 karena ada tambahan kolom */}
+                                {loading ? <tr><td colSpan="5" className="p-8 text-center text-gray-500">Memuat log dari server...</td></tr> :
+                                    paginatedLogs.length === 0 ? <tr><td colSpan="5" className="p-8 text-center text-gray-500">Belum ada riwayat scan yang sesuai.</td></tr> :
                                         paginatedLogs.map((log, idx) => (
                                             <tr key={idx} className="hover:bg-gray-50">
                                                 <td className="p-4 font-medium text-gray-800">
@@ -4003,6 +4008,17 @@
                                                     </span>
                                                 </td>
                                                 <td className="p-4 font-bold text-gray-900">{log.nama_santri || log.santri_id}</td>
+
+                                                {/* DATA PETUGAS SCAN */}
+                                                <td className="p-4 font-medium text-gray-700">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="bg-gray-200 p-1 rounded-full text-gray-500">
+                                                            <Icons.User size={12} />
+                                                        </div>
+                                                        <span>{log.nama_petugas || log.petugas || log.user || '-'}</span>
+                                                    </div>
+                                                </td>
+
                                                 <td className="p-4 max-w-[250px] whitespace-normal break-words font-medium">
                                                     {log._displayKeterangan === 'TEPAT WAKTU' ? (
                                                         <span className="px-2 py-1 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
@@ -4016,7 +4032,7 @@
                                                         <span className="text-gray-600">{log._displayKeterangan}</span>
                                                     )}
 
-                                                    {/* --- TAMBAHAN INFO WAKTU KELUAR --- */}
+                                                    {/* --- INFO WAKTU KELUAR --- */}
                                                     {log._waktuKeluar && (
                                                         <div className="text-[11px] text-gray-500 mt-1.5 font-medium">
                                                             Keluar: {log._waktuKeluar} WIB
@@ -4030,7 +4046,7 @@
                         </table>
                     </Card>
 
-                    {/* KOMPONEN PAGINATION DITAMBAHKAN DI SINI */}
+                    {/* KOMPONEN PAGINATION */}
                     {!loading && filteredLogs.length > 0 && (
                         <Pagination
                             currentPage={currentPage} totalPages={totalPages}
