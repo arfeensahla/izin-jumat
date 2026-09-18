@@ -3785,7 +3785,7 @@
         };
 
         // ==========================================
-        // 4. COMPONENT: RIWAYAT SCAN PAGE (PAGINATED & PETUGAS)
+        // 4. COMPONENT: RIWAYAT SCAN PAGE (PAGINATED + PETUGAS)
         // ==========================================
         const RiwayatScanPage = () => {
             const { showToast } = useContext(ToastContext);
@@ -3905,7 +3905,8 @@
 
                 const nama = String(log.nama_santri || log.santri_id || '').toLowerCase();
                 const ket = String(log._displayKeterangan || '').toLowerCase();
-                // Tambahan: Agar bisa mencari berdasarkan nama petugas juga
+
+                // --- TAMBAHAN FILTER NAMA PETUGAS ---
                 const petugas = String(log.nama_petugas || log.petugas || log.user || '').toLowerCase();
                 const search = String(searchTerm || '').toLowerCase();
 
@@ -3918,6 +3919,7 @@
                     }
                 }
 
+                // Tambahkan pencarian petugas ke dalam logika filter
                 return isTabMatch && (nama.includes(search) || ket.includes(search) || petugas.includes(search));
             });
 
@@ -3968,6 +3970,7 @@
                         <div className="w-full md:w-1/3">
                             <input
                                 type="text"
+                                // Update placeholder agar user tahu bisa cari nama petugas
                                 placeholder="Cari Santri / Petugas / Keterangan..."
                                 className="w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium"
                                 value={searchTerm}
@@ -3987,13 +3990,13 @@
                                     <th className="p-4 font-semibold whitespace-nowrap">Waktu Scan</th>
                                     <th className="p-4 font-semibold whitespace-nowrap">Aksi</th>
                                     <th className="p-4 font-semibold min-w-[200px]">Nama Santri</th>
-                                    {/* KOLOM BARU: PETUGAS */}
+                                    {/* --- KOLOM BARU --- */}
                                     <th className="p-4 font-semibold min-w-[150px]">Petugas Scan</th>
                                     <th className="p-4 font-semibold min-w-[250px]">Keterangan</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {/* colSpan diubah dari 4 menjadi 5 karena ada tambahan kolom */}
+                                {/* colSpan disesuaikan jadi 5 */}
                                 {loading ? <tr><td colSpan="5" className="p-8 text-center text-gray-500">Memuat log dari server...</td></tr> :
                                     paginatedLogs.length === 0 ? <tr><td colSpan="5" className="p-8 text-center text-gray-500">Belum ada riwayat scan yang sesuai.</td></tr> :
                                         paginatedLogs.map((log, idx) => (
@@ -4009,14 +4012,9 @@
                                                 </td>
                                                 <td className="p-4 font-bold text-gray-900">{log.nama_santri || log.santri_id}</td>
 
-                                                {/* DATA PETUGAS SCAN */}
+                                                {/* --- DATA PETUGAS --- */}
                                                 <td className="p-4 font-medium text-gray-700">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="bg-gray-200 p-1 rounded-full text-gray-500">
-                                                            <Icons.User size={12} />
-                                                        </div>
-                                                        <span>{log.nama_petugas || log.petugas || log.user || '-'}</span>
-                                                    </div>
+                                                    {log.nama_petugas || log.petugas || log.user || '-'}
                                                 </td>
 
                                                 <td className="p-4 max-w-[250px] whitespace-normal break-words font-medium">
@@ -4046,7 +4044,7 @@
                         </table>
                     </Card>
 
-                    {/* KOMPONEN PAGINATION */}
+                    {/* KOMPONEN PAGINATION DITAMBAHKAN DI SINI */}
                     {!loading && filteredLogs.length > 0 && (
                         <Pagination
                             currentPage={currentPage} totalPages={totalPages}
