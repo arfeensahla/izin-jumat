@@ -1785,15 +1785,39 @@
         const helper = {
             getNextFriday: () => {
                 const d = new Date();
-                d.setDate(d.getDate() + ((5 + 7 - d.getDay()) % 7 || 7)); // 5 = Jumat
+                d.setDate(d.getDate() + ((5 + 7 - d.getDay()) % 7 || 7));
                 return d;
             },
             getWeekOfMonth: (date) => {
                 const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
                 return Math.ceil((date.getDate() + firstDay) / 7);
             },
-            // FORMAT TANGGAL LEBIH SIMPEL: Jum, 28 Ags 2026
-            formatDate: (date) => date.toLocaleDateString('id-ID', { weekday: 'short', year: 'numeric', month: 'short', day: '2-digit' })
+            formatDate: (date) => date.toLocaleDateString('id-ID', { weekday: 'short', year: 'numeric', month: 'short', day: '2-digit' }),
+
+            // --- SUNTIKAN BARU: Mesin Penerjemah Tanggal ---
+            parseDateString: (str) => {
+                if (!str) return new Date(NaN);
+                let d = new Date(str);
+                if (!isNaN(d.getTime())) return d;
+
+                if (typeof str === 'string') {
+                    if (str.includes('/')) {
+                        const parts = str.split('/');
+                        if (parts.length === 3) return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                    } else {
+                        const parts = str.split(/[\s,]+/);
+                        const day = parseInt(parts[1], 10);
+                        const monthStr = parts[2] ? parts[2].toLowerCase() : '';
+                        const year = parseInt(parts[3], 10);
+                        const months = { 'jan': 0, 'januari': 0, 'feb': 1, 'februari': 1, 'mar': 2, 'maret': 2, 'apr': 3, 'april': 3, 'mei': 4, 'jun': 5, 'juni': 5, 'jul': 6, 'juli': 6, 'ags': 7, 'agustus': 7, 'sep': 8, 'september': 8, 'okt': 9, 'oktober': 9, 'nov': 10, 'november': 10, 'des': 11, 'desember': 11 };
+                        if (!isNaN(day) && !isNaN(year) && months[monthStr] !== undefined) {
+                            return new Date(year, months[monthStr], day);
+                        }
+                    }
+                }
+                return new Date(NaN);
+            }
+            // ------------------------------------------------
         };
 
         // ==========================================
@@ -2278,7 +2302,7 @@
                 let isTabMatch = true;
                 if (activeTab === 'pekan_ini') {
                     const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
-                    let pDate = new Date(rawDate);
+                    let pDate = helper.parseDateString(rawDate);
                     if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
                         const parts = rawDate.split('/');
                         if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
@@ -2391,7 +2415,7 @@
                                         paginatedPermits.map((p, idx) => {
                                             let isKadaluarsa = false;
                                             const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
-                                            let pDate = new Date(rawDate);
+                                            let pDate = helper.parseDateString(rawDate);
                                             if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
                                                 const parts = rawDate.split('/');
                                                 if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
@@ -3033,7 +3057,7 @@
                 let isTabMatch = true;
                 if (activeTab === 'pekan_ini') {
                     const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
-                    let pDate = new Date(rawDate);
+                    let pDate = helper.parseDateString(rawDate);
                     if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
                         const parts = rawDate.split('/');
                         if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
@@ -3149,7 +3173,7 @@
                                         paginatedPermits.map((p, idx) => {
                                             let isKadaluarsa = false;
                                             const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
-                                            let pDate = new Date(rawDate);
+                                            let pDate = helper.parseDateString(rawDate);
                                             if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
                                                 const parts = rawDate.split('/');
                                                 if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
@@ -3301,7 +3325,7 @@
                     if (status === 'MENUNGGU_APPROVAL' || status === 'MENUNGGU') sMenunggu++;
 
                     const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
-                    let pDate = new Date(rawDate);
+                    let pDate = helper.parseDateString(rawDate);
                     if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
                         const parts = rawDate.split('/');
                         if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
@@ -3532,7 +3556,7 @@
 
                 allPermits.forEach(p => {
                     const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
-                    let pDate = new Date(rawDate);
+                    let pDate = helper.parseDateString(rawDate);
 
                     if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
                         const parts = rawDate.split('/');
@@ -3764,7 +3788,7 @@
                 let isTabMatch = true;
                 if (activeTab === 'pekan_ini') {
                     const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
-                    let pDate = new Date(rawDate);
+                    let pDate = helper.parseDateString(rawDate);
                     if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
                         const parts = rawDate.split('/');
                         if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
@@ -3897,7 +3921,7 @@
                                         paginatedPermits.map((p, idx) => {
                                             let isKadaluarsa = false;
                                             const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
-                                            let pDate = new Date(rawDate);
+                                            let pDate = helper.parseDateString(rawDate);
                                             if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
                                                 const parts = rawDate.split('/');
                                                 if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
