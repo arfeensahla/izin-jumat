@@ -1794,24 +1794,49 @@
             },
             formatDate: (date) => date.toLocaleDateString('id-ID', { weekday: 'short', year: 'numeric', month: 'short', day: '2-digit' }),
 
-            // --- SUNTIKAN BARU: Mesin Penerjemah Tanggal ---
+            // --- SUNTIKAN BARU: Mesin Penerjemah Tanggal Super (Anti Invalid Date) ---
             parseDateString: (str) => {
                 if (!str) return new Date(NaN);
+
+                // 1. Format ISO Database
+                if (typeof str === 'string' && str.includes('T') && str.includes('Z')) {
+                    const d = new Date(str);
+                    if (!isNaN(d.getTime())) return d;
+                }
+
+                // 2. Parse bawaan standar Javascript
                 let d = new Date(str);
                 if (!isNaN(d.getTime())) return d;
 
+                // 3. Format Teks Indonesia (Jum, 02 Okt 2026) atau DD/MM/YYYY
                 if (typeof str === 'string') {
                     if (str.includes('/')) {
                         const parts = str.split('/');
-                        if (parts.length === 3) return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                        if (parts.length >= 3) {
+                            const parsed = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                            if (!isNaN(parsed.getTime())) return parsed;
+                        }
                     } else {
-                        const parts = str.split(/[\s,]+/);
-                        const day = parseInt(parts[1], 10);
-                        const monthStr = parts[2] ? parts[2].toLowerCase() : '';
-                        const year = parseInt(parts[3], 10);
-                        const months = { 'jan': 0, 'januari': 0, 'feb': 1, 'februari': 1, 'mar': 2, 'maret': 2, 'apr': 3, 'april': 3, 'mei': 4, 'jun': 5, 'juni': 5, 'jul': 6, 'juli': 6, 'ags': 7, 'agustus': 7, 'sep': 8, 'september': 8, 'okt': 9, 'oktober': 9, 'nov': 10, 'november': 10, 'des': 11, 'desember': 11 };
-                        if (!isNaN(day) && !isNaN(year) && months[monthStr] !== undefined) {
-                            return new Date(year, months[monthStr], day);
+                        const cleanStr = str.replace(/,/g, '');
+                        const parts = cleanStr.split(/[\s]+/);
+
+                        let dayIndex = -1;
+                        for (let i = 0; i < parts.length; i++) {
+                            if (!isNaN(parseInt(parts[i], 10)) && parseInt(parts[i], 10) <= 31) {
+                                dayIndex = i;
+                                break;
+                            }
+                        }
+
+                        if (dayIndex !== -1 && parts.length > dayIndex + 2) {
+                            const day = parseInt(parts[dayIndex], 10);
+                            const monthStr = parts[dayIndex + 1] ? parts[dayIndex + 1].toLowerCase() : '';
+                            const year = parseInt(parts[dayIndex + 2], 10);
+                            const months = { 'jan': 0, 'januari': 0, 'feb': 1, 'februari': 1, 'mar': 2, 'maret': 2, 'apr': 3, 'april': 3, 'mei': 4, 'jun': 5, 'juni': 5, 'jul': 6, 'juli': 6, 'ags': 7, 'agustus': 7, 'sep': 8, 'september': 8, 'okt': 9, 'oktober': 9, 'nov': 10, 'november': 10, 'des': 11, 'desember': 11 };
+
+                            if (!isNaN(day) && !isNaN(year) && months[monthStr] !== undefined) {
+                                return new Date(year, months[monthStr], day);
+                            }
                         }
                     }
                 }
@@ -1821,7 +1846,7 @@
         };
 
         // ==========================================
-        // COMPONENT: AJUKAN IZIN KELUAR (TRACK RECORD SANTRI)
+        // COMPONENT: AJUKAN IZIN KELUAR (TRACK RECORD LINTAS BULAN)
         // ==========================================
         const AjukanIzinPage = ({ setCurrentRoute }) => {
             const { user } = useContext(AuthContext);
@@ -1839,13 +1864,17 @@
             const [submitting, setSubmitting] = useState(false);
             const [searchSaudaraTerm, setSearchSaudaraTerm] = useState('');
 
+            // --- PERBAIKAN BUG TANGGAL JUMAT DI SINI 👇 ---
             const nextFriday = useMemo(() => {
                 const today = new Date();
+                // Jika hari ini adalah Jumat (Index hari ke-5), gunakan hari ini.
                 if (today.getDay() === 5) {
                     return today;
                 }
+                // Jika hari lain, gunakan helper untuk mencari Jumat terdekat.
                 return helper.getNextFriday();
             }, []);
+            // ----------------------------------------------
 
             const weekNumber = useMemo(() => {
                 let week = helper.getWeekOfMonth(nextFriday);
@@ -1886,54 +1915,59 @@
                         setJadwalData(finalJadwal);
                         setAllPermits(pData);
                         setAllLogs(lData);
-                    } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
+                    } catch (e) {
+                        showToast(e.message, 'error');
+                    } finally {
+                        setLoading(false);
+                    }
                 };
                 fetchDeps();
             }, [user.kelas_id]);
 
-            const selectedSantri = useMemo(() => santriData.find(s => (s.santri_id || s.nis || s.id) === form.santri_id), [santriData, form.santri_id]);
-            const selectedSaudara = useMemo(() => allSantriData.find(s => (s.santri_id || s.nis || s.id) === form.saudara_santri_id), [allSantriData, form.saudara_santri_id]);
+            const selectedSantri = useMemo(() => santriData.find(s => String(s.santri_id || s.nis || s.id) === String(form.santri_id)), [santriData, form.santri_id]);
+            const selectedSaudara = useMemo(() => allSantriData.find(s => String(s.santri_id || s.nis || s.id) === String(form.saudara_santri_id)), [allSantriData, form.saudara_santri_id]);
 
-            // --- MESIN PENDETEKSI TRACK RECORD SANTRI TERPILIH ---
+            // --- MESIN PENDETEKSI TRACK RECORD SANTRI TERPILIH (LINTAS BULAN) ---
             const trackRecord = useMemo(() => {
                 if (!selectedSantri || !allPermits) return null;
 
                 let countIzin = 0;
                 let countTerlambat = 0;
 
-                const now = new Date();
-                const currentMonth = now.getMonth();
-                const currentYear = now.getFullYear();
+                // TARGET PENDETEKSIAN: Bulan dari tanggal izin yang diajukan, bukan hari ini.
+                const targetMonth = nextFriday.getMonth();
+                const targetYear = nextFriday.getFullYear();
 
                 const logsMap = {};
-                allLogs.forEach(l => {
-                    const id = l.permit_id || l.id_perizinan;
-                    if (id) {
-                        if (!logsMap[id]) logsMap[id] = [];
-                        logsMap[id].push(l);
-                    }
-                });
+                if (allLogs && allLogs.length > 0) {
+                    allLogs.forEach(l => {
+                        const id = l.permit_id || l.id_perizinan;
+                        if (id) {
+                            if (!logsMap[id]) logsMap[id] = [];
+                            logsMap[id].push(l);
+                        }
+                    });
+                }
+
+                const targetSantriId = String(selectedSantri.santri_id || selectedSantri.nis || selectedSantri.id || '').trim();
 
                 allPermits.forEach(p => {
-                    // Cari santri yang cocok
-                    if ((p.santri_id || p.nis) === (selectedSantri.santri_id || selectedSantri.nis || selectedSantri.id)) {
+                    const pId = String(p.santri_id || p.nis || '').trim();
+
+                    if (pId !== '' && pId === targetSantriId) {
 
                         const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
-                        let pDate = new Date(rawDate);
-                        if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
-                            const parts = rawDate.split('/');
-                            if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                        }
+                        let pDate = helper.parseDateString(rawDate); // Gunakan parser super
 
-                        // Hanya periksa bulan yang sama
-                        if (!isNaN(pDate.getTime()) && pDate.getMonth() === currentMonth && pDate.getFullYear() === currentYear) {
+                        // Cocokkan dengan bulan & tahun target izin
+                        if (!isNaN(pDate.getTime()) && pDate.getMonth() === targetMonth && pDate.getFullYear() === targetYear) {
 
-                            const status = String(p.status_pengajuan || '').toUpperCase();
-                            if (status === 'DISETUJUI' || status === 'SELESAI') {
+                            const status = String(p.status_pengajuan || '').trim().toUpperCase();
+                            if (status === 'DISETUJUI' || status === 'SELESAI' || status === 'APPROVE') {
                                 countIzin++;
 
-                                const pId = p.permit_id || p.id_perizinan;
-                                const pLogs = logsMap[pId] || [];
+                                const idPermit = p.permit_id || p.id_perizinan;
+                                const pLogs = logsMap[idPermit] || [];
                                 const returnLog = pLogs.find(l => String(l.tipe_scan).toUpperCase() === 'RETURN');
 
                                 if (returnLog) {
@@ -1959,8 +1993,12 @@
                     }
                 });
 
-                return { izin: countIzin, terlambat: countTerlambat };
-            }, [selectedSantri, allPermits, allLogs]);
+                return {
+                    izin: countIzin,
+                    terlambat: countTerlambat,
+                    bulan: nextFriday.toLocaleDateString('id-ID', { month: 'long' })
+                };
+            }, [selectedSantri, allPermits, allLogs, nextFriday]);
             // ----------------------------------------------------
 
             const statusJadwalAsli = useMemo(() => {
@@ -2038,7 +2076,11 @@
                     setForm(initialForm);
                     setSearchSaudaraTerm('');
                     setCurrentRoute('histori');
-                } catch (e) { showToast(e.message, 'error'); } finally { setSubmitting(false); }
+                } catch (e) {
+                    showToast(e.message, 'error');
+                } finally {
+                    setSubmitting(false);
+                }
             };
 
             const santriOptions = santriData.map(s => ({ value: (s.santri_id || s.nis || s.id), label: `${s.nama || s.nama_santri} (${s.kelas})` }));
@@ -2048,7 +2090,11 @@
 
             return (
                 <div className="space-y-6 animate-fade-in-down max-w-4xl">
-                    <div><h2 className="text-2xl font-bold text-gray-800">Ajukan Izin Keluar</h2><p className="text-gray-500">Sistem otomatis menghitung penjadwalan pekan ini berdasarkan identitas santri.</p></div>
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">Ajukan Izin Keluar</h2>
+                        <p className="text-gray-500">Sistem otomatis menghitung penjadwalan pekan ini berdasarkan identitas santri.</p>
+                    </div>
+
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <Card>
                             <h3 className="text-lg font-bold text-gray-700 border-b pb-2 mb-4">1. Identitas Santri</h3>
@@ -2062,19 +2108,19 @@
                                 </div>
                             )}
 
-                            {/* --- KOTAK PERINGATAN TRACK RECORD --- */}
+                            {/* --- KOTAK PERINGATAN TRACK RECORD DITAMPILKAN LAGI DI SINI --- */}
                             {selectedSantri && trackRecord && (trackRecord.izin > 0 || trackRecord.terlambat > 0) && (
                                 <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-3 animate-fade-in-down">
                                     <Icons.Clock className="text-red-500 shrink-0 mt-0.5" size={20} />
                                     <div>
                                         <p className="text-sm text-red-700">
-                                            <span className="font-bold">Perhatian:</span> Bulan ini sudah izin <span className="font-black text-red-900">{trackRecord.izin}x</span>
+                                            <span className="font-bold">Perhatian:</span> Bulan {trackRecord.bulan} ini sudah izin <span className="font-black text-red-900">{trackRecord.izin}x</span>
                                             {trackRecord.terlambat > 0 ? ` & punya riwayat ${trackRecord.terlambat}x terlambat.` : '.'}
                                         </p>
                                     </div>
                                 </div>
                             )}
-                            {/* -------------------------------------- */}
+                            {/* ----------------------------------------------------------- */}
 
                         </Card>
 
@@ -2087,6 +2133,7 @@
                                 </div>
                                 <Input disabled={submitting} label={<>Tujuan Keluar (Tempat/Kota) <span className="text-red-500">*</span></>} required value={form.tujuan} onChange={(e) => setForm({ ...form, tujuan: e.target.value })} placeholder="Contoh: Bandung" />
                             </Card>
+
                             <Card>
                                 <h3 className="text-lg font-bold text-gray-700 border-b pb-2 mb-4">3. Wali Safar (Penjemput)</h3>
                                 <Input disabled={submitting} label={<>Nama Wali Safar <span className="text-red-500">*</span></>} required value={form.wali_safar} onChange={(e) => setForm({ ...form, wali_safar: e.target.value })} placeholder="Nama penjemput" />
@@ -2098,7 +2145,10 @@
                         {selectedSantri && (
                             <Card className={statusJadwal === 'Sesuai Jadwal' ? 'border-emerald-300 ring-1 ring-emerald-300' : 'border-yellow-400 ring-1 ring-yellow-400'}>
                                 <div className="flex flex-col md:flex-row justify-between items-start gap-4 border-b pb-4 mb-4">
-                                    <div><h3 className="text-lg font-bold text-gray-800">4. Analisis Penjadwalan</h3><p className="text-sm text-gray-600 mt-1">Tanggal Izin: <strong className="text-gray-900">{helper.formatDate(nextFriday)}</strong> (Pekan {weekNumber})</p></div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-gray-800">4. Analisis Penjadwalan</h3>
+                                        <p className="text-sm text-gray-600 mt-1">Tanggal Izin: <strong className="text-gray-900">{helper.formatDate(nextFriday)}</strong> (Pekan {weekNumber})</p>
+                                    </div>
                                     <div className={`px-4 py-2 rounded-full font-bold text-sm ${statusJadwal === 'Sesuai Jadwal' ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'}`}>Status: {statusJadwal}</div>
                                 </div>
                                 <div className="space-y-4">
@@ -2121,7 +2171,7 @@
                                                     {searchSaudaraTerm && !form.saudara_santri_id && !submitting && (
                                                         <div className="max-h-40 overflow-y-auto border border-blue-200 rounded-lg bg-white shadow-sm mt-1">
                                                             {allSantriData
-                                                                .filter(s => (s.santri_id || s.nis || s.id) !== form.santri_id)
+                                                                .filter(s => String(s.santri_id || s.nis || s.id) !== String(form.santri_id))
                                                                 .filter(s => String(s.nama || s.nama_santri).toLowerCase().includes(searchSaudaraTerm.toLowerCase()))
                                                                 .slice(0, 5)
                                                                 .map(s => {
@@ -2493,7 +2543,7 @@
         };
 
         // ==========================================
-        // COMPONENT: SCREENING IZIN PAGE (DENGAN TRACK RECORD)
+        // COMPONENT: SCREENING IZIN PAGE (UPGRADED TRACK RECORD)
         // ==========================================
         const ScreeningIzinPage = () => {
             const { user } = useContext(AuthContext);
@@ -2501,10 +2551,10 @@
             const [permits, setPermits] = useState([]);
             const [santriList, setSantriList] = useState([]);
 
-            // --- STATE TRACK RECORD ---
+            // --- STATE TRACK RECORD BARU ---
             const [allPermits, setAllPermits] = useState([]);
             const [allLogs, setAllLogs] = useState([]);
-            // --------------------------
+            // -------------------------------
 
             const [loading, setLoading] = useState(true);
             const [selectedPermit, setSelectedPermit] = useState(null);
@@ -2525,7 +2575,7 @@
                     const [resPermits, resSantri, resLogs] = await Promise.all([
                         apiService.request('getPermits'),
                         apiService.request('getSantri'),
-                        apiService.request('getScanLogs') // Tarik log untuk track record
+                        apiService.request('getScanLogs') // Tarik log keamanan untuk cek terlambat
                     ]);
 
                     let finalPermits = [];
@@ -2563,25 +2613,33 @@
                                 }
                             }
                             return { ...p, _saudaraInfo: saudaraInfo };
-                        }); // Hapus reverse agar murni FIFO
+                        });
 
                     setPermits(pendingPermits);
                     setSantriList(finalSantri);
-                } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
+                } catch (e) {
+                    showToast(e.message, 'error');
+                } finally {
+                    setLoading(false);
+                }
             };
 
-            useEffect(() => { fetchPermits(); }, []);
+            useEffect(() => {
+                fetchPermits();
+            }, []);
 
-            // --- MESIN PENDETEKSI TRACK RECORD ---
-            const getTrackRecord = (santriId, nis) => {
-                if (!allPermits || allPermits.length === 0) return { izin: 0, terlambat: 0 };
+            // --- MESIN PENDETEKSI TRACK RECORD LINTAS BULAN (SCREENING KARTU) ---
+            const getTrackRecord = (permitToScreen) => {
+                if (!allPermits || allPermits.length === 0) return { izin: 0, terlambat: 0, bulan: '' };
 
                 let countIzin = 0;
                 let countTerlambat = 0;
 
-                const now = new Date();
-                const currentMonth = now.getMonth();
-                const currentYear = now.getFullYear();
+                // TARGET PENDETEKSIAN: Bulan dari tanggal izin yang sedang diajukan
+                const pTargetDate = helper.parseDateString(permitToScreen.tanggal_izin || permitToScreen.tanggal || permitToScreen.waktu_pengajuan);
+                const targetMonth = pTargetDate.getMonth();
+                const targetYear = pTargetDate.getFullYear();
+                const targetMonthName = isNaN(pTargetDate.getTime()) ? '' : pTargetDate.toLocaleDateString('id-ID', { month: 'long' });
 
                 const logsMap = {};
                 if (allLogs && allLogs.length > 0) {
@@ -2594,24 +2652,22 @@
                     });
                 }
 
-                allPermits.forEach(p => {
-                    const idTarget = p.santri_id || p.nis;
-                    if (idTarget && (idTarget === santriId || idTarget === nis)) {
-                        const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
-                        let pDate = new Date(rawDate);
-                        if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
-                            const parts = rawDate.split('/');
-                            if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                        }
+                const targetSantriId = String(permitToScreen.santri_id || permitToScreen.nis || permitToScreen.id || '').trim();
 
-                        // Hanya hitung bulan ini
-                        if (!isNaN(pDate.getTime()) && pDate.getMonth() === currentMonth && pDate.getFullYear() === currentYear) {
-                            const status = String(p.status_pengajuan || '').toUpperCase();
-                            if (status === 'DISETUJUI' || status === 'SELESAI') {
+                allPermits.forEach(p => {
+                    const pId = String(p.santri_id || p.nis || '').trim();
+                    if (pId !== '' && pId === targetSantriId) {
+
+                        const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
+                        let pDate = helper.parseDateString(rawDate); // Gunakan parser super
+
+                        if (!isNaN(pDate.getTime()) && pDate.getMonth() === targetMonth && pDate.getFullYear() === targetYear) {
+                            const status = String(p.status_pengajuan || '').trim().toUpperCase();
+                            if (status === 'DISETUJUI' || status === 'SELESAI' || status === 'APPROVE') {
                                 countIzin++;
 
-                                const pId = p.permit_id || p.id_perizinan;
-                                const pLogs = logsMap[pId] || [];
+                                const idPermit = p.permit_id || p.id_perizinan;
+                                const pLogs = logsMap[idPermit] || [];
                                 const returnLog = pLogs.find(l => String(l.tipe_scan).toUpperCase() === 'RETURN');
 
                                 if (returnLog) {
@@ -2637,9 +2693,9 @@
                     }
                 });
 
-                return { izin: countIzin, terlambat: countTerlambat };
+                return { izin: countIzin, terlambat: countTerlambat, bulan: targetMonthName };
             };
-            // -------------------------------------
+            // --------------------------------------------------------------------
 
             const handleApprove = async (permit) => {
                 if (!window.confirm(`Yakin menyetujui izin untuk ${permit.nama_santri}? QR Code akan otomatis diterbitkan.`)) return;
@@ -2658,7 +2714,11 @@
                     }).catch(e => console.log("Log error:", e));
 
                     fetchPermits();
-                } catch (e) { showToast(e.message, 'error'); } finally { setProcessing(false); }
+                } catch (e) {
+                    showToast(e.message, 'error');
+                } finally {
+                    setProcessing(false);
+                }
             };
 
             const handleBulkApprove = async () => {
@@ -2684,8 +2744,11 @@
                     showToast(`${selectedApproveIds.length} pengajuan berhasil disetujui!`, 'success');
                     setSelectedApproveIds([]);
                     fetchPermits();
-                } catch (error) { showToast('Gagal menyetujui beberapa pengajuan: ' + error.message, 'error'); }
-                finally { setIsApproving(false); }
+                } catch (error) {
+                    showToast('Gagal menyetujui beberapa pengajuan: ' + error.message, 'error');
+                } finally {
+                    setIsApproving(false);
+                }
             };
 
             const handleProcessReject = async () => {
@@ -2707,7 +2770,11 @@
                     setSelectedPermit(null);
                     setRejectReason('');
                     fetchPermits();
-                } catch (e) { showToast(e.message, 'error'); } finally { setProcessing(false); }
+                } catch (e) {
+                    showToast(e.message, 'error');
+                } finally {
+                    setProcessing(false);
+                }
             };
 
             const kelasOptions = [...new Set(permits.map(p => p.kelas).filter(Boolean))].sort();
@@ -2792,102 +2859,106 @@
                         </div>
                     )}
 
-                    {loading ? <div className="p-12 text-center text-gray-500">Membaca antrean izin dari server...</div> :
-                        permits.length === 0 ? <div className="p-12 text-center bg-white rounded-xl border border-dashed border-gray-300 text-gray-500">Yeay! Tidak ada antrean perizinan saat ini.</div> :
-                            filteredPermits.length === 0 ? <div className="p-12 text-center bg-white rounded-xl border border-dashed border-gray-300 text-gray-500">Santri yang dicari tidak ditemukan dalam antrean.</div> :
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
-                                    {filteredPermits.map((p, idx) => {
-                                        const permitId = p.permit_id || p.id_perizinan;
-                                        const isSelected = selectedApproveIds.includes(permitId);
+                    {loading ? (
+                        <div className="p-12 text-center text-gray-500">Membaca antrean izin dari server...</div>
+                    ) : permits.length === 0 ? (
+                        <div className="p-12 text-center bg-white rounded-xl border border-dashed border-gray-300 text-gray-500">Yeay! Tidak ada antrean perizinan saat ini.</div>
+                    ) : filteredPermits.length === 0 ? (
+                        <div className="p-12 text-center bg-white rounded-xl border border-dashed border-gray-300 text-gray-500">Santri yang dicari tidak ditemukan dalam antrean.</div>
+                    ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+                            {filteredPermits.map((p, idx) => {
+                                const permitId = p.permit_id || p.id_perizinan;
+                                const isSelected = selectedApproveIds.includes(permitId);
 
-                                        // PANGGIL MESIN TRACK RECORD
-                                        const tRecord = getTrackRecord(p.santri_id, p.nis);
+                                // PANGGIL MESIN TRACK RECORD (SUPER AMAN)
+                                const tRecord = getTrackRecord(p);
 
-                                        return (
-                                            <Card key={idx} className={`flex flex-col justify-between border-l-4 transition-all relative ${isSelected ? 'border-emerald-500 bg-emerald-50/50 shadow-md' : 'border-yellow-400 hover:shadow-md'}`}>
+                                return (
+                                    <Card key={idx} className={`flex flex-col justify-between border-l-4 transition-all relative ${isSelected ? 'border-emerald-500 bg-emerald-50/50 shadow-md' : 'border-yellow-400 hover:shadow-md'}`}>
 
-                                                {/* CHECKBOX KARTU */}
-                                                <div className="absolute top-4 right-4 z-10">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="w-5 h-5 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500 cursor-pointer"
-                                                        checked={isSelected}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) setSelectedApproveIds([...selectedApproveIds, permitId]);
-                                                            else setSelectedApproveIds(selectedApproveIds.filter(id => id !== permitId));
-                                                        }}
-                                                    />
-                                                </div>
+                                        {/* CHECKBOX KARTU */}
+                                        <div className="absolute top-4 right-4 z-10">
+                                            <input
+                                                type="checkbox"
+                                                className="w-5 h-5 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500 cursor-pointer"
+                                                checked={isSelected}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) setSelectedApproveIds([...selectedApproveIds, permitId]);
+                                                    else setSelectedApproveIds(selectedApproveIds.filter(id => id !== permitId));
+                                                }}
+                                            />
+                                        </div>
 
+                                        <div>
+                                            <div className="flex justify-between items-start mb-4 border-b pb-4 pr-8">
                                                 <div>
-                                                    <div className="flex justify-between items-start mb-4 border-b pb-4 pr-8">
+                                                    <h3 className="text-xl font-bold text-gray-900">{p.nama_santri}</h3>
+                                                    <p className="text-sm text-gray-500">{p.kelas} • Tgl Izin: <strong>{p.tanggal_izin}</strong></p>
+                                                </div>
+                                                <span className={`px-3 py-1 text-xs font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                                                    {p.status_jadwal ? p.status_jadwal.toUpperCase() : 'TIDAK DIKETAHUI'}
+                                                </span>
+                                            </div>
+                                            <div className="space-y-2 text-sm text-gray-700 mb-6">
+
+                                                {/* --- KOTAK PERINGATAN TRACK RECORD --- */}
+                                                {(tRecord.izin > 0 || tRecord.terlambat > 0) && (
+                                                    <div className="mb-4 bg-red-50 border border-red-100 rounded-lg p-3 flex items-start gap-2.5 animate-fade-in-down shadow-sm">
+                                                        <Icons.Clock className="text-red-500 shrink-0 mt-0.5" size={16} />
                                                         <div>
-                                                            <h3 className="text-xl font-bold text-gray-900">{p.nama_santri}</h3>
-                                                            <p className="text-sm text-gray-500">{p.kelas} • Tgl Izin: <strong>{p.tanggal_izin}</strong></p>
+                                                            <p className="text-[11px] md:text-xs text-red-700 leading-snug">
+                                                                <span className="font-bold">Perhatian:</span> Bulan {tRecord.bulan} ini sudah izin <span className="font-black text-red-900">{tRecord.izin}x</span>
+                                                                {tRecord.terlambat > 0 ? ` & punya riwayat ${tRecord.terlambat}x terlambat.` : '.'}
+                                                            </p>
                                                         </div>
-                                                        <span className={`px-3 py-1 text-xs font-bold rounded-full ${p.status_jadwal === 'Sesuai Jadwal' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                                                            {p.status_jadwal ? p.status_jadwal.toUpperCase() : 'TIDAK DIKETAHUI'}
+                                                    </div>
+                                                )}
+                                                {/* -------------------------------------- */}
+
+                                                <p><span className="text-gray-500 w-24 inline-block">Keperluan:</span> <strong>{p.keperluan}</strong></p>
+                                                <p><span className="text-gray-500 w-24 inline-block">Tujuan:</span> <strong>{p.tujuan}</strong></p>
+                                                <p><span className="text-gray-500 w-24 inline-block">Penjemput:</span> <strong>{p.wali_safar} ({p.hubungan_wali})</strong></p>
+
+                                                {p.status_jadwal === 'Di Luar Jadwal' && (
+                                                    <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg">
+                                                        <p className="text-red-800 text-xs font-bold mb-1">ALASAN DI LUAR JADWAL:</p>
+                                                        <p className="text-red-700 italic">{p.keterangan_luar_jadwal}</p>
+                                                    </div>
+                                                )}
+
+                                                {(String(p.ikut_jadwal_saudara).toLowerCase() === 'true' || String(p.ikut_jadwal_saudara).toLowerCase() === 'ya' || p.ikut_jadwal_saudara === '1') && (
+                                                    <div className="mt-2">
+                                                        <span className="inline-block bg-orange-50 text-orange-800 px-2 py-1.5 rounded text-[10.5px] border border-orange-200 leading-snug shadow-sm">
+                                                            <span className="font-semibold text-orange-600">Ikut Jadwal Kakak/Adik:</span><br />
+                                                            <strong className="font-bold text-orange-900">
+                                                                {p._saudaraInfo ? `${p._saudaraInfo.nama || p._saudaraInfo.nama_santri} (${p._saudaraInfo.kelas})` : `(ID: ${p.saudara_santri_id})`}
+                                                            </strong>
                                                         </span>
                                                     </div>
-                                                    <div className="space-y-2 text-sm text-gray-700 mb-6">
+                                                )}
+                                            </div>
+                                        </div>
 
-                                                        {/* --- KOTAK PERINGATAN TRACK RECORD --- */}
-                                                        {(tRecord.izin > 0 || tRecord.terlambat > 0) && (
-                                                            <div className="mb-4 bg-red-50 border border-red-100 rounded-lg p-3 flex items-start gap-2.5 animate-fade-in-down shadow-sm">
-                                                                <Icons.Clock className="text-red-500 shrink-0 mt-0.5" size={16} />
-                                                                <div>
-                                                                    <p className="text-[11px] md:text-xs text-red-700 leading-snug">
-                                                                        <span className="font-bold">Perhatian:</span> Bulan ini sudah izin <span className="font-black text-red-900">{tRecord.izin}x</span>
-                                                                        {tRecord.terlambat > 0 ? ` & punya riwayat ${tRecord.terlambat}x terlambat.` : '.'}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                        {/* -------------------------------------- */}
-
-                                                        <p><span className="text-gray-500 w-24 inline-block">Keperluan:</span> <strong>{p.keperluan}</strong></p>
-                                                        <p><span className="text-gray-500 w-24 inline-block">Tujuan:</span> <strong>{p.tujuan}</strong></p>
-                                                        <p><span className="text-gray-500 w-24 inline-block">Penjemput:</span> <strong>{p.wali_safar} ({p.hubungan_wali})</strong></p>
-
-                                                        {p.status_jadwal === 'Di Luar Jadwal' && (
-                                                            <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg">
-                                                                <p className="text-red-800 text-xs font-bold mb-1">ALASAN DI LUAR JADWAL:</p>
-                                                                <p className="text-red-700 italic">{p.keterangan_luar_jadwal}</p>
-                                                            </div>
-                                                        )}
-
-                                                        {(String(p.ikut_jadwal_saudara).toLowerCase() === 'true' || String(p.ikut_jadwal_saudara).toLowerCase() === 'ya' || p.ikut_jadwal_saudara === '1') && (
-                                                            <div className="mt-2">
-                                                                <span className="inline-block bg-orange-50 text-orange-800 px-2 py-1.5 rounded text-[10.5px] border border-orange-200 leading-snug shadow-sm">
-                                                                    <span className="font-semibold text-orange-600">Ikut Jadwal Kakak/Adik:</span><br />
-                                                                    <strong className="font-bold text-orange-900">
-                                                                        {p._saudaraInfo ? `${p._saudaraInfo.nama || p._saudaraInfo.nama_santri} (${p._saudaraInfo.kelas})` : `(ID: ${p.saudara_santri_id})`}
-                                                                    </strong>
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid grid-cols-2 gap-3 mt-2 border-t pt-4">
-                                                    <button
-                                                        onClick={() => setSelectedPermit(p)}
-                                                        disabled={processing || isApproving}
-                                                        className="py-2.5 px-4 bg-red-50 text-red-700 hover:bg-red-100 font-bold rounded-lg transition-colors border border-red-200"
-                                                    >Tolak Izin</button>
-                                                    <button
-                                                        onClick={() => handleApprove(p)}
-                                                        disabled={processing || isApproving}
-                                                        className="py-2.5 px-4 bg-emerald-600 text-white hover:bg-emerald-700 font-bold rounded-lg transition-colors shadow-sm"
-                                                    >
-                                                        {processing ? 'Memproses...' : 'Setujui & Buat QR'}
-                                                    </button>
-                                                </div>
-                                            </Card>
-                                        )
-                                    })}
-                                </div>
-                    }
+                                        <div className="grid grid-cols-2 gap-3 mt-2 border-t pt-4">
+                                            <button
+                                                onClick={() => setSelectedPermit(p)}
+                                                disabled={processing || isApproving}
+                                                className="py-2.5 px-4 bg-red-50 text-red-700 hover:bg-red-100 font-bold rounded-lg transition-colors border border-red-200"
+                                            >Tolak Izin</button>
+                                            <button
+                                                onClick={() => handleApprove(p)}
+                                                disabled={processing || isApproving}
+                                                className="py-2.5 px-4 bg-emerald-600 text-white hover:bg-emerald-700 font-bold rounded-lg transition-colors shadow-sm"
+                                            >
+                                                {processing ? 'Memproses...' : 'Setujui & Buat QR'}
+                                            </button>
+                                        </div>
+                                    </Card>
+                                )
+                            })}
+                        </div>
+                    )}
 
                     {/* MODAL KHUSUS PENOLAKAN */}
                     <Modal isOpen={!!selectedPermit} onClose={() => setSelectedPermit(null)} title="Tolak Pengajuan Izin">
