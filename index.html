@@ -4069,7 +4069,7 @@
         };
 
         // ==========================================
-        // 4. COMPONENT: RIWAYAT SCAN PAGE (PAGINATED + PETUGAS)
+        // 4. COMPONENT: RIWAYAT SCAN PAGE (FIX BUG WAKTU KELUAR)
         // ==========================================
         const RiwayatScanPage = () => {
             const { showToast } = useContext(ToastContext);
@@ -4097,7 +4097,7 @@
                         else if (Array.isArray(res)) finalLogs = res;
 
                         // --- OPTIMASI: Kalkulasi Tanggal & Keterangan ---
-                        const mappedLogs = finalLogs.map(log => {
+                        const mappedLogs = finalLogs.map((log, index) => {
                             let logDate = new Date(0);
                             let tglTampil = '-';
 
@@ -4105,16 +4105,9 @@
                             const rawDate = log.created_at || log.tanggal || log.tanggal_scan;
 
                             if (rawDate) {
-                                const tempDate = new Date(rawDate);
-                                if (!isNaN(tempDate.getTime())) {
-                                    logDate = tempDate;
+                                logDate = helper.parseDateString(rawDate);
+                                if (!isNaN(logDate.getTime())) {
                                     tglTampil = logDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-                                } else if (typeof rawDate === 'string' && rawDate.includes('/')) {
-                                    const parts = rawDate.split('/');
-                                    if (parts.length === 3) {
-                                        logDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                                        tglTampil = logDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-                                    }
                                 }
                             }
 
@@ -4135,14 +4128,31 @@
                             let waktuKeluarTerkait = null;
 
                             if (String(log.tipe_scan).toUpperCase() === 'RETURN' && jamBaku && jamBaku !== '-') {
-                                // Cari waktu EXIT santri ini
-                                const exitLog = finalLogs.find(x =>
+
+                                // --- PERBAIKAN BUG WAKTU KELUAR LINTAS TANGGAL ---
+                                // Prioritas 1: Cari log EXIT yang ID Perizinannya SAMA PERSIS
+                                let exitLog = finalLogs.find(x =>
                                     String(x.tipe_scan).toUpperCase() === 'EXIT' &&
-                                    (x.nama_santri === log.nama_santri || (x.santri_id && x.santri_id === log.santri_id))
+                                    x.permit_id && log.permit_id && x.permit_id === log.permit_id
                                 );
+
+                                // Prioritas 2 (Jaring Pengaman Data Lawas Tanpa ID): 
+                                // Cari log EXIT milik santri tersebut HANYA JIKA dicatat SEBELUM log RETURN ini (berdasarkan urutan array/waktu terdekat ke atas)
+                                if (!exitLog) {
+                                    for (let i = index - 1; i >= 0; i--) {
+                                        const x = finalLogs[i];
+                                        if (String(x.tipe_scan).toUpperCase() === 'EXIT' &&
+                                            (x.nama_santri === log.nama_santri || (x.santri_id && x.santri_id === log.santri_id))) {
+                                            exitLog = x;
+                                            break;
+                                        }
+                                    }
+                                }
+
                                 if (exitLog) {
                                     waktuKeluarTerkait = exitLog.waktu_scan || exitLog.waktu || null;
                                 }
+                                // --------------------------------------------------
 
                                 const timeParts = String(jamBaku).split(':');
                                 if (timeParts.length >= 2) {
@@ -4298,7 +4308,12 @@
 
                                                 {/* --- DATA PETUGAS --- */}
                                                 <td className="p-4 font-medium text-gray-700">
-                                                    {log.nama_petugas || log.petugas || log.user || '-'}
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="bg-gray-200 p-1 rounded-full text-gray-500">
+                                                            <Icons.User size={12} />
+                                                        </div>
+                                                        <span>{log.nama_petugas || log.petugas || log.user || '-'}</span>
+                                                    </div>
                                                 </td>
 
                                                 <td className="p-4 max-w-[250px] whitespace-normal break-words font-medium">
