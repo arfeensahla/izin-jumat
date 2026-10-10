@@ -170,12 +170,12 @@
                             resultData = { success: true, data: dTp };
                             break;
                         case 'getPermits':
-                            const { data: dPermit, error: ePermit } = await supabase.from('perizinan').select('*').limit(10000);
+                            const { data: dPermit, error: ePermit } = await supabase.from('perizinan').select('*');
                             if (ePermit) throw ePermit;
                             resultData = { success: true, data: dPermit };
                             break;
                         case 'getScanLogs':
-                            const { data: dLog, error: eLog } = await supabase.from('scan_log').select('*').limit(10000);
+                            const { data: dLog, error: eLog } = await supabase.from('scan_log').select('*');
                             if (eLog) throw eLog;
                             resultData = { success: true, data: dLog };
                             break;
@@ -3310,7 +3310,7 @@
         };
 
         // ==========================================
-        // COMPONENT: DASHBOARD MANAJEMEN (FIX BUG LIMIT & FORMAT JAM)
+        // COMPONENT: DASHBOARD MANAJEMEN (DYNAMIC FILTER & GROUPED METRICS)
         // ==========================================
         const DashboardManajemen = ({ title, subtitle, userClass, setCurrentRoute }) => {
             const { showToast } = useContext(ToastContext);
@@ -3320,6 +3320,7 @@
             const [allLogs, setAllLogs] = useState([]);
             const [loading, setLoading] = useState(true);
 
+            // --- STATE FILTER GLOBAL ---
             const [periodeRekap, setPeriodeRekap] = useState('pekan_ini');
             const [startDate, setStartDate] = useState('');
             const [endDate, setEndDate] = useState('');
@@ -3339,6 +3340,7 @@
                         let pData = (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) ? resPermits.data.data : (Array.isArray(resPermits?.data) ? resPermits.data : (Array.isArray(resPermits) ? resPermits : []));
                         let lData = (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) ? resLogs.data.data : (Array.isArray(resLogs?.data) ? resLogs.data : (Array.isArray(resLogs) ? resLogs : []));
 
+                        // Filter khusus Wali Kelas
                         if (userClass) {
                             pData = pData.filter(p => String(p.kelas).toUpperCase() === String(userClass).toUpperCase());
                         }
@@ -3356,16 +3358,18 @@
                 return () => { isMounted = false; };
             }, [userClass]);
 
+            // --- MESIN KALKULASI DINAMIS (Mengikuti Filter) ---
             const { stats, totalMenunggu } = useMemo(() => {
                 let sPusat = { ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0, tepatWaktu: 0 };
                 let sMenunggu = 0;
 
                 if (!allPermits || allPermits.length === 0) return { stats: sPusat, totalMenunggu: 0 };
 
+                // Bikin Kamus (Hash Map) untuk logs
                 const logsMap = {};
                 if (allLogs && allLogs.length > 0) {
                     allLogs.forEach(l => {
-                        const id = String(l.permit_id || l.id_perizinan || '').trim();
+                        const id = l.permit_id || l.id_perizinan;
                         if (id) {
                             if (!logsMap[id]) logsMap[id] = [];
                             logsMap[id].push(l);
@@ -3389,11 +3393,15 @@
                 const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
                 allPermits.forEach(p => {
-                    const status = String(p.status_pengajuan || '').trim().toUpperCase();
+                    const status = String(p.status_pengajuan || '').toUpperCase();
                     if (status === 'MENUNGGU_APPROVAL' || status === 'MENUNGGU') sMenunggu++;
 
                     const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
                     let pDate = helper.parseDateString(rawDate);
+                    if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
+                        const parts = rawDate.split('/');
+                        if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                    }
 
                     let masukFilter = false;
                     if (!isNaN(pDate.getTime())) {
@@ -3412,32 +3420,34 @@
 
                     if (masukFilter) {
                         sPusat.ajuan++;
-                        if (status === 'DISETUJUI' || status === 'SELESAI') sPusat.disetujui++;
+                        if (status === 'DISETUJUI') sPusat.disetujui++;
                         if (status === 'DITOLAK') sPusat.ditolak++;
 
-                        const pId = String(p.permit_id || p.id_perizinan || '').trim();
-                        let pLogs = logsMap[pId] ? [...logsMap[pId]] : [];
+                        const pId = p.permit_id || p.id_perizinan;
+                        const pLogs = logsMap[pId] || [];
 
-                        const hasExit = pLogs.some(l => String(l.tipe_scan).trim().toUpperCase() === 'EXIT');
-                        const returnLog = pLogs.find(l => String(l.tipe_scan).trim().toUpperCase() === 'RETURN');
+                        const hasExit = pLogs.some(l => String(l.tipe_scan).toUpperCase() === 'EXIT');
+                        const returnLog = pLogs.find(l => String(l.tipe_scan).toUpperCase() === 'RETURN');
 
                         if (hasExit && !returnLog) sPusat.diluar++;
-
                         if (returnLog) {
                             sPusat.kembali++;
 
+                            // --- SINKRONISASI LOGIKA TERLAMBAT DENGAN TABEL ---
                             let isTerlambat = false;
-                            const ketLog = String(returnLog.keterangan || returnLog.status || '').trim().toUpperCase();
+                            const ketLog = String(returnLog.keterangan || returnLog.status || '').toUpperCase();
 
+                            // 1. Prioritas utama: Baca keterangan dari scanner
                             if (ketLog.includes('TERLAMBAT')) {
                                 isTerlambat = true;
                             } else if (!ketLog.includes('TEPAT WAKTU')) {
-                                // MENGUBAH TITIK MENJADI TITIK DUA AGAR BISA DIPOTONG SISTEM
-                                const waktuReturn = String(returnLog.waktu_scan || returnLog.waktu || '').replace('.', ':');
-                                const timeParts = waktuReturn.split(':');
+                                // 2. Fallback hitungan waktu jika keterangan tidak jelas
+                                const waktuReturn = returnLog.waktu_scan || returnLog.waktu || '';
+                                const timeParts = String(waktuReturn).split(':');
                                 if (timeParts.length >= 2) {
                                     let jam = parseInt(timeParts[0], 10);
                                     const menit = parseInt(timeParts[1], 10);
+                                    // Antisipasi jika jam tertulis 05:00 sore tapi format 12-hour tanpa PM
                                     if (jam > 0 && jam <= 7) jam += 12;
                                     if (!isNaN(jam) && !isNaN(menit)) {
                                         if ((jam * 60) + menit > 990) isTerlambat = true; // Lewat 16:30
@@ -3791,39 +3801,35 @@
                         });
 
                         const dataWithMobility = finalData.map(p => {
-                            let mobilitas = '-'; let wKeluar = null; let wKembali = null;
+                            let mobilitas = '-';
+                            let wKeluar = null;
+                            let wKembali = null;
                             if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
-                                const pId = String(p.permit_id || p.id || p.id_perizinan).trim();
-                                const pLogs = logsMap[pId] || [];
-
-                                const exitLog = pLogs.find(l => String(l.tipe_scan || '').trim().toUpperCase() === 'EXIT');
-                                const returnLog = pLogs.find(l => String(l.tipe_scan || '').trim().toUpperCase() === 'RETURN');
-
+                                const pId = p.permit_id || p.id || p.id_perizinan;
+                                const myLogs = logsMap[pId] || [];
+                                const exitLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
+                                const returnLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'RETURN');
                                 if (exitLog) wKeluar = exitLog.waktu_scan || exitLog.waktu;
                                 if (returnLog) wKembali = returnLog.waktu_scan || returnLog.waktu;
-
                                 if (!exitLog) mobilitas = 'Belum Keluar';
                                 else if (exitLog && !returnLog) mobilitas = 'Masih Di Luar';
                                 else if (returnLog) {
-                                    let isTerlambat = false;
-                                    const ketLog = String(returnLog.keterangan || returnLog.status || '').toUpperCase();
-                                    if (ketLog.includes('TERLAMBAT')) {
-                                        isTerlambat = true;
-                                    } else if (!ketLog.includes('TEPAT WAKTU')) {
-                                        // MENGUBAH TITIK MENJADI TITIK DUA 
-                                        const waktuReturn = String(returnLog.waktu_scan || returnLog.waktu || '').replace('.', ':');
-                                        const timeParts = waktuReturn.split(':');
-                                        if (timeParts.length >= 2) {
-                                            let jam = parseInt(timeParts[0], 10); const menit = parseInt(timeParts[1], 10);
-                                            if (jam > 0 && jam <= 7) jam += 12;
-                                            if (!isNaN(jam) && !isNaN(menit) && ((jam * 60) + menit > 990)) isTerlambat = true;
-                                        }
-                                    }
-                                    mobilitas = isTerlambat ? 'Terlambat' : 'Tepat Waktu';
+                                    if (String(returnLog.keterangan || '').toUpperCase().includes('TERLAMBAT')) mobilitas = 'Terlambat';
+                                    else mobilitas = 'Tepat Waktu';
                                 }
                             }
-                            let saudaraInfo = null; if (p.saudara_santri_id) saudaraInfo = santriMap[p.saudara_santri_id];
-                            return { ...p, _bulan_filter: getBulanTahun(p.tanggal_izin), _status_mobilitas: mobilitas, _waktu_keluar: wKeluar, _waktu_kembali: wKembali, _saudaraInfo: saudaraInfo };
+
+                            let saudaraInfo = null;
+                            if (p.saudara_santri_id) saudaraInfo = santriMap[p.saudara_santri_id];
+
+                            return {
+                                ...p,
+                                _bulan_filter: getBulanTahun(p.tanggal_izin),
+                                _status_mobilitas: mobilitas,
+                                _waktu_keluar: wKeluar,
+                                _waktu_kembali: wKembali,
+                                _saudaraInfo: saudaraInfo
+                            };
                         });
                         setPermits(dataWithMobility);
                     } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
@@ -4064,7 +4070,7 @@
         };
 
         // ==========================================
-        // 4. COMPONENT: RIWAYAT SCAN PAGE (FIX BUG TANGGAL)
+        // 4. COMPONENT: RIWAYAT SCAN PAGE (FIX BUG ICON USER)
         // ==========================================
         const RiwayatScanPage = () => {
             const { showToast } = useContext(ToastContext);
@@ -4072,10 +4078,14 @@
             const [loading, setLoading] = useState(true);
             const [searchTerm, setSearchTerm] = useState('');
 
+            // --- TAB STATE BARU ---
             const [activeTab, setActiveTab] = useState('pekan_ini');
+
+            // --- STATE PAGINATION ---
             const [currentPage, setCurrentPage] = useState(1);
             const [itemsPerPage, setItemsPerPage] = useState(10);
 
+            // Reset ke halaman 1 jika filter atau pencarian berubah
             useEffect(() => { setCurrentPage(1); }, [searchTerm, activeTab]);
 
             useEffect(() => {
@@ -4087,16 +4097,13 @@
                         else if (res && Array.isArray(res.data)) finalLogs = res.data;
                         else if (Array.isArray(res)) finalLogs = res;
 
-                        // --- AMBIL SEMUA LOG SEKALIGUS (Jangan difilter di sini) ---
-                        const mappedLogs = finalLogs.map((log) => {
+                        // --- OPTIMASI: Kalkulasi Tanggal & Keterangan ---
+                        const mappedLogs = finalLogs.map((log, index) => {
                             let logDate = new Date(0);
                             let tglTampil = '-';
 
-                            // 1. Ambil tanggal dari kolom
-                            const rawDate = log.created_at || log.tanggal || log.tanggal_scan || log.waktu;
-
-                            // 2. Ambil tanggal dari ID (Jaring Pengaman Terkuat)
-                            const scanId = log.id || log.scan_id || log.id_scan || log[0] || '';
+                            // Coba ambil dari kolom tanggal/created_at
+                            const rawDate = log.created_at || log.tanggal || log.tanggal_scan;
 
                             if (rawDate) {
                                 logDate = helper.parseDateString(rawDate);
@@ -4105,11 +4112,15 @@
                                 }
                             }
 
-                            if (tglTampil === '-' && typeof scanId === 'string' && scanId.startsWith('SCN-')) {
-                                const timestamp = parseInt(scanId.replace('SCN-', ''), 10);
-                                if (!isNaN(timestamp)) {
-                                    logDate = new Date(timestamp);
-                                    tglTampil = logDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+                            // JIKA TANGGAL GAGAL/KOSONG, AMBIL DARI ID SCN
+                            if (tglTampil === '-') {
+                                const scanId = log.id || log.scan_id || log.id_scan || log[0] || '';
+                                if (typeof scanId === 'string' && scanId.startsWith('SCN-')) {
+                                    const timestamp = parseInt(scanId.replace('SCN-', ''), 10);
+                                    if (!isNaN(timestamp)) {
+                                        logDate = new Date(timestamp);
+                                        tglTampil = logDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+                                    }
                                 }
                             }
 
@@ -4117,20 +4128,32 @@
                             const jamBaku = log.waktu_scan || log.waktu || '-';
                             let waktuKeluarTerkait = null;
 
-                            if (String(log.tipe_scan).toUpperCase() === 'RETURN') {
+                            if (String(log.tipe_scan).toUpperCase() === 'RETURN' && jamBaku && jamBaku !== '-') {
 
-                                // --- CARI PASANGAN EXIT BERDASARKAN ID PERMIT ---
-                                const targetPermitId = log.permit_id || log.id_perizinan;
+                                // --- PERBAIKAN BUG WAKTU KELUAR LINTAS TANGGAL ---
+                                // Prioritas 1: Cari log EXIT yang ID Perizinannya SAMA PERSIS
+                                let exitLog = finalLogs.find(x =>
+                                    String(x.tipe_scan).toUpperCase() === 'EXIT' &&
+                                    x.permit_id && log.permit_id && x.permit_id === log.permit_id
+                                );
 
-                                if (targetPermitId) {
-                                    const exitLog = finalLogs.find(x =>
-                                        String(x.tipe_scan).toUpperCase() === 'EXIT' &&
-                                        (x.permit_id === targetPermitId || x.id_perizinan === targetPermitId)
-                                    );
-                                    if (exitLog) {
-                                        waktuKeluarTerkait = exitLog.waktu_scan || exitLog.waktu || null;
+                                // Prioritas 2 (Jaring Pengaman Data Lawas Tanpa ID): 
+                                // Cari log EXIT milik santri tersebut HANYA JIKA dicatat SEBELUM log RETURN ini
+                                if (!exitLog) {
+                                    for (let i = index - 1; i >= 0; i--) {
+                                        const x = finalLogs[i];
+                                        if (String(x.tipe_scan).toUpperCase() === 'EXIT' &&
+                                            (x.nama_santri === log.nama_santri || (x.santri_id && x.santri_id === log.santri_id))) {
+                                            exitLog = x;
+                                            break;
+                                        }
                                     }
                                 }
+
+                                if (exitLog) {
+                                    waktuKeluarTerkait = exitLog.waktu_scan || exitLog.waktu || null;
+                                }
+                                // --------------------------------------------------
 
                                 const timeParts = String(jamBaku).split(':');
                                 if (timeParts.length >= 2) {
@@ -4160,6 +4183,7 @@
                 fetchLogs();
             }, []);
 
+            // --- RUMUS KALENDER PONDOK (Sabtu-Jumat) ---
             const now = new Date();
             const jsDay = now.getDay();
             const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
@@ -4170,6 +4194,7 @@
             endOfWeek.setDate(startOfWeek.getDate() + 6);
             endOfWeek.setHours(23, 59, 59, 999);
 
+            // --- FILTER DAN URUTKAN (SORTING) ---
             const filteredLogs = logs.filter(log => {
                 if (!log) return false;
 
@@ -4183,26 +4208,29 @@
                     if (log._parsedDate && !isNaN(log._parsedDate.getTime())) {
                         isTabMatch = (log._parsedDate >= startOfWeek && log._parsedDate <= endOfWeek);
                     } else {
-                        isTabMatch = false; // Tolak data yang tanggalnya tidak terbaca
+                        isTabMatch = false;
                     }
                 }
 
                 return isTabMatch && (nama.includes(search) || ket.includes(search) || petugas.includes(search));
             });
 
+            // --- URUTKAN RIWAYAT SCAN DARI TERBARU KE TERLAMA ---
             filteredLogs.sort((a, b) => {
                 const timeA = a._parsedDate.getTime();
                 const timeB = b._parsedDate.getTime();
 
-                if (timeA !== timeB && !isNaN(timeA) && !isNaN(timeB)) {
+                if (timeA !== timeB) {
                     return timeB - timeA;
                 }
 
                 const jamA = a._jamBaku || '';
                 const jamB = b._jamBaku || '';
+
                 return jamB.localeCompare(jamA);
             });
 
+            // --- PEMOTONGAN DATA (PAGINATION) ---
             const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
             const paginatedLogs = filteredLogs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
@@ -4276,6 +4304,7 @@
                                                 <td className="p-4 font-medium text-gray-700">
                                                     <div className="flex items-center gap-2">
                                                         <div className="bg-gray-200 p-1 rounded-full text-gray-500">
+                                                            {/* Ikon sudah diperbaiki menjadi Icons.Users */}
                                                             <Icons.Users />
                                                         </div>
                                                         <span>{log.nama_petugas || log.petugas || log.user || '-'}</span>
@@ -4375,7 +4404,7 @@
                         </button>
                     </div>
                     {/* ------------------------------------------- */}
-                    <div className="sm:mx-auto sm:w-full sm:max-w-md text-center mt-12 sm:mt-0">
+                    <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
                         <div className="mx-auto w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center text-white mb-4 shadow-lg shadow-emerald-200">
                             <Icons.FileText />
                         </div>
