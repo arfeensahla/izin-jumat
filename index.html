@@ -170,12 +170,12 @@
                             resultData = { success: true, data: dTp };
                             break;
                         case 'getPermits':
-                            const { data: dPermit, error: ePermit } = await supabase.from('perizinan').select('*');
+                            const { data: dPermit, error: ePermit } = await supabase.from('perizinan').select('*').limit(10000);
                             if (ePermit) throw ePermit;
                             resultData = { success: true, data: dPermit };
                             break;
                         case 'getScanLogs':
-                            const { data: dLog, error: eLog } = await supabase.from('scan_log').select('*');
+                            const { data: dLog, error: eLog } = await supabase.from('scan_log').select('*').limit(10000);
                             if (eLog) throw eLog;
                             resultData = { success: true, data: dLog };
                             break;
