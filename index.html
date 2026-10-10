@@ -3310,7 +3310,7 @@
         };
 
         // ==========================================
-        // COMPONENT: DASHBOARD MANAJEMEN (FIX BUG RETURN LOG)
+        // COMPONENT: DASHBOARD MANAJEMEN (FIX BUG LIMIT & FORMAT JAM)
         // ==========================================
         const DashboardManajemen = ({ title, subtitle, userClass, setCurrentRoute }) => {
             const { showToast } = useContext(ToastContext);
@@ -3320,7 +3320,6 @@
             const [allLogs, setAllLogs] = useState([]);
             const [loading, setLoading] = useState(true);
 
-            // --- STATE FILTER GLOBAL ---
             const [periodeRekap, setPeriodeRekap] = useState('pekan_ini');
             const [startDate, setStartDate] = useState('');
             const [endDate, setEndDate] = useState('');
@@ -3340,7 +3339,6 @@
                         let pData = (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) ? resPermits.data.data : (Array.isArray(resPermits?.data) ? resPermits.data : (Array.isArray(resPermits) ? resPermits : []));
                         let lData = (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) ? resLogs.data.data : (Array.isArray(resLogs?.data) ? resLogs.data : (Array.isArray(resLogs) ? resLogs : []));
 
-                        // Filter khusus Wali Kelas
                         if (userClass) {
                             pData = pData.filter(p => String(p.kelas).toUpperCase() === String(userClass).toUpperCase());
                         }
@@ -3358,14 +3356,12 @@
                 return () => { isMounted = false; };
             }, [userClass]);
 
-            // --- MESIN KALKULASI DINAMIS ---
             const { stats, totalMenunggu } = useMemo(() => {
                 let sPusat = { ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0, tepatWaktu: 0 };
                 let sMenunggu = 0;
 
                 if (!allPermits || allPermits.length === 0) return { stats: sPusat, totalMenunggu: 0 };
 
-                // Bikin Kamus (Hash Map) berdasar permit_id SAJA (tanpa pandang tanggal)
                 const logsMap = {};
                 if (allLogs && allLogs.length > 0) {
                     allLogs.forEach(l => {
@@ -3391,9 +3387,6 @@
 
                 const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
                 const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-
-                const isExit = (t) => ['EXIT', 'KELUAR', 'OUT'].includes(String(t).trim().toUpperCase());
-                const isReturn = (t) => ['RETURN', 'KEMBALI', 'IN', 'MASUK'].includes(String(t).trim().toUpperCase());
 
                 allPermits.forEach(p => {
                     const status = String(p.status_pengajuan || '').trim().toUpperCase();
@@ -3422,13 +3415,11 @@
                         if (status === 'DISETUJUI' || status === 'SELESAI') sPusat.disetujui++;
                         if (status === 'DITOLAK') sPusat.ditolak++;
 
-                        // --- AMBIL LOG BERDASARKAN ID TIKET ---
                         const pId = String(p.permit_id || p.id_perizinan || '').trim();
                         let pLogs = logsMap[pId] ? [...logsMap[pId]] : [];
 
-                        // Cek log Exit & Return berdasarkan permit_id
-                        const hasExit = pLogs.some(l => isExit(l.tipe_scan));
-                        const returnLog = pLogs.find(l => isReturn(l.tipe_scan));
+                        const hasExit = pLogs.some(l => String(l.tipe_scan).trim().toUpperCase() === 'EXIT');
+                        const returnLog = pLogs.find(l => String(l.tipe_scan).trim().toUpperCase() === 'RETURN');
 
                         if (hasExit && !returnLog) sPusat.diluar++;
 
@@ -3441,8 +3432,9 @@
                             if (ketLog.includes('TERLAMBAT')) {
                                 isTerlambat = true;
                             } else if (!ketLog.includes('TEPAT WAKTU')) {
-                                const waktuReturn = returnLog.waktu_scan || returnLog.waktu || '';
-                                const timeParts = String(waktuReturn).split(':');
+                                // MENGUBAH TITIK MENJADI TITIK DUA AGAR BISA DIPOTONG SISTEM
+                                const waktuReturn = String(returnLog.waktu_scan || returnLog.waktu || '').replace('.', ':');
+                                const timeParts = waktuReturn.split(':');
                                 if (timeParts.length >= 2) {
                                     let jam = parseInt(timeParts[0], 10);
                                     const menit = parseInt(timeParts[1], 10);
@@ -3458,6 +3450,7 @@
                         }
                     }
                 });
+
                 return { stats: sPusat, totalMenunggu: sMenunggu };
             }, [allPermits, allLogs, periodeRekap, startDate, endDate, userClass]);
 
@@ -3798,35 +3791,39 @@
                         });
 
                         const dataWithMobility = finalData.map(p => {
-                            let mobilitas = '-';
-                            let wKeluar = null;
-                            let wKembali = null;
+                            let mobilitas = '-'; let wKeluar = null; let wKembali = null;
                             if (p.status_pengajuan === 'DISETUJUI' || p.status_pengajuan === 'SELESAI') {
-                                const pId = p.permit_id || p.id || p.id_perizinan;
-                                const myLogs = logsMap[pId] || [];
-                                const exitLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'EXIT');
-                                const returnLog = myLogs.find(l => String(l.tipe_scan || '').toUpperCase() === 'RETURN');
+                                const pId = String(p.permit_id || p.id || p.id_perizinan).trim();
+                                const pLogs = logsMap[pId] || [];
+
+                                const exitLog = pLogs.find(l => String(l.tipe_scan || '').trim().toUpperCase() === 'EXIT');
+                                const returnLog = pLogs.find(l => String(l.tipe_scan || '').trim().toUpperCase() === 'RETURN');
+
                                 if (exitLog) wKeluar = exitLog.waktu_scan || exitLog.waktu;
                                 if (returnLog) wKembali = returnLog.waktu_scan || returnLog.waktu;
+
                                 if (!exitLog) mobilitas = 'Belum Keluar';
                                 else if (exitLog && !returnLog) mobilitas = 'Masih Di Luar';
                                 else if (returnLog) {
-                                    if (String(returnLog.keterangan || '').toUpperCase().includes('TERLAMBAT')) mobilitas = 'Terlambat';
-                                    else mobilitas = 'Tepat Waktu';
+                                    let isTerlambat = false;
+                                    const ketLog = String(returnLog.keterangan || returnLog.status || '').toUpperCase();
+                                    if (ketLog.includes('TERLAMBAT')) {
+                                        isTerlambat = true;
+                                    } else if (!ketLog.includes('TEPAT WAKTU')) {
+                                        // MENGUBAH TITIK MENJADI TITIK DUA 
+                                        const waktuReturn = String(returnLog.waktu_scan || returnLog.waktu || '').replace('.', ':');
+                                        const timeParts = waktuReturn.split(':');
+                                        if (timeParts.length >= 2) {
+                                            let jam = parseInt(timeParts[0], 10); const menit = parseInt(timeParts[1], 10);
+                                            if (jam > 0 && jam <= 7) jam += 12;
+                                            if (!isNaN(jam) && !isNaN(menit) && ((jam * 60) + menit > 990)) isTerlambat = true;
+                                        }
+                                    }
+                                    mobilitas = isTerlambat ? 'Terlambat' : 'Tepat Waktu';
                                 }
                             }
-
-                            let saudaraInfo = null;
-                            if (p.saudara_santri_id) saudaraInfo = santriMap[p.saudara_santri_id];
-
-                            return {
-                                ...p,
-                                _bulan_filter: getBulanTahun(p.tanggal_izin),
-                                _status_mobilitas: mobilitas,
-                                _waktu_keluar: wKeluar,
-                                _waktu_kembali: wKembali,
-                                _saudaraInfo: saudaraInfo
-                            };
+                            let saudaraInfo = null; if (p.saudara_santri_id) saudaraInfo = santriMap[p.saudara_santri_id];
+                            return { ...p, _bulan_filter: getBulanTahun(p.tanggal_izin), _status_mobilitas: mobilitas, _waktu_keluar: wKeluar, _waktu_kembali: wKembali, _saudaraInfo: saudaraInfo };
                         });
                         setPermits(dataWithMobility);
                     } catch (e) { showToast(e.message, 'error'); } finally { setLoading(false); }
