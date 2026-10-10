@@ -3310,10 +3310,7 @@
         };
 
         // ==========================================
-        // COMPONENT: DASHBOARD MANAJEMEN (DYNAMIC FILTER & GROUPED METRICS)
-        // ==========================================
-        // ==========================================
-        // COMPONENT: DASHBOARD MANAJEMEN (FIX BUG MASIH DI LUAR)
+        // COMPONENT: DASHBOARD MANAJEMEN (ULTIMATE FIX MASIH DI LUAR)
         // ==========================================
         const DashboardManajemen = ({ title, subtitle, userClass, setCurrentRoute }) => {
             const { showToast } = useContext(ToastContext);
@@ -3361,7 +3358,7 @@
                 return () => { isMounted = false; };
             }, [userClass]);
 
-            // --- MESIN KALKULASI DINAMIS (Mengikuti Filter & Kebal Bug Spasi) ---
+            // --- MESIN KALKULASI DINAMIS (Anti Bug Spasi & Beda Kata) ---
             const { stats, totalMenunggu } = useMemo(() => {
                 let sPusat = { ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0, tepatWaktu: 0 };
                 let sMenunggu = 0;
@@ -3395,16 +3392,16 @@
                 const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
                 const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
+                // HELPER: Kamus sinonim status log (antisipasi ketikan manual satpam)
+                const isExit = (t) => ['EXIT', 'KELUAR', 'OUT'].includes(String(t).trim().toUpperCase());
+                const isReturn = (t) => ['RETURN', 'KEMBALI', 'IN', 'MASUK'].includes(String(t).trim().toUpperCase());
+
                 allPermits.forEach(p => {
                     const status = String(p.status_pengajuan || '').trim().toUpperCase();
                     if (status === 'MENUNGGU_APPROVAL' || status === 'MENUNGGU') sMenunggu++;
 
                     const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
                     let pDate = helper.parseDateString(rawDate);
-                    if (isNaN(pDate.getTime()) && typeof rawDate === 'string' && rawDate.includes('/')) {
-                        const parts = rawDate.split('/');
-                        if (parts.length === 3) pDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                    }
 
                     let masukFilter = false;
                     if (!isNaN(pDate.getTime())) {
@@ -3429,46 +3426,64 @@
                         const pId = String(p.permit_id || p.id_perizinan || '').trim();
                         let pLogs = logsMap[pId] ? [...logsMap[pId]] : [];
 
-                        // --- JARING PENGAMAN: Jika log lawas tidak punya permit_id ---
-                        if (pLogs.length < 2 && allLogs.length > 0) {
+                        // --- JARING PENGAMAN RADAR LUAS ---
+                        // Jika permit belum punya log keluar DAN kembali secara utuh, cari manual pakai nama
+                        if (!pLogs.some(l => isExit(l.tipe_scan)) || !pLogs.some(l => isReturn(l.tipe_scan))) {
                             const pName = String(p.nama_santri || '').trim().toLowerCase();
-                            const pDateStr = helper.parseDateString(rawDate).toDateString();
 
                             allLogs.forEach(l => {
-                                const lId = String(l.permit_id || l.id_perizinan || '').trim();
-                                if (!lId) {
-                                    const lName = String(l.nama_santri || '').trim().toLowerCase();
-                                    const lDateStr = helper.parseDateString(l.created_at || l.tanggal || l.tanggal_scan).toDateString();
-                                    if (lName === pName && lDateStr === pDateStr) {
-                                        if (!pLogs.find(existing => existing.scan_id === l.scan_id)) pLogs.push(l);
+                                const lName = String(l.nama_santri || '').trim().toLowerCase();
+                                if (lName === pName) {
+                                    // Tarik tanggal log
+                                    let lDate = helper.parseDateString(l.created_at || l.tanggal || l.tanggal_scan);
+
+                                    // Coba tarik dari SCN-ID jika tanggalnya kosong
+                                    if (isNaN(lDate.getTime())) {
+                                        const scanId = l.id || l.scan_id || l.id_scan || l[0] || '';
+                                        if (typeof scanId === 'string' && scanId.startsWith('SCN-')) {
+                                            lDate = new Date(parseInt(scanId.replace('SCN-', ''), 10));
+                                        }
+                                    }
+
+                                    // Toleransi waktu: Log dianggap milik izin ini jika dicatat antara H-1 sampai H+2 dari tanggal izin
+                                    if (!isNaN(lDate.getTime()) && !isNaN(pDate.getTime())) {
+                                        const diffHours = (lDate.getTime() - pDate.getTime()) / (1000 * 60 * 60);
+                                        if (diffHours >= -12 && diffHours <= 48) {
+                                            // Hindari memasukkan data duplikat
+                                            if (!pLogs.find(existing => existing.scan_id === l.scan_id)) {
+                                                pLogs.push(l);
+                                            }
+                                        }
                                     }
                                 }
                             });
                         }
                         // ---------------------------------------------------------------
 
-                        const hasExit = pLogs.some(l => String(l.tipe_scan || '').trim().toUpperCase() === 'EXIT');
-                        const returnLog = pLogs.find(l => String(l.tipe_scan || '').trim().toUpperCase() === 'RETURN');
+                        const hasExit = pLogs.some(l => isExit(l.tipe_scan));
+                        const returnLog = pLogs.find(l => isReturn(l.tipe_scan));
 
+                        // Hitung posisi
                         if (hasExit && !returnLog) sPusat.diluar++;
+
                         if (returnLog) {
                             sPusat.kembali++;
 
-                            // --- SINKRONISASI LOGIKA TERLAMBAT DENGAN TABEL ---
+                            // --- SINKRONISASI LOGIKA TERLAMBAT ---
                             let isTerlambat = false;
                             const ketLog = String(returnLog.keterangan || returnLog.status || '').trim().toUpperCase();
 
-                            // 1. Prioritas utama: Baca keterangan dari scanner
+                            // 1. Cek keterangan yang diketik/digenerate
                             if (ketLog.includes('TERLAMBAT')) {
                                 isTerlambat = true;
                             } else if (!ketLog.includes('TEPAT WAKTU')) {
-                                // 2. Fallback hitungan waktu jika keterangan tidak jelas
+                                // 2. Hitung manual dari jam kalau keterangan tidak jelas
                                 const waktuReturn = returnLog.waktu_scan || returnLog.waktu || '';
                                 const timeParts = String(waktuReturn).split(':');
                                 if (timeParts.length >= 2) {
                                     let jam = parseInt(timeParts[0], 10);
                                     const menit = parseInt(timeParts[1], 10);
-                                    // Antisipasi jika jam tertulis 05:00 sore tapi format 12-hour tanpa PM
+                                    // Antisipasi format 12-jam (jam 5 sore ditulis 05:00)
                                     if (jam > 0 && jam <= 7) jam += 12;
                                     if (!isNaN(jam) && !isNaN(menit)) {
                                         if ((jam * 60) + menit > 990) isTerlambat = true; // Lewat 16:30
@@ -3481,7 +3496,6 @@
                         }
                     }
                 });
-
                 return { stats: sPusat, totalMenunggu: sMenunggu };
             }, [allPermits, allLogs, periodeRekap, startDate, endDate, userClass]);
 
