@@ -3747,18 +3747,18 @@
             }, [searchTerm, filterBulan, filterKelas, filterStatus, filterMobilitas, activeTab]);
 
             const getBulanTahun = (tgl) => {
-                if (!tgl) return '-';
-                const strTgl = String(tgl).trim();
-                const d = new Date(strTgl);
-                if (!isNaN(d.getTime())) return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-                const parts = strTgl.split(/[\/\- ]/);
-                if (parts.length >= 3) {
-                    const monthNames = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-                    let m = parseInt(parts[1], 10);
-                    let y = parts[2].length === 4 ? parts[2] : (parts[0].length === 4 ? parts[0] : parts[2]);
-                    if (m >= 1 && m <= 12 && String(y).length === 4) return `${monthNames[m]} ${y}`;
+                if (!tgl || tgl === '-') return '-';
+
+                // 1. Serahkan tugas membaca tanggal ke mesin "helper" yang sudah kita buat
+                const d = helper.parseDateString(tgl);
+
+                // 2. Jika berhasil dibaca sebagai waktu yang valid
+                if (!isNaN(d.getTime())) {
+                    return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
                 }
-                return strTgl;
+
+                // 3. Fallback darurat (jika benar-benar bukan tanggal)
+                return String(tgl).trim();
             };
 
             useEffect(() => {
