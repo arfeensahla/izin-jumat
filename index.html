@@ -3746,19 +3746,67 @@
                 setCurrentPage(1);
             }, [searchTerm, filterBulan, filterKelas, filterStatus, filterMobilitas, activeTab]);
 
+            // --- FIX BUG DROPDOWN BULAN (STANDALONE) ---
             const getBulanTahun = (tgl) => {
                 if (!tgl || tgl === '-') return '-';
 
-                // 1. Serahkan tugas membaca tanggal ke mesin "helper" yang sudah kita buat
-                const d = helper.parseDateString(tgl);
+                // 1. Bersihkan koma dan ubah ke huruf kecil
+                const strTgl = String(tgl).trim();
+                const cleanStr = strTgl.replace(/,/g, '').toLowerCase();
+                const parts = cleanStr.split(/[\/\- ]+/);
 
-                // 2. Jika berhasil dibaca sebagai waktu yang valid
-                if (!isNaN(d.getTime())) {
-                    return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+                // 2. Kamus Bulan Indonesia
+                const bulanMap = {
+                    'jan': 'Januari', 'januari': 'Januari',
+                    'feb': 'Februari', 'februari': 'Februari',
+                    'mar': 'Maret', 'maret': 'Maret',
+                    'apr': 'April', 'april': 'April',
+                    'mei': 'Mei',
+                    'jun': 'Juni', 'juni': 'Juni',
+                    'jul': 'Juli', 'juli': 'Juli',
+                    'ags': 'Agustus', 'agustus': 'Agustus',
+                    'sep': 'September', 'september': 'September',
+                    'okt': 'Oktober', 'oktober': 'Oktober',
+                    'nov': 'November', 'november': 'November',
+                    'des': 'Desember', 'desember': 'Desember'
+                };
+
+                let tahun = '';
+                let bulan = '';
+
+                // 3. Cari Tahun (Pastikan berupa 4 digit angka)
+                for (let part of parts) {
+                    if (/^\d{4}$/.test(part)) {
+                        tahun = part;
+                        break;
+                    }
                 }
 
-                // 3. Fallback darurat (jika benar-benar bukan tanggal)
-                return String(tgl).trim();
+                // 4. Cari Bulan dari Teks (contoh: 'okt' -> 'Oktober')
+                for (let part of parts) {
+                    if (bulanMap[part]) {
+                        bulan = bulanMap[part];
+                        break;
+                    }
+                }
+
+                // 5. Jika tidak ada teks bulan, tebak dari angka di posisi tengah (Format DD/MM/YYYY)
+                if (!bulan && parts.length >= 3) {
+                    let mIndex = /^\d{4}$/.test(parts[0]) ? 1 : 1;
+                    const mNum = parseInt(parts[mIndex], 10);
+                    const monthNames = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+                    if (mNum >= 1 && mNum <= 12) {
+                        bulan = monthNames[mNum];
+                    }
+                }
+
+                // 6. Gabungkan hasil akhir
+                if (bulan && tahun) {
+                    return `${bulan} ${tahun}`;
+                }
+
+                // Fallback darurat
+                return strTgl;
             };
 
             useEffect(() => {
