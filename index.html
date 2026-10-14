@@ -3442,21 +3442,31 @@
             const [startDate, setStartDate] = useState('');
             const [endDate, setEndDate] = useState('');
 
-            // --- FUNGSI AKTIVASI NOTIFIKASI PWA ---
+            // --- FUNGSI AKTIVASI NOTIFIKASI PWA (ANTI BENTROK) ---
             const aktifkanNotifikasi = async () => {
                 try {
                     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
                         return showToast('Browser HP ini tidak mendukung notifikasi otomatis.', 'error');
                     }
+
                     const permission = await Notification.requestPermission();
                     if (permission !== 'granted') {
                         return showToast('Izin notifikasi ditolak oleh HP.', 'error');
                     }
-                    // Mendaftarkan service worker (pastikan file sw.js ada di folder public)
+
                     const register = await navigator.serviceWorker.register('/sw.js');
 
-                    // Kunci publik VAPID dummy (Nanti diganti dengan milik Supabase Bapak)
+                    // --- JARING PENGAMAN: Hapus jejak token/kunci lama yang nyangkut di HP ---
+                    const existingSubscription = await register.pushManager.getSubscription();
+                    if (existingSubscription) {
+                        await existingSubscription.unsubscribe();
+                        console.log("Token lama berhasil dicabut.");
+                    }
+                    // -------------------------------------------------------------------------
+
+                    // Kunci Publik VAPID Bapak yang baru
                     const publicVapidKey = 'BGnAM_kEFyyCMO5sjIjcrqHW4L9tY_j3hk_dI_wFdR0axEWqrw2eRaygGwHcrdE614YznULxRjIzHaZIDiK61Ro';
+
                     const subscription = await register.pushManager.subscribe({
                         userVisibleOnly: true,
                         applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
@@ -3467,13 +3477,14 @@
                         role: user?.role || 'SEKRETARIS_MUDIR',
                         token: subscription
                     });
+
                     showToast('Mantap! HP Sekretaris sudah terdaftar di sistem.', 'success');
                 } catch (error) {
                     console.error("Gagal aktivasi notif:", error);
-                    showToast('Gagal mengaktifkan notifikasi.', 'error');
+                    // Munculkan pesan error aslinya ke layar agar mudah dilacak
+                    showToast('Gagal: ' + error.message, 'error');
                 }
             };
-            // --------------------------------------
 
             useEffect(() => {
                 let isMounted = true;
