@@ -3456,7 +3456,7 @@
                     const register = await navigator.serviceWorker.register('/sw.js');
 
                     // Kunci publik VAPID dummy (Nanti diganti dengan milik Supabase Bapak)
-                    const publicVapidKey = 'BAd7QjYU9ShjX4H9g8HQU1710CIbSbg2PvWrMH4qlP4jJVUSXlgALK5J4vRjZksXpM0dzpVcDIKQEGBohzQ6yiI';
+                    const publicVapidKey = 'BGnAM_kEFyyCMO5sjIjcrqHW4L9tY_j3hk_dI_wFdR0axEWqrw2eRaygGwHcrdE614YznULxRjIzHaZIDiK61Ro';
                     const subscription = await register.pushManager.subscribe({
                         userVisibleOnly: true,
                         applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
