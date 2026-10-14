@@ -3415,10 +3415,9 @@
         };
 
         // ==========================================
-        // COMPONENT: DASHBOARD MANAJEMEN (DYNAMIC FILTER + PUSH NOTIF ANTI-SPAM)
+        // COMPONENT: DASHBOARD MANAJEMEN (FINAL + TOGGLE NOTIF)
         // ==========================================
 
-        // --- HELPER UNTUK NOTIFIKASI PWA ---
         const urlBase64ToUint8Array = (base64String) => {
             const padding = '='.repeat((4 - base64String.length % 4) % 4);
             const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
@@ -3427,7 +3426,6 @@
             for (let i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i); }
             return outputArray;
         };
-        // -----------------------------------
 
         const DashboardManajemen = ({ title, subtitle, userClass, setCurrentRoute }) => {
             const { showToast } = useContext(ToastContext);
@@ -3437,16 +3435,13 @@
             const [allLogs, setAllLogs] = useState([]);
             const [loading, setLoading] = useState(true);
 
-            // --- STATE FILTER GLOBAL ---
             const [periodeRekap, setPeriodeRekap] = useState('pekan_ini');
             const [startDate, setStartDate] = useState('');
             const [endDate, setEndDate] = useState('');
 
-            // --- STATE TOMBOL ANTI-SPAM NOTIFIKASI ---
             const [isSubscribing, setIsSubscribing] = useState(false);
             const [isSubscribed, setIsSubscribed] = useState(false);
 
-            // Cek otomatis apakah HP ini sudah pernah daftar notif sebelumnya
             useEffect(() => {
                 const cekStatusLangganan = async () => {
                     if ('serviceWorker' in navigator && 'PushManager' in window) {
@@ -3454,7 +3449,7 @@
                             const register = await navigator.serviceWorker.getRegistration();
                             if (register) {
                                 const subscription = await register.pushManager.getSubscription();
-                                if (subscription) setIsSubscribed(true); // Kunci tombol jika sudah terdaftar
+                                if (subscription) setIsSubscribed(true);
                             }
                         } catch (e) {
                             console.log("Gagal mengecek status notifikasi", e);
@@ -3464,10 +3459,9 @@
                 cekStatusLangganan();
             }, []);
 
-            // --- FUNGSI AKTIVASI NOTIFIKASI PWA (FIX ANTI SPAM) ---
             const aktifkanNotifikasi = async () => {
-                if (isSubscribing || isSubscribed) return; // Cegah double click
-                setIsSubscribing(true); // Ubah teks tombol jadi "Memproses..."
+                if (isSubscribing) return;
+                setIsSubscribing(true);
 
                 try {
                     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -3484,11 +3478,8 @@
                     }
 
                     const register = await navigator.serviceWorker.register('/sw.js');
-
-                    // Cek apakah sudah pernah langganan sebelumnya
                     let subscription = await register.pushManager.getSubscription();
 
-                    // Jika belum, baru buat token baru
                     if (!subscription) {
                         const publicVapidKey = 'BGnAM_kEFyyCMO5sjIjcrqHW4L9tY_j3hk_dI_wFdROaxEWqrw2eRaygGwHcrdE6l4YznULxRjIzHaZIDiK61Ro';
                         subscription = await register.pushManager.subscribe({
@@ -3497,47 +3488,57 @@
                         });
                     }
 
-                    // Mengirim token unik HP ke Supabase
                     await apiService.request('savePushToken', {
                         role: user?.role || 'SEKRETARIS_MUDIR',
                         token: subscription
                     });
 
-                    setIsSubscribed(true); // Ubah teks jadi "Notif Aktif"
+                    setIsSubscribed(true);
                     showToast('Mantap! HP Sekretaris sudah terdaftar di sistem.', 'success');
                 } catch (error) {
                     console.error("Gagal aktivasi notif:", error);
                     showToast('Gagal: ' + error.message, 'error');
                 } finally {
-                    setIsSubscribing(false); // Kembalikan tombol ke keadaan normal
+                    setIsSubscribing(false);
                 }
             };
-            // --------------------------------------------------------
+
+            // --- FUNGSI BARU: MATIKAN NOTIFIKASI ---
+            const matikanNotifikasi = async () => {
+                if (isSubscribing) return;
+                setIsSubscribing(true);
+
+                try {
+                    const register = await navigator.serviceWorker.getRegistration();
+                    if (register) {
+                        const subscription = await register.pushManager.getSubscription();
+                        if (subscription) {
+                            await subscription.unsubscribe(); // Cabut ingatan dari Browser/HP
+                        }
+                    }
+                    setIsSubscribed(false);
+                    showToast('Notifikasi berhasil dimatikan dari perangkat ini.', 'success');
+                } catch (error) {
+                    console.error("Gagal mematikan notif:", error);
+                    showToast('Gagal mencabut notifikasi.', 'error');
+                } finally {
+                    setIsSubscribing(false);
+                }
+            };
+            // ----------------------------------------
 
             useEffect(() => {
                 let isMounted = true;
                 const fetchData = async () => {
                     setLoading(true);
                     try {
-                        const [resPermits, resLogs] = await Promise.all([
-                            apiService.request('getPermits'),
-                            apiService.request('getScanLogs')
-                        ]);
-
+                        const [resPermits, resLogs] = await Promise.all([apiService.request('getPermits'), apiService.request('getScanLogs')]);
                         if (!isMounted) return;
-
                         let pData = (resPermits && resPermits.data && Array.isArray(resPermits.data.data)) ? resPermits.data.data : (Array.isArray(resPermits?.data) ? resPermits.data : (Array.isArray(resPermits) ? resPermits : []));
                         let lData = (resLogs && resLogs.data && Array.isArray(resLogs.data.data)) ? resLogs.data.data : (Array.isArray(resLogs?.data) ? resLogs.data : (Array.isArray(resLogs) ? resLogs : []));
-
-                        // Filter khusus Wali Kelas
-                        if (userClass) {
-                            pData = pData.filter(p => String(p.kelas).toUpperCase() === String(userClass).toUpperCase());
-                        }
-
-                        setAllPermits(pData);
-                        setAllLogs(lData);
+                        if (userClass) pData = pData.filter(p => String(p.kelas).toUpperCase() === String(userClass).toUpperCase());
+                        setAllPermits(pData); setAllLogs(lData);
                     } catch (e) {
-                        console.error("Fetch error:", e);
                         if (isMounted) showToast('Gagal memuat data dashboard', 'error');
                     } finally {
                         if (isMounted) setLoading(false);
@@ -3547,18 +3548,16 @@
                 return () => { isMounted = false; };
             }, [userClass]);
 
-            // --- MESIN KALKULASI DINAMIS (Mengikuti Filter) ---
             const { stats, totalMenunggu } = useMemo(() => {
                 let sPusat = { ajuan: 0, disetujui: 0, ditolak: 0, diluar: 0, kembali: 0, terlambat: 0, tepatWaktu: 0 };
                 let sMenunggu = 0;
 
                 if (!allPermits || allPermits.length === 0) return { stats: sPusat, totalMenunggu: 0 };
 
-                // Bikin Kamus (Hash Map) untuk logs
                 const logsMap = {};
                 if (allLogs && allLogs.length > 0) {
                     allLogs.forEach(l => {
-                        const id = l.permit_id || l.id_perizinan;
+                        const id = String(l.permit_id || l.id_perizinan || '').trim();
                         if (id) {
                             if (!logsMap[id]) logsMap[id] = [];
                             logsMap[id].push(l);
@@ -3566,23 +3565,13 @@
                     });
                 }
 
-                const now = new Date();
-                const jsDay = now.getDay();
-                const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
-
-                const startOfWeek = new Date(now);
-                startOfWeek.setHours(0, 0, 0, 0);
-                startOfWeek.setDate(now.getDate() - diffToSaturday);
-
-                const endOfWeek = new Date(startOfWeek);
-                endOfWeek.setDate(startOfWeek.getDate() + 6);
-                endOfWeek.setHours(23, 59, 59, 999);
-
-                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+                const now = new Date(); const jsDay = now.getDay(); const diffToSaturday = (jsDay === 6) ? 0 : jsDay + 1;
+                const startOfWeek = new Date(now); startOfWeek.setHours(0, 0, 0, 0); startOfWeek.setDate(now.getDate() - diffToSaturday);
+                const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6); endOfWeek.setHours(23, 59, 59, 999);
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1); const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
                 allPermits.forEach(p => {
-                    const status = String(p.status_pengajuan || '').toUpperCase();
+                    const status = String(p.status_pengajuan || '').trim().toUpperCase();
                     if (status === 'MENUNGGU_APPROVAL' || status === 'MENUNGGU') sMenunggu++;
 
                     const rawDate = p.tanggal_izin || p.tanggal || p.waktu_pengajuan || p.timestamp || p.waktu;
@@ -3594,58 +3583,57 @@
 
                     let masukFilter = false;
                     if (!isNaN(pDate.getTime())) {
-                        if (periodeRekap === 'pekan_ini') {
-                            masukFilter = (pDate >= startOfWeek && pDate <= endOfWeek);
-                        } else if (periodeRekap === 'bulan_ini') {
-                            masukFilter = (pDate >= startOfMonth && pDate <= endOfMonth);
-                        } else if (periodeRekap === 'semua') {
-                            masukFilter = true;
-                        } else if (periodeRekap === 'custom' && startDate && endDate) {
-                            const s = new Date(startDate); s.setHours(0, 0, 0, 0);
-                            const e = new Date(endDate); e.setHours(23, 59, 59, 999);
+                        if (periodeRekap === 'pekan_ini') masukFilter = (pDate >= startOfWeek && pDate <= endOfWeek);
+                        else if (periodeRekap === 'bulan_ini') masukFilter = (pDate >= startOfMonth && pDate <= endOfMonth);
+                        else if (periodeRekap === 'semua') masukFilter = true;
+                        else if (periodeRekap === 'custom' && startDate && endDate) {
+                            const s = new Date(startDate); s.setHours(0, 0, 0, 0); const e = new Date(endDate); e.setHours(23, 59, 59, 999);
                             masukFilter = (pDate >= s && pDate <= e);
                         }
                     }
 
                     if (masukFilter) {
                         sPusat.ajuan++;
-                        if (status === 'DISETUJUI') sPusat.disetujui++;
+                        if (status === 'DISETUJUI' || status === 'SELESAI') sPusat.disetujui++;
                         if (status === 'DITOLAK') sPusat.ditolak++;
 
-                        const pId = p.permit_id || p.id_perizinan;
-                        const pLogs = logsMap[pId] || [];
+                        const pId = String(p.permit_id || p.id_perizinan || '').trim();
+                        let pLogs = logsMap[pId] ? [...logsMap[pId]] : [];
 
-                        const hasExit = pLogs.some(l => String(l.tipe_scan).toUpperCase() === 'EXIT');
-                        const returnLog = pLogs.find(l => String(l.tipe_scan).toUpperCase() === 'RETURN');
+                        if (pLogs.length < 2 && allLogs.length > 0) {
+                            const pName = String(p.nama_santri || '').trim().toLowerCase();
+                            const pDateStr = helper.parseDateString(rawDate).toDateString();
+                            allLogs.forEach(l => {
+                                const lId = String(l.permit_id || l.id_perizinan || '').trim();
+                                if (!lId) {
+                                    const lName = String(l.nama_santri || '').trim().toLowerCase();
+                                    const lDateStr = helper.parseDateString(l.created_at || l.tanggal || l.tanggal_scan).toDateString();
+                                    if (lName === pName && lDateStr === pDateStr) {
+                                        if (!pLogs.find(existing => existing.scan_id === l.scan_id)) pLogs.push(l);
+                                    }
+                                }
+                            });
+                        }
+
+                        const hasExit = pLogs.some(l => String(l.tipe_scan || '').trim().toUpperCase() === 'EXIT');
+                        const returnLog = pLogs.find(l => String(l.tipe_scan || '').trim().toUpperCase() === 'RETURN');
 
                         if (hasExit && !returnLog) sPusat.diluar++;
                         if (returnLog) {
                             sPusat.kembali++;
-
-                            // --- SINKRONISASI LOGIKA TERLAMBAT DENGAN TABEL ---
                             let isTerlambat = false;
-                            const ketLog = String(returnLog.keterangan || returnLog.status || '').toUpperCase();
-
-                            // 1. Prioritas utama: Baca keterangan dari scanner
-                            if (ketLog.includes('TERLAMBAT')) {
-                                isTerlambat = true;
-                            } else if (!ketLog.includes('TEPAT WAKTU')) {
-                                // 2. Fallback hitungan waktu jika keterangan tidak jelas
-                                const waktuReturn = returnLog.waktu_scan || returnLog.waktu || '';
-                                const timeParts = String(waktuReturn).split(':');
+                            const ketLog = String(returnLog.keterangan || returnLog.status || '').trim().toUpperCase();
+                            if (ketLog.includes('TERLAMBAT')) isTerlambat = true;
+                            else if (!ketLog.includes('TEPAT WAKTU')) {
+                                const waktuReturn = String(returnLog.waktu_scan || returnLog.waktu || '').replace('.', ':');
+                                const timeParts = waktuReturn.split(':');
                                 if (timeParts.length >= 2) {
-                                    let jam = parseInt(timeParts[0], 10);
-                                    const menit = parseInt(timeParts[1], 10);
-                                    // Antisipasi jika jam tertulis 05:00 sore tapi format 12-hour tanpa PM
+                                    let jam = parseInt(timeParts[0], 10); const menit = parseInt(timeParts[1], 10);
                                     if (jam > 0 && jam <= 7) jam += 12;
-                                    if (!isNaN(jam) && !isNaN(menit)) {
-                                        if ((jam * 60) + menit > 990) isTerlambat = true; // Lewat 16:30
-                                    }
+                                    if (!isNaN(jam) && !isNaN(menit)) { if ((jam * 60) + menit > 990) isTerlambat = true; }
                                 }
                             }
-
-                            if (isTerlambat) sPusat.terlambat++;
-                            else sPusat.tepatWaktu++;
+                            if (isTerlambat) sPusat.terlambat++; else sPusat.tepatWaktu++;
                         }
                     }
                 });
@@ -3655,30 +3643,28 @@
 
             return (
                 <div className="space-y-6 animate-fade-in-down">
-                    
-                    {/* --- HEADER DENGAN TOMBOL ANTI-SPAM --- */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b pb-4 gap-4">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
                             <p className="text-gray-500">{subtitle}</p>
                         </div>
-                        
+
                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full md:w-auto">
-                            {/* Tombol Khusus Sekretaris */}
+                            {/* --- TOMBOL NOTIFIKASI PINTAR --- */}
                             {user?.role === 'SEKRETARIS_MUDIR' && (
                                 <button
-                                    onClick={aktifkanNotifikasi}
-                                    disabled={isSubscribed || isSubscribing}
-                                    className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-lg border transition-colors shadow-sm w-full md:w-auto justify-center ${
-                                        isSubscribed 
-                                            ? 'bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed' 
+                                    onClick={isSubscribed ? matikanNotifikasi : aktifkanNotifikasi}
+                                    disabled={isSubscribing}
+                                    className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-lg border transition-colors shadow-sm w-full md:w-auto justify-center ${isSubscribed
+                                            ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200'
                                             : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                                    }`}
+                                        }`}
                                 >
-                                    {isSubscribing ? '⏳ Memproses...' : isSubscribed ? '✅ Notif HP Aktif' : '🔔 Aktifkan Notif HP'}
+                                    {isSubscribing ? '⏳ Memproses...' : isSubscribed ? '🔕 Matikan Notif' : '🔔 Aktifkan Notif HP'}
                                 </button>
                             )}
-                            
+                            {/* -------------------------------- */}
+
                             {userClass && (
                                 <div className="bg-blue-50 border border-blue-200 px-4 py-2 rounded-lg text-left sm:text-right w-full sm:w-auto">
                                     <span className="text-sm text-blue-600 block leading-tight">Data Kelas</span>
@@ -3687,82 +3673,32 @@
                             )}
                         </div>
                     </div>
-                    {/* ------------------------------------------- */}
 
                     {!loading && totalMenunggu > 0 && user?.role === 'SEKRETARIS_MUDIR' && (
-                        <div
-                            onClick={() => setCurrentRoute ? setCurrentRoute('screening') : null}
-                            className="bg-yellow-50 border border-yellow-200 border-l-4 border-l-yellow-500 p-3 rounded-r-lg shadow-sm flex items-center justify-between gap-2 animate-fade-in-down active:bg-yellow-200 transition-colors cursor-pointer"
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className="bg-white p-2 rounded-full shadow-sm text-lg shrink-0">🔔</div>
-                                <div>
-                                    <h4 className="text-yellow-800 font-bold text-sm leading-tight">Perlu Persetujuan</h4>
-                                    <p className="text-yellow-700 text-[11px] sm:text-xs mt-0.5 leading-snug">
-                                        Ada <span className="font-black text-yellow-900">{totalMenunggu}</span> izin baru. <span className="font-bold underline">Ketuk untuk cek</span>.
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="text-yellow-600 bg-yellow-200 p-2 rounded-full shrink-0">
-                                <span className="font-bold text-sm leading-none">➔</span>
-                            </div>
+                        <div onClick={() => setCurrentRoute ? setCurrentRoute('screening') : null} className="bg-yellow-50 border border-yellow-200 border-l-4 border-l-yellow-500 p-3 rounded-r-lg shadow-sm flex items-center justify-between gap-2 animate-fade-in-down active:bg-yellow-200 transition-colors cursor-pointer">
+                            <div className="flex items-center gap-3"><div className="bg-white p-2 rounded-full shadow-sm text-lg shrink-0">🔔</div><div><h4 className="text-yellow-800 font-bold text-sm leading-tight">Perlu Persetujuan</h4><p className="text-yellow-700 text-[11px] sm:text-xs mt-0.5 leading-snug">Ada <span className="font-black text-yellow-900">{totalMenunggu}</span> izin baru. <span className="font-bold underline">Ketuk untuk cek</span>.</p></div></div><div className="text-yellow-600 bg-yellow-200 p-2 rounded-full shrink-0"><span className="font-bold text-sm leading-none">➔</span></div>
                         </div>
                     )}
 
                     <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <div>
-                            <h3 className="text-lg font-bold text-emerald-800 leading-tight">Statistik Perizinan</h3>
-                            <p className="text-xs text-gray-500 mt-0.5">Pilih periode data yang ingin ditampilkan pada kartu di bawah.</p>
-                        </div>
+                        <div><h3 className="text-lg font-bold text-emerald-800 leading-tight">Statistik Perizinan</h3><p className="text-xs text-gray-500 mt-0.5">Pilih periode data yang ingin ditampilkan pada kartu di bawah.</p></div>
                         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                            <select
-                                className="p-2.5 border border-gray-300 rounded-lg outline-none text-sm font-bold text-gray-700 bg-gray-50 focus:ring-2 focus:ring-emerald-500 focus:bg-white cursor-pointer transition-all"
-                                value={periodeRekap}
-                                onChange={(e) => setPeriodeRekap(e.target.value)}
-                            >
-                                <option value="pekan_ini">📅 Pekan Ini</option>
-                                <option value="bulan_ini">📅 Bulan Ini</option>
-                                <option value="semua">📊 Semua Waktu (All Time)</option>
-                                <option value="custom">⚙️ Custom Tanggal...</option>
+                            <select className="p-2.5 border border-gray-300 rounded-lg outline-none text-sm font-bold text-gray-700 bg-gray-50 focus:ring-2 focus:ring-emerald-500 focus:bg-white cursor-pointer transition-all" value={periodeRekap} onChange={(e) => setPeriodeRekap(e.target.value)}>
+                                <option value="pekan_ini">📅 Pekan Ini</option><option value="bulan_ini">📅 Bulan Ini</option><option value="semua">📊 Semua Waktu (All Time)</option><option value="custom">⚙️ Custom Tanggal...</option>
                             </select>
-
                             {periodeRekap === 'custom' && (
                                 <div className="flex items-center gap-2 animate-fade-in-down bg-gray-50 border border-gray-200 p-1 rounded-lg">
-                                    <input type="date" className="p-1.5 bg-transparent text-sm outline-none cursor-pointer font-medium text-gray-700" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                                    <span className="text-gray-400 font-bold text-xs">s/d</span>
-                                    <input type="date" className="p-1.5 bg-transparent text-sm outline-none cursor-pointer font-medium text-gray-700" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                                    <input type="date" className="p-1.5 bg-transparent text-sm outline-none cursor-pointer font-medium text-gray-700" value={startDate} onChange={(e) => setStartDate(e.target.value)} /><span className="text-gray-400 font-bold text-xs">s/d</span><input type="date" className="p-1.5 bg-transparent text-sm outline-none cursor-pointer font-medium text-gray-700" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                                 </div>
                             )}
                         </div>
                     </div>
 
                     <div className="space-y-6">
-                        <div>
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">Kelompok 1 : Ajuan</h4>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-                                <div className="col-span-2 md:col-span-1">
-                                    <StatCard title="Total Ajuan" value={loading ? "..." : stats.ajuan} icon={<Icons.FileText />} color="bg-blue-50 text-blue-600 border border-blue-100 shadow-sm" />
-                                </div>
-                                <StatCard title="Disetujui" value={loading ? "..." : stats.disetujui} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm" />
-                                <StatCard title="Ditolak" value={loading ? "..." : stats.ditolak} icon={<Icons.XCircle />} color="bg-red-50 text-red-600 border border-red-100 shadow-sm" />
-                            </div>
-                        </div>
-
+                        <div><h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">Kelompok 1 : Ajuan</h4><div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4"><div className="col-span-2 md:col-span-1"><StatCard title="Total Ajuan" value={loading ? "..." : stats.ajuan} icon={<Icons.FileText />} color="bg-blue-50 text-blue-600 border border-blue-100 shadow-sm" /></div><StatCard title="Disetujui" value={loading ? "..." : stats.disetujui} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm" /><StatCard title="Ditolak" value={loading ? "..." : stats.ditolak} icon={<Icons.XCircle />} color="bg-red-50 text-red-600 border border-red-100 shadow-sm" /></div></div>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div>
-                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">Kelompok 2 : Posisi Santri</h4>
-                                <div className="grid grid-cols-2 gap-3 md:gap-4">
-                                    <StatCard title="Masih Di Luar" value={loading ? "..." : stats.diluar} icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600 border border-orange-100 shadow-sm" />
-                                    <StatCard title="Sudah Kembali" value={loading ? "..." : stats.kembali} icon={<Icons.Home />} color="bg-teal-50 text-teal-600 border border-teal-100 shadow-sm" />
-                                </div>
-                            </div>
-                            <div>
-                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">Kelompok 3 : Waktu Kembali</h4>
-                                <div className="grid grid-cols-2 gap-3 md:gap-4">
-                                    <StatCard title="Tepat Waktu" value={loading ? "..." : stats.tepatWaktu} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm" />
-                                    <StatCard title="Terlambat" value={loading ? "..." : stats.terlambat} icon={<Icons.Clock />} color="bg-rose-50 text-rose-600 border border-rose-100 shadow-sm" />
-                                </div>
-                            </div>
+                            <div><h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">Kelompok 2 : Posisi Santri</h4><div className="grid grid-cols-2 gap-3 md:gap-4"><StatCard title="Masih Di Luar" value={loading ? "..." : stats.diluar} icon={<Icons.TrendingUp />} color="bg-orange-50 text-orange-600 border border-orange-100 shadow-sm" /><StatCard title="Sudah Kembali" value={loading ? "..." : stats.kembali} icon={<Icons.Home />} color="bg-teal-50 text-teal-600 border border-teal-100 shadow-sm" /></div></div>
+                            <div><h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2 mb-3">Kelompok 3 : Waktu Kembali</h4><div className="grid grid-cols-2 gap-3 md:gap-4"><StatCard title="Tepat Waktu" value={loading ? "..." : stats.tepatWaktu} icon={<Icons.CheckCircle />} color="bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm" /><StatCard title="Terlambat" value={loading ? "..." : stats.terlambat} icon={<Icons.Clock />} color="bg-rose-50 text-rose-600 border border-rose-100 shadow-sm" /></div></div>
                         </div>
                     </div>
                 </div>
