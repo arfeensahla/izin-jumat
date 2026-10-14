@@ -3442,7 +3442,7 @@
             const [startDate, setStartDate] = useState('');
             const [endDate, setEndDate] = useState('');
 
-            // --- FUNGSI AKTIVASI NOTIFIKASI PWA (ANTI BENTROK) ---
+            // --- FUNGSI AKTIVASI NOTIFIKASI PWA (FIX ANTI SPAM) ---
             const aktifkanNotifikasi = async () => {
                 try {
                     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -3456,21 +3456,17 @@
 
                     const register = await navigator.serviceWorker.register('/sw.js');
 
-                    // --- JARING PENGAMAN: Hapus jejak token/kunci lama yang nyangkut di HP ---
-                    const existingSubscription = await register.pushManager.getSubscription();
-                    if (existingSubscription) {
-                        await existingSubscription.unsubscribe();
-                        console.log("Token lama berhasil dicabut.");
+                    // Cek apakah sudah pernah langganan sebelumnya
+                    let subscription = await register.pushManager.getSubscription();
+
+                    // Jika belum, baru buat token baru
+                    if (!subscription) {
+                        const publicVapidKey = 'BGnAM_kEFyyCMO5sjIjcrqHW4L9tY_j3hk_dI_wFdROaxEWqrw2eRaygGwHcrdE6l4YznULxRjIzHaZIDiK61Ro';
+                        subscription = await register.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+                        });
                     }
-                    // -------------------------------------------------------------------------
-
-                    // Kunci Publik VAPID Bapak yang baru
-                    const publicVapidKey = 'BGnAM_kEFyyCMO5sjIjcrqHW4L9tY_j3hk_dI_wFdR0axEWqrw2eRaygGwHcrdE614YznULxRjIzHaZIDiK61Ro';
-
-                    const subscription = await register.pushManager.subscribe({
-                        userVisibleOnly: true,
-                        applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
-                    });
 
                     // Mengirim token unik HP ke Supabase
                     await apiService.request('savePushToken', {
@@ -3481,7 +3477,6 @@
                     showToast('Mantap! HP Sekretaris sudah terdaftar di sistem.', 'success');
                 } catch (error) {
                     console.error("Gagal aktivasi notif:", error);
-                    // Munculkan pesan error aslinya ke layar agar mudah dilacak
                     showToast('Gagal: ' + error.message, 'error');
                 }
             };
