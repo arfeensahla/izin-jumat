@@ -3484,7 +3484,7 @@
                     let subscription = await register.pushManager.getSubscription();
 
                     if (!subscription) {
-                        const publicVapidKey = 'BGnAM_kEFyyCMO5sjIjcrqHW4L9tY_j3hk_dI_wFdROaxEWqrw2eRaygGwHcrdE6l4YznULxRjIzHaZIDiK61Ro';
+                        const publicVapidKey = 'BDqgvSmRRFYcaeVw_WGEC7jWbqTOmC8W3MwRokegapj5aqY8HGpzUjxxGr3sniWHN94ORZx4xqHuLaa3-2E_Z6E';
                         subscription = await register.pushManager.subscribe({
                             userVisibleOnly: true,
                             applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
@@ -3661,8 +3661,8 @@
                                     onClick={isSubscribed ? matikanNotifikasi : aktifkanNotifikasi}
                                     disabled={isSubscribing}
                                     className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-lg border transition-colors shadow-sm w-full md:w-auto justify-center ${isSubscribed
-                                            ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200'
-                                            : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                                        ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200'
+                                        : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
                                         }`}
                                 >
                                     {isSubscribing ? '⏳ Memproses...' : isSubscribed ? '🔕 Matikan Notif' : '🔔 Aktifkan Notif HP'}

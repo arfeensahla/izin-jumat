@@ -5,8 +5,8 @@ Deno.serve(async (req) => {
     try {
         // 1. KITA PINDAHKAN KE DALAM SINI & HARDCODE KUNCINYA
         // Ini menjamin robot membaca kunci yang 100% akurat setiap kali menembak!
-        const publicVapidKey = 'BGnAM_kEFyyCMO5sjIjcrqHW4L9tY_j3hk_dI_wFdROaxEWqrw2eRaygGwHcrdE6l4YznULxRjIzHaZIDiK61Ro';
-        const privateVapidKey = 'HTKtwvrrTWe4hVbqsKzIHlIOwyTADPkPlaSKfhawLAA';
+        const publicVapidKey = 'BDqgvSmRRFYcaeVw_WGEC7jWbqTOmC8W3MwRokegapj5aqY8HGpzUjxxGr3sniWHN94ORZx4xqHuLaa3-2E_Z6E';
+        const privateVapidKey = 'hR-8tqmP-BL5Scz1M-UE8QowFIwCSqrc_byLa2c5zUQ';
 
         webpush.setVapidDetails(
             'mailto:arfeensahla@gmail.com',
