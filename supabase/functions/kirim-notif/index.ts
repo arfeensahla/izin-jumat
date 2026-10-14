@@ -1,17 +1,19 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
 import webpush from "npm:web-push@3.6.7"
 
-const publicVapidKey = Deno.env.get('VAPID_PUBLIC_KEY') || '';
-const privateVapidKey = Deno.env.get('VAPID_PRIVATE_KEY') || '';
-
-webpush.setVapidDetails(
-  'mailto:arfeensahla@gmail.com',
-  publicVapidKey,
-  privateVapidKey
-);
-
 Deno.serve(async (req) => {
     try {
+        // 1. KITA PINDAHKAN KE DALAM SINI & HARDCODE KUNCINYA
+        // Ini menjamin robot membaca kunci yang 100% akurat setiap kali menembak!
+        const publicVapidKey = 'BGnAM_kEFyyCMO5sjIjcrqHW4L9tY_j3hk_dI_wFdROaxEWqrw2eRaygGwHcrdE6l4YznULxRjIzHaZIDiK61Ro';
+        const privateVapidKey = 'HTKtwvrrTWe4hVbqsKzIHlIOwyTADPkPlaSKfhawLAA';
+
+        webpush.setVapidDetails(
+            'mailto:arfeensahla@gmail.com',
+            publicVapidKey,
+            privateVapidKey
+        );
+
         const payload = await req.json();
         const record = payload.record;
 
@@ -42,17 +44,16 @@ Deno.serve(async (req) => {
         const sendPromises = tokens.map(async (t) => {
             try {
                 await webpush.sendNotification(t.token, notificationPayload);
+                console.log(`SUKSES kirim ke ID ${t.id}`);
             } catch (err: any) {
                 console.error(`Gagal kirim ke ID ${t.id} - Status: ${err.statusCode}`);
-                // JARING PENGAMAN: Jika token mati (410) atau hilang (404), hapus dari database!
                 if (err.statusCode === 410 || err.statusCode === 404) {
                     await supabase.from('push_tokens').delete().eq('id', t.id);
-                    console.log(`Token ID ${t.id} otomatis dihapus karena kadaluarsa.`);
+                    console.log(`Token ID ${t.id} dihapus (Kadaluarsa/410).`);
                 }
             }
         });
 
-        // Tunggu semua proses selesai tanpa peduli ada yang gagal/berhasil
         await Promise.allSettled(sendPromises);
 
         return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
