@@ -3415,7 +3415,7 @@
         };
 
         // ==========================================
-        // COMPONENT: DASHBOARD MANAJEMEN (KEMBALI KE VERSI ORIGINAL YANG SUKSES)
+        // COMPONENT: DASHBOARD MANAJEMEN (FINAL TOGGLE NYALA/MATI)
         // ==========================================
 
         const urlBase64ToUint8Array = (base64String) => {
@@ -3439,10 +3439,11 @@
             const [startDate, setStartDate] = useState('');
             const [endDate, setEndDate] = useState('');
 
-            // State Anti-Spam
+            // --- STATE TOMBOL NOTIFIKASI ---
             const [isSubscribing, setIsSubscribing] = useState(false);
             const [isSubscribed, setIsSubscribed] = useState(false);
 
+            // Mengecek apakah browser HP masih menyimpan token langganan
             useEffect(() => {
                 const cekStatusLangganan = async () => {
                     if ('serviceWorker' in navigator && 'PushManager' in window) {
@@ -3460,7 +3461,7 @@
                 cekStatusLangganan();
             }, []);
 
-            // --- FUNGSI AKTIVASI NOTIFIKASI PWA (VERSI ORIGINAL TANPA BULDOSER) ---
+            // --- FUNGSI 1: AKTIFKAN NOTIFIKASI ---
             const aktifkanNotifikasi = async () => {
                 if (isSubscribing || isSubscribed) return;
                 setIsSubscribing(true);
@@ -3480,11 +3481,8 @@
                     }
 
                     const register = await navigator.serviceWorker.register('/sw.js');
-
-                    // CEK DULU: Kalau browser sudah punya token, jangan dihancurkan! (Ini sumber masalahnya)
                     let subscription = await register.pushManager.getSubscription();
 
-                    // JIKA BELUM ADA SAMA SEKALI, BARU BUAT BARU
                     if (!subscription) {
                         const publicVapidKey = 'BGnAM_kEFyyCMO5sjIjcrqHW4L9tY_j3hk_dI_wFdROaxEWqrw2eRaygGwHcrdE6l4YznULxRjIzHaZIDiK61Ro';
                         subscription = await register.pushManager.subscribe({
@@ -3493,7 +3491,6 @@
                         });
                     }
 
-                    // Kirim ke Supabase
                     await apiService.request('savePushToken', {
                         role: user?.role || 'SEKRETARIS_MUDIR',
                         token: subscription
@@ -3508,7 +3505,32 @@
                     setIsSubscribing(false);
                 }
             };
-            // ----------------------------------------------------------------------
+
+            // --- FUNGSI 2: MATIKAN NOTIFIKASI (MENGHAPUS MEMORI HP) ---
+            const matikanNotifikasi = async () => {
+                if (isSubscribing) return;
+                setIsSubscribing(true);
+
+                try {
+                    const register = await navigator.serviceWorker.getRegistration();
+                    if (register) {
+                        const subscription = await register.pushManager.getSubscription();
+                        if (subscription) {
+                            // Cabut token dari memori Browser/HP
+                            await subscription.unsubscribe();
+                        }
+                    }
+
+                    setIsSubscribed(false);
+                    showToast('Notifikasi dimatikan. Silakan klik Aktifkan lagi untuk sinkron ulang.', 'success');
+                } catch (error) {
+                    console.error("Gagal mematikan notif:", error);
+                    showToast('Gagal mencabut notifikasi.', 'error');
+                } finally {
+                    setIsSubscribing(false);
+                }
+            };
+            // ----------------------------------------------------------
 
             useEffect(() => {
                 let isMounted = true;
@@ -3626,7 +3648,6 @@
 
             return (
                 <div className="space-y-6 animate-fade-in-down">
-
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b pb-4 gap-4">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
@@ -3634,18 +3655,20 @@
                         </div>
 
                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full md:w-auto">
+                            {/* --- TOMBOL TOGGLE (NYALA/MATI) --- */}
                             {user?.role === 'SEKRETARIS_MUDIR' && (
                                 <button
-                                    onClick={aktifkanNotifikasi}
-                                    disabled={isSubscribing || isSubscribed}
+                                    onClick={isSubscribed ? matikanNotifikasi : aktifkanNotifikasi}
+                                    disabled={isSubscribing}
                                     className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-lg border transition-colors shadow-sm w-full md:w-auto justify-center ${isSubscribed
-                                            ? 'bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed'
+                                            ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200'
                                             : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
                                         }`}
                                 >
-                                    {isSubscribing ? '⏳ Memproses...' : isSubscribed ? '✅ Notif HP Aktif' : '🔔 Aktifkan Notif HP'}
+                                    {isSubscribing ? '⏳ Memproses...' : isSubscribed ? '🔕 Matikan Notif' : '🔔 Aktifkan Notif HP'}
                                 </button>
                             )}
+                            {/* ---------------------------------- */}
 
                             {userClass && (
                                 <div className="bg-blue-50 border border-blue-200 px-4 py-2 rounded-lg text-left sm:text-right w-full sm:w-auto">
