@@ -179,6 +179,15 @@
                             if (eLog) throw eLog;
                             resultData = { success: true, data: dLog };
                             break;
+                        // --- TAMBAHAN UNTUK PUSH NOTIFIKASI ---
+                        case 'savePushToken':
+                            const { data: dToken, error: eToken } = await supabase
+                                .from('push_tokens')
+                                .insert([{ role: payload.role, token: payload.token }]);
+                            if (eToken) throw eToken;
+                            resultData = { success: true, data: dToken };
+                            break;
+                        // --------------------------------------
 
                         // 3. SIMPAN DATA UMUM
                         case 'saveData':
@@ -3453,8 +3462,12 @@
                         applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
                     });
 
-                    console.log("TOKEN HP BAPAK:", JSON.stringify(subscription));
-                    showToast('Mantap! Notifikasi HP berhasil diaktifkan.', 'success');
+                    // Mengirim token unik HP ke Supabase
+                    await apiService.request('savePushToken', {
+                        role: user?.role || 'SEKRETARIS_MUDIR',
+                        token: subscription
+                    });
+                    showToast('Mantap! HP Sekretaris sudah terdaftar di sistem.', 'success');
                 } catch (error) {
                     console.error("Gagal aktivasi notif:", error);
                     showToast('Gagal mengaktifkan notifikasi.', 'error');
