@@ -6,18 +6,27 @@ self.addEventListener('push', function (event) {
         const data = event.data.json();
 
         const options = {
-            body: data.body, // Isi pesan: "Ada 1 ajuan izin baru dari Ismail..."
-            icon: '/icon_spj.png', // Ganti dengan nama file logo pondok Bapak di folder public
-            badge: '/icon_spj.png', // Ikon kecil monokrom di status bar Android
-            vibrate: [200, 100, 200, 100, 200, 100, 200], // Pola getaran HP
+            body: data.body, // Isi pesan
+            icon: '/icon_spj.png', // Logo pondok
+            badge: '/icon_spj.png', // Ikon monokrom di status bar
+            vibrate: [200, 100, 200, 100, 200, 100, 200], // Pola getaran
             data: {
                 url: data.url || '/' // Link yang dibuka saat notif diklik
             }
         };
 
-        event.waitUntil(
-            self.registration.showNotification(data.title, options)
-        );
+        // Tampilkan notifikasi di atas layar
+        const showNotifPromise = self.registration.showNotification(data.title, options);
+
+        // Tambahkan angka/titik merah di Ikon Aplikasi PWA
+        let setBadgePromise = Promise.resolve();
+        if ('setAppBadge' in navigator) {
+            // Memasang angka 1 sebagai indikator ada notif baru
+            setBadgePromise = navigator.setAppBadge(1).catch(err => console.error('Gagal set badge:', err));
+        }
+
+        // Jalankan keduanya secara bersamaan
+        event.waitUntil(Promise.all([showNotifPromise, setBadgePromise]));
     }
 });
 
@@ -25,7 +34,7 @@ self.addEventListener('push', function (event) {
 self.addEventListener('notificationclick', function (event) {
     event.notification.close(); // Tutup notifnya
 
-    // Buka halaman aplikasi (misal: langsung ke tab screening)
+    // Buka halaman aplikasi
     event.waitUntil(
         clients.openWindow(event.notification.data.url)
     );

@@ -3446,6 +3446,11 @@
             // Mengecek apakah browser HP masih menyimpan token langganan
             useEffect(() => {
                 const cekStatusLangganan = async () => {
+                    // --- KODE TAMBAHAN UNTUK MENGHAPUS ANGKA ICON ---
+                    if ('clearAppBadge' in navigator) {
+                        navigator.clearAppBadge().catch(err => console.log('Gagal clear badge:', err));
+                    }
+                    // ------------------------------------------------
                     if ('serviceWorker' in navigator && 'PushManager' in window) {
                         try {
                             const register = await navigator.serviceWorker.getRegistration();
