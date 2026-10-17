@@ -4864,7 +4864,7 @@
         };
 
         // ==========================================
-        // COMPONENT: RESET PASSWORD PAGE (ADMIN)
+        // COMPONENT: RESET PASSWORD PAGE (ADMIN - SEARCHABLE & SORTED)
         // ==========================================
         const ResetPasswordPage = () => {
             const { showToast } = useContext(ToastContext);
@@ -4873,21 +4873,41 @@
             const [loading, setLoading] = useState(true);
             const [processing, setProcessing] = useState(false);
 
+            // --- STATE UNTUK FITUR PENCARIAN (SEARCHABLE) ---
+            const [searchQuery, setSearchQuery] = useState('');
+            const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+            const dropdownRef = React.useRef(null);
+
+            // Fungsi untuk menutup dropdown jika klik di luar area kotak
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                        setIsDropdownOpen(false);
+                    }
+                };
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+            }, []);
+
             const fetchUsers = async () => {
                 try {
-                    console.log("1. Meminta data users ke server...");
                     const res = await apiService.request('getUsers');
-                    console.log("2. Respon mentah dari Supabase:", res);
-
                     let finalUsers = [];
                     if (res && res.data && Array.isArray(res.data.data)) finalUsers = res.data.data;
                     else if (res && Array.isArray(res.data)) finalUsers = res.data;
                     else if (Array.isArray(res)) finalUsers = res;
 
-                    console.log("3. Data final yang masuk ke state:", finalUsers);
+                    // --- FITUR MENGURUTKAN BERDASARKAN ALFABET (A-Z) ---
+                    finalUsers.sort((a, b) => {
+                        const nameA = String(a.nama || '').toUpperCase();
+                        const nameB = String(b.nama || '').toUpperCase();
+                        if (nameA < nameB) return -1;
+                        if (nameA > nameB) return 1;
+                        return 0;
+                    });
+
                     setUsersList(finalUsers);
                 } catch (e) {
-                    console.error("Error getUsers:", e);
                     showToast(e.message, 'error');
                 } finally {
                     setLoading(false);
@@ -4896,9 +4916,23 @@
 
             useEffect(() => { fetchUsers(); }, []);
 
+            // --- FITUR FILTER PENCARIAN ---
+            const filteredUsers = usersList.filter(u =>
+                String(u.nama || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                String(u.username || '').toLowerCase().includes(searchQuery.toLowerCase())
+            );
+
+            // Eksekusi saat salah satu nama diklik dari dropdown
+            const handleSelectUser = (userObj) => {
+                setSelectedUser(userObj.username);
+                // Mengisi kotak input dengan nama yang dipilih agar terlihat rapi
+                setSearchQuery(`${userObj.nama} (${String(userObj.role).replace('_', ' ')})`);
+                setIsDropdownOpen(false); // Tutup dropdown
+            };
+
             const handleReset = async (e) => {
                 e.preventDefault();
-                if (!selectedUser) return showToast('Pilih pengguna terlebih dahulu!', 'error');
+                if (!selectedUser) return showToast('Pilih pengguna dari daftar terlebih dahulu!', 'error');
 
                 const targetUser = usersList.find(u => u.username === selectedUser);
                 if (!window.confirm(`Yakin ingin mereset password untuk akun ${targetUser.nama} (${targetUser.role}) menjadi: 123456 ?`)) return;
@@ -4910,7 +4944,10 @@
                         new_password: '123456'
                     });
                     showToast(`Password ${targetUser.nama} berhasil direset ke 123456`, 'success');
+
+                    // Bersihkan form setelah sukses
                     setSelectedUser('');
+                    setSearchQuery('');
                 } catch (e) {
                     showToast(e.message, 'error');
                 } finally {
@@ -4932,23 +4969,55 @@
                             <form onSubmit={handleReset} className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Pilih Akun Pengguna</label>
-                                    <select
-                                        className="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-emerald-500 outline-none"
-                                        value={selectedUser}
-                                        onChange={(e) => setSelectedUser(e.target.value)}
-                                        disabled={processing}
-                                        required
-                                    >
-                                        <option value="">-- Pilih Akun --</option>
-                                        {usersList.map((u, idx) => (
-                                            <option key={idx} value={u.username}>
-                                                {u.nama} ({String(u.role).replace('_', ' ')}) - Username: {u.username}
-                                            </option>
-                                        ))}
-                                    </select>
+
+                                    {/* KOTAK CUSTOM DROPDOWN */}
+                                    <div className="relative" ref={dropdownRef}>
+                                        <input
+                                            type="text"
+                                            className="w-full p-3 pr-10 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-emerald-500 outline-none cursor-text text-gray-800 font-medium"
+                                            placeholder="Ketik nama atau username untuk mencari..."
+                                            value={searchQuery}
+                                            onChange={(e) => {
+                                                setSearchQuery(e.target.value);
+                                                setSelectedUser(''); // Reset state ID jika user mengetik ulang
+                                                setIsDropdownOpen(true);
+                                            }}
+                                            onClick={() => setIsDropdownOpen(true)}
+                                            disabled={processing}
+                                        />
+
+                                        {/* Ikon Panah Kecil */}
+                                        <div className="absolute right-3 top-3.5 text-gray-400 pointer-events-none text-xs">
+                                            ▼
+                                        </div>
+
+                                        {/* DAFTAR POP-UP YANG MUNCUL SAAT DIKETIK/DIKLIK */}
+                                        {isDropdownOpen && (
+                                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto animate-fade-in-down">
+                                                {filteredUsers.length > 0 ? (
+                                                    filteredUsers.map((u, idx) => (
+                                                        <div
+                                                            key={idx}
+                                                            onClick={() => handleSelectUser(u)}
+                                                            className="p-3 hover:bg-emerald-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                                                        >
+                                                            <p className="font-bold text-gray-800">{u.nama}</p>
+                                                            <p className="text-xs text-emerald-600 font-medium mt-0.5">
+                                                                {String(u.role).replace('_', ' ')} <span className="text-gray-400 font-normal">| Username: {u.username}</span>
+                                                            </p>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="p-4 text-center text-gray-500 text-sm italic">
+                                                        Pengguna tidak ditemukan
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
-                                <Button fullWidth type="submit" variant="danger" disabled={processing || !selectedUser} icon={<Icons.Settings />}>
+                                <Button fullWidth type="submit" variant="danger" disabled={processing || !selectedUser} icon={<Icons.Settings />} className="mt-2 py-3">
                                     {processing ? 'Memproses...' : 'Reset Password ke 123456'}
                                 </Button>
                             </form>
