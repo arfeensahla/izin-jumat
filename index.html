@@ -309,6 +309,20 @@
                             resultData = { success: true, message: 'Password berhasil diubah.' };
                             break;
 
+                        // --- TAMBAHAN UNTUK FITUR RESET PASSWORD ---
+                        case 'getUsers':
+                            const { data: dUsers, error: eUsers } = await supabase.from('users').select('*');
+                            if (eUsers) throw eUsers;
+                            resultData = { success: true, data: dUsers };
+                            break;
+
+                        case 'resetPassword':
+                            const { error: eReset } = await supabase.from('users').update({ password: payload.new_password }).eq('username', payload.username);
+                            if (eReset) throw eReset;
+                            resultData = { success: true, message: 'Password berhasil direset.' };
+                            break;
+                        // -------------------------------------------
+
                         default:
                             throw new Error(`Perintah aksi '${action}' belum terdaftar di API Supabase.`);
                     }
@@ -545,7 +559,8 @@
                     { id: 'tahun_pelajaran', label: 'Tahun Pelajaran', icon: Icons.Calendar },
                     { id: 'kenaikan_kelas', label: 'Kenaikan Kelas', icon: Icons.TrendingUp },
                     { id: 'jadwal_perizinan', label: 'Jadwal Perizinan', icon: Icons.Clock },
-                    { id: 'perizinan', label: 'Semua Perizinan', icon: Icons.FileText }
+                    { id: 'perizinan', label: 'Semua Perizinan', icon: Icons.FileText },
+                    { id: 'reset_password', label: 'Reset Password', icon: Icons.Settings }
                 ],
                 [ROLES.WALI_KELAS]: [
                     { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
@@ -4848,6 +4863,95 @@
             );
         };
 
+        // ==========================================
+        // COMPONENT: RESET PASSWORD PAGE (ADMIN)
+        // ==========================================
+        const ResetPasswordPage = () => {
+            const { showToast } = useContext(ToastContext);
+            const [usersList, setUsersList] = useState([]);
+            const [selectedUser, setSelectedUser] = useState('');
+            const [loading, setLoading] = useState(true);
+            const [processing, setProcessing] = useState(false);
+
+            const fetchUsers = async () => {
+                try {
+                    const res = await apiService.request('getUsers');
+                    let finalUsers = [];
+                    if (res && res.data && Array.isArray(res.data.data)) finalUsers = res.data.data;
+                    else if (res && Array.isArray(res.data)) finalUsers = res.data;
+                    else if (Array.isArray(res)) finalUsers = res;
+                    setUsersList(finalUsers);
+                } catch (e) {
+                    showToast(e.message, 'error');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            useEffect(() => { fetchUsers(); }, []);
+
+            const handleReset = async (e) => {
+                e.preventDefault();
+                if (!selectedUser) return showToast('Pilih pengguna terlebih dahulu!', 'error');
+
+                const targetUser = usersList.find(u => u.username === selectedUser);
+                if (!window.confirm(`Yakin ingin mereset password untuk akun ${targetUser.nama} (${targetUser.role}) menjadi: 123456 ?`)) return;
+
+                setProcessing(true);
+                try {
+                    await apiService.request('resetPassword', {
+                        username: selectedUser,
+                        new_password: '123456'
+                    });
+                    showToast(`Password ${targetUser.nama} berhasil direset ke 123456`, 'success');
+                    setSelectedUser('');
+                } catch (e) {
+                    showToast(e.message, 'error');
+                } finally {
+                    setProcessing(false);
+                }
+            };
+
+            return (
+                <div className="space-y-6 animate-fade-in-down max-w-2xl">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">Reset Password Pengguna</h2>
+                        <p className="text-gray-500">Kembalikan kata sandi akun Wali Kelas, Sekretaris, atau Security ke default (123456).</p>
+                    </div>
+
+                    <Card>
+                        {loading ? (
+                            <div className="p-4 text-center text-gray-500">Memuat data pengguna...</div>
+                        ) : (
+                            <form onSubmit={handleReset} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Pilih Akun Pengguna</label>
+                                    <select
+                                        className="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-emerald-500 outline-none"
+                                        value={selectedUser}
+                                        onChange={(e) => setSelectedUser(e.target.value)}
+                                        disabled={processing}
+                                        required
+                                    >
+                                        <option value="">-- Pilih Akun --</option>
+                                        {usersList.map((u, idx) => (
+                                            <option key={idx} value={u.username}>
+                                                {u.nama} ({String(u.role).replace('_', ' ')}) - Username: {u.username}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <Button fullWidth type="submit" variant="danger" disabled={processing || !selectedUser} icon={<Icons.Settings />}>
+                                    {processing ? 'Memproses...' : 'Reset Password ke 123456'}
+                                </Button>
+                            </form>
+                        )}
+                    </Card>
+                </div>
+            );
+        };
+
         const MainRouter = ({ currentRoute, setCurrentRoute }) => {
             const { user } = useContext(AuthContext);
 
@@ -4865,6 +4969,7 @@
             if (currentRoute === 'kenaikan_kelas' && user.role === ROLES.ADMIN) return <KenaikanKelasPage />;
             if (currentRoute === 'jadwal_perizinan' && user.role === ROLES.ADMIN) return <JadwalPerizinanPage />;
             if (currentRoute === 'perizinan' && user.role === ROLES.ADMIN) return <SemuaPerizinanPage />;
+            if (currentRoute === 'reset_password' && user.role === ROLES.ADMIN) return <ResetPasswordPage />;
 
             // WALI KELAS MENU ROUTING
             if (currentRoute === 'pengajuan' && user.role === ROLES.WALI_KELAS) return <AjukanIzinPage setCurrentRoute={setCurrentRoute} />;
