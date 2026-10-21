@@ -189,19 +189,20 @@
                             break;
                         // --------------------------------------
 
-                        // 3. SIMPAN ATAU PERBARUI DATA UMUM (EDIT/TAMBAH)
+                        // 3. SIMPAN ATAU PERBARUI DATA UMUM
                         case 'saveData':
                             const tableMap = {
                                 'KELAS': 'kelas', 'SANTRI': 'santri', 'JADWAL': 'jadwal',
                                 'TAHUN_PELAJARAN': 'tahun_pelajaran', 'PERIZINAN': 'perizinan', 'SCAN_LOG': 'scan_log'
                             };
                             const tableName = tableMap[payload.sheetName];
-
-                            // PERBAIKAN: Ganti .insert() menjadi .upsert() agar bisa dipakai untuk Edit Data
                             const { error: eSave } = await supabase.from(tableName).upsert(payload.data);
-
                             if (eSave) throw eSave;
-                            resultData = { success: true, message: 'Data berhasil disimpan/diperbarui.' };
+
+                            // 👇 TAMBAHAN BARU: Hapus memori (cache) browser agar langsung ambil data terbaru
+                            sessionStorage.clear();
+
+                            resultData = { success: true, message: 'Data berhasil disimpan.' };
                             break;
 
                         // 4. HAPUS DATA UMUM
@@ -217,6 +218,10 @@
                             const tInfo = tMap[payload.sheetName];
                             const { error: eDel } = await supabase.from(tInfo.name).delete().eq(tInfo.pk, payload.rowId);
                             if (eDel) throw eDel;
+
+                            // 👇 TAMBAHAN BARU: Hapus memori (cache) browser agar tabel ikut terhapus di layar
+                            sessionStorage.clear();
+
                             resultData = { success: true, message: 'Data berhasil dihapus.' };
                             break;
 
