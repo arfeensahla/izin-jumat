@@ -150,7 +150,11 @@
 
                         // 2. PENARIKAN DATA MASTER (GET)
                         case 'getSantri':
-                            const { data: dSantri, error: eSantri } = await supabase.from('santri').select('*');
+                            const { data: dSantri, error: eSantri } = await supabase
+                                .from('santri')
+                                .select('*')
+                                .order('nama_santri', { ascending: true }); // Pastikan 'nama_santri' sesuai dengan nama kolom di Supabase Bapak
+
                             if (eSantri) throw eSantri;
                             resultData = { success: true, data: dSantri };
                             break;
