@@ -2132,6 +2132,11 @@
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 if (submitting) return;
+                const isSanksi = selectedSantri && String(selectedSantri.status_sanksi || '').toUpperCase() === 'DIKUNCI';
+                if (isSanksi) {
+                    showToast("PENGAJUAN DITOLAK: Santri ini sedang dalam masa sanksi indisipliner!", "error");
+                    return; // Menghentikan proses secara paksa
+                }
 
                 if (statusJadwal === 'Di Luar Jadwal' && !form.keterangan_luar_jadwal) return showToast("Keterangan Di Luar Jadwal wajib diisi!", "error");
                 if (form.hubungan_wali === 'Lainnya' && !form.hubungan_lainnya) return showToast("Detail hubungan Lainnya wajib diisi!", "error");
