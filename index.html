@@ -1123,6 +1123,7 @@
         // ==========================================
         const DataSantriPage = () => {
             const { showToast } = useContext(ToastContext);
+            const { user } = useContext(AuthContext);
             const [santri, setSantri] = useState([]);
             const [kelasOptions, setKelasOptions] = useState([]);
             const [isModalOpen, setIsModalOpen] = useState(false);
