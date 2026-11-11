@@ -335,6 +335,19 @@
                             break;
                         // -------------------------------------------
 
+                        // 10. KUNCI / BUKA IZIN (SANKSI SANTRI)
+                        case 'toggleSanksi':
+                            const { error: eSanksi } = await supabase
+                                .from('santri')
+                                .update({ status_sanksi: payload.status_sanksi })
+                                .eq('nis', payload.nis); // Patokan PK tabel santri
+                            if (eSanksi) throw eSanksi;
+
+                            sessionStorage.clear(); // Hapus cache agar layar langsung berubah
+                            resultData = { success: true, message: 'Status sanksi berhasil diperbarui.' };
+                            break;
+                        // -------------------------------------------
+
                         default:
                             throw new Error(`Perintah aksi '${action}' belum terdaftar di API Supabase.`);
                     }
@@ -1167,6 +1180,26 @@
                 } catch (e) { showToast(e.message, 'error'); }
             };
 
+            const handleToggleSanksi = async (nis, currentStatus, nama) => {
+                const newStatus = currentStatus === 'DIKUNCI' ? 'BEBAS' : 'DIKUNCI';
+                if (!window.confirm(`Yakin ingin ${newStatus === 'DIKUNCI' ? 'MENGUNCI' : 'MEMBEBASKAN'} izin untuk santri a.n. ${nama}?`)) return;
+
+                try {
+                    await apiService.request('toggleSanksi', { nis, status_sanksi: newStatus });
+                    showToast(`Status perizinan ${nama} berhasil diubah menjadi ${newStatus}!`, 'success');
+
+                    // Catat ke log sistem
+                    apiService.request('saveLog', {
+                        role: user?.role || 'ADMIN', nama: user?.nama || 'Admin', aksi: 'SANKSI_SANTRI',
+                        keterangan: `${newStatus === 'DIKUNCI' ? 'Mengunci' : 'Membuka kunci'} izin santri a.n ${nama}`
+                    }).catch(() => { });
+
+                    fetchData();
+                } catch (e) {
+                    showToast(e.message, 'error');
+                }
+            };
+
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 if (submitting) return; // Mencegah klik ganda
@@ -1289,6 +1322,9 @@
                                     <th className="p-4 cursor-pointer hover:bg-emerald-100 transition-colors select-none" onClick={() => handleSort('gender')}>
                                         Gender <SortIcon columnKey="gender" />
                                     </th>
+                                    <th className="p-4 cursor-pointer hover:bg-emerald-100 transition-colors select-none" onClick={() => handleSort('status_sanksi')}>
+                                        Status Izin <SortIcon columnKey="status_sanksi" />
+                                    </th>
                                     <th className="p-4">Aksi</th>
                                 </tr>
                             </thead>
@@ -1300,6 +1336,8 @@
                                             const renderNama = item.nama_santri || item.Nama || item.nama || item.nama_lengkap || '-';
                                             const renderKelas = item.kelas || item.Kelas || '-';
                                             const renderGender = String(item.gender || item.Gender || item.jk || '-');
+                                            const renderSanksi = String(item.status_sanksi || 'BEBAS').toUpperCase();
+                                            const isLocked = renderSanksi === 'DIKUNCI';
 
                                             return (
                                                 <tr key={idx} className="hover:bg-gray-50">
@@ -1310,6 +1348,21 @@
                                                         <span className={`px-2 py-1 rounded text-[10px] font-bold ${renderGender.toLowerCase().includes('laki') ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>
                                                             {renderGender.toUpperCase()}
                                                         </span>
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <span className={`px-2 py-1 rounded text-[10px] font-bold border ${isLocked ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                                                            {isLocked ? '🔒 DIKUNCI' : '✅ BEBAS'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 flex gap-2 items-center">
+                                                        {/* Tombol Kunci */}
+                                                        <button onClick={() => handleToggleSanksi(renderNis, renderSanksi, renderNama)} className={`px-3 py-1 rounded-md text-xs font-bold transition-colors ${isLocked ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'}`}>
+                                                            {isLocked ? 'Buka Kunci' : 'Kunci Izin'}
+                                                        </button>
+
+                                                        {/* Tombol Edit dan Hapus yang lama tetap ada di sini */}
+                                                        <button onClick={() => { setFormData(item); setIsModalOpen(true); }} className="text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-md text-xs font-bold transition-colors">Edit</button>
+                                                        <button onClick={() => handleDelete(renderNis)} className="text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md text-xs font-bold transition-colors">Hapus</button>
                                                     </td>
                                                     <td className="p-4">
                                                         <button onClick={() => { setFormData(item); setIsModalOpen(true); }} className="text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-md text-xs font-bold transition-colors mr-2">Edit</button>
@@ -1918,6 +1971,8 @@
                 return week > 4 ? '4' : week.toString();
             }, [nextFriday]);
 
+            const isSanksi = selectedSantri && String(selectedSantri.status_sanksi || '').toUpperCase() === 'DIKUNCI';
+
             const initialForm = { santri_id: '', keperluan: '', tujuan: '', wali_safar: '', hubungan_wali: '', hubungan_lainnya: '', ikut_jadwal_saudara: false, saudara_santri_id: '', keterangan_luar_jadwal: '' };
             const [form, setForm] = useState(initialForm);
 
@@ -2158,6 +2213,16 @@
                                 </div>
                             )}
                             {/* ----------------------------------------------------------- */}
+                            {/* --- BLOKIR JIKA DALAM MASA SANKSI --- */}
+                            {selectedSantri && String(selectedSantri.status_sanksi || '').toUpperCase() === 'DIKUNCI' && (
+                                <div className="mt-4 bg-red-100 border-2 border-red-500 rounded-lg p-4 flex items-center gap-3 animate-pulse">
+                                    <span className="text-2xl">🔒</span>
+                                    <div>
+                                        <h4 className="font-black text-red-900 text-sm tracking-wide">SANTRI DALAM MASA SANKSI</h4>
+                                        <p className="text-xs text-red-700 font-medium mt-1">Santri ini dikunci oleh Admin (Bimbingan Konseling) dan tidak diizinkan mengajukan keluar pondok hingga sanksi dicabut.</p>
+                                    </div>
+                                </div>
+                            )}
 
                         </Card>
 
@@ -2242,8 +2307,8 @@
                                 </div>
                             </Card>
                         )}
-                        <Button type="submit" disabled={!selectedSantri || submitting} fullWidth className="py-4 text-lg shadow-lg">
-                            {submitting ? 'Mengirim ke Server...' : 'Kirim Pengajuan Izin'}
+                        <Button type="submit" disabled={!selectedSantri || submitting || isSanksi} fullWidth className="py-4 text-lg shadow-lg">
+                            {submitting ? 'Mengirim ke Server...' : (isSanksi ? '🔒 Terhalang Sanksi' : 'Kirim Pengajuan Izin')}
                         </Button>
                     </form>
                 </div>
